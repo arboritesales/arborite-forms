@@ -233,7 +233,7 @@ window.addEventListener('load', function() {
   }
   buildAll();
   setTimeout(initAllSigs, 400);
-  if (SUPA_URL !== 'https://labskiotmfvdgcfbhbbl.supabase.co') fetchJobList();
+  if (SUPA_URL !== 'YOUR_SUPABASE_URL') fetchJobList();
 });
 
 // ── BUILD CONTENT ──
@@ -450,7 +450,7 @@ function showLoadModal() {
   document.getElementById('loadSearch').value = '';
   document.getElementById('loadModal').className = 'modal-bg show';
   renderJobList(allJobs);
-  if (SUPA_URL !== 'https://labskiotmfvdgcfbhbbl.supabase.co') fetchJobList();
+  if (SUPA_URL !== 'YOUR_SUPABASE_URL') fetchJobList();
 }
 
 function filterJobList(q) {
@@ -497,7 +497,7 @@ function fetchJobList() {
 }
 
 function loadJobByRef(ref) {
-  if (SUPA_URL === 'https://labskiotmfvdgcfbhbbl.supabase.co') { setStatus('Configure Supabase first', 'err'); return; }
+  if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Configure Supabase first', 'err'); return; }
   setStatus('Loading...', '');
   supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&limit=1')
     .then(function(r) { return r.json(); })
@@ -514,7 +514,7 @@ function loadJobByRef(ref) {
 
 function saveJob() {
   if (!currentJobRef) { setStatus('Create or load a job first', 'err'); return; }
-  if (SUPA_URL === 'https://labskiotmfvdgcfbhbbl.supabase.co') {
+  if (SUPA_URL === 'YOUR_SUPABASE_URL') {
     setStatus('Supabase not configured — see setup guide', 'err');
     alert('To enable saving, open the HTML file in Notepad and replace YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY with your Supabase project values, then re-upload to GitHub.');
     return;
@@ -528,7 +528,10 @@ function saveJob() {
         setStatus('Saved ' + new Date().toLocaleTimeString(), 'ok');
         fetchJobList();
       } else {
-        return r.text().then(function(t) { throw new Error(r.status + ' ' + t); });
+        return r.text().then(function(t) {
+          console.error('Supabase save error:', r.status, t);
+          throw new Error(r.status + ': ' + t.substring(0, 200));
+        });
       }
     })
     .catch(function(e) { setStatus('Save failed: ' + e.message, 'err'); })
@@ -592,7 +595,7 @@ function restoreSig(id, dataUrl) {
 // ── SUPABASE ──
 function supaFetch(method, path, body) {
   var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
-  if (method === 'POST') h['Prefer'] = 'return=minimal,resolution=merge-duplicates';
+  if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
   var opts = {method: method, headers: h};
   if (body) opts.body = JSON.stringify(body);
   return fetch(SUPA_URL + '/rest/v1/' + path, opts);
