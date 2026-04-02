@@ -98,7 +98,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
 
 <script>
 var SUPA_URL = 'https://labskiotmfvdgcfbhbbl.supabase.co';
-var currentQuoteRef = '';
+
 var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhYnNraW90bWZ2ZGdjZmJoYmJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNDQ4MjQsImV4cCI6MjA5MDYyMDgyNH0._TV9AxkwUTY_Ea4S7qUHoCRJ88NSRvPA3KUD4WiDroI';
 var TABLE    = 'job_forms';
 var PANELS   = ['powa','signoff','method','daily'];
@@ -408,19 +408,19 @@ function onQuoteRefInput(val) {
 }
 
 function setJobRef(ref) {
-  currentQuoteRef = ref;
+  currentJobRef = ref;
   var fields = ['p_quote','so_quote','ms_jobno','dr_quote'];
   for (var i = 0; i < fields.length; i++) {
     var el = document.getElementById(fields[i]);
     if (el) el.value = ref;
   }
-  var canSave = ref && ref.length > 0 && SUPA_URL !== 'https://labskiotmfvdgcfbhbbl.supabase.co';
+  var canSave = ref && ref.length > 0;
   document.getElementById('btnSave').disabled = !canSave;
   // Update job bar
   var barEl = document.getElementById('barRef');
   if (barEl) barEl.innerHTML = ref ? '<span style="color:var(--lime);">' + ref + '</span>' : 'No job loaded';
   // Enable/disable save
-  var canSave = ref.length > 0 && SUPA_URL !== 'https://labskiotmfvdgcfbhbbl.supabase.co';
+  var canSave = ref.length > 0;
   var btnSave = document.getElementById('btnSave');
   if (btnSave) btnSave.disabled = !canSave;
 }
@@ -514,7 +514,11 @@ function loadJobByRef(ref) {
 
 function saveJob() {
   if (!currentJobRef) { setStatus('Create or load a job first', 'err'); return; }
-  if (SUPA_URL === 'https://labskiotmfvdgcfbhbbl.supabase.co') { setStatus('Configure Supabase URL and key first', 'err'); return; }
+  if (SUPA_URL === 'https://labskiotmfvdgcfbhbbl.supabase.co') {
+    setStatus('Supabase not configured — see setup guide', 'err');
+    alert('To enable saving, open the HTML file in Notepad and replace YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY with your Supabase project values, then re-upload to GitHub.');
+    return;
+  }
   setStatus('Saving...', '');
   document.getElementById('btnSave').disabled = true;
   var payload = {quote_ref: currentJobRef, form_data: collectFormData(), updated_at: new Date().toISOString()};
