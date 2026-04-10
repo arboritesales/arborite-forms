@@ -502,19 +502,31 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
   <div class="sec-head">Audit Details</div>
   <div class="field-grid">
     <div class="field-row c2">
-      <div class="fc lbl">Auditor Name</div><div class="fc"><input type="text" id="aud_auditor"></div>
+      <div class="fc lbl">Auditor Name</div><div class="fc"><select id="aud_auditor" style="width:100%;border:none;background:transparent;font-family:'Barlow',sans-serif;font-size:13px;color:var(--dark);outline:none;padding:2px 0;cursor:pointer;">
+      <option value="">-- Select auditor --</option>
+      <option value="Brook Taylor-Ware">Brook Taylor-Ware</option>
+      <option value="Joel Cripps">Joel Cripps</option>
+      <option value="Jon Challinor">Jon Challinor</option>
+      </select></div>
       <div class="fc lbl">Audit Date</div><div class="fc"><input type="date" id="aud_date"></div>
     </div>
     <div class="field-row c2">
-      <div class="fc lbl">Job Ref / Site Address</div><div class="fc"><input type="text" id="aud_site"></div>
+      <div class="fc lbl">Audit Time</div><div class="fc"><input type="text" id="aud_time" placeholder="e.g. 09:30"></div>
       <div class="fc lbl">Announced Audit?</div>
       <div class="fc">
         <label class="opt"><input type="radio" name="aud_announced" value="Yes"> Yes</label>
         <label class="opt" style="margin-left:12px;"><input type="radio" name="aud_announced" value="No"> No</label>
       </div>
     </div>
-    <div class="field-row lw"><div class="fc lbl">Operators on Site</div><div class="fc"><input type="text" id="aud_operators"></div></div>
-    <div class="field-row lw"><div class="fc lbl">Type of Task / Operation</div><div class="fc"><input type="text" id="aud_task_type"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Job Ref / Site Address</div><div class="fc"><input type="text" id="aud_site"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Operators on Site</div>
+      <div class="fc" style="flex-direction:column;align-items:flex-start;gap:4px;padding:6px 12px;">
+        <div id="aud_ops_checks" class="multi-check" style="flex-wrap:wrap;gap:4px 14px;"></div>
+      </div></div>
+    <div class="field-row lw"><div class="fc lbl">Type of Task / Operation</div>
+      <div class="fc" style="flex-direction:column;align-items:flex-start;gap:4px;padding:6px 12px;">
+        <div id="aud_task_checks" class="multi-check" style="flex-wrap:wrap;gap:4px 14px;"><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_0" value="Aerial tree work - pruning" style="width:15px;height:15px;accent-color:var(--green);"> Aerial tree work — pruning</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_1" value="Aerial tree work - felling" style="width:15px;height:15px;accent-color:var(--green);"> Aerial tree work — felling</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_2" value="Climbing works" style="width:15px;height:15px;accent-color:var(--green);"> Climbing works</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_3" value="MEWP works" style="width:15px;height:15px;accent-color:var(--green);"> MEWP works</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_4" value="Ground base works" style="width:15px;height:15px;accent-color:var(--green);"> Ground base works</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_5" value="Site clearance" style="width:15px;height:15px;accent-color:var(--green);"> Site clearance</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_6" value="Grass cutting and mulching / LV800 works" style="width:15px;height:15px;accent-color:var(--green);"> Grass cutting and mulching / LV800 works</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_7" value="Stump grinding" style="width:15px;height:15px;accent-color:var(--green);"> Stump grinding</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_8" value="Tree protection fencing" style="width:15px;height:15px;accent-color:var(--green);"> Tree protection fencing</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_9" value="Utility vegetation management" style="width:15px;height:15px;accent-color:var(--green);"> Utility vegetation management</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;"><input type="checkbox" id="aud_task_10" value="Other" style="width:15px;height:15px;accent-color:var(--green);"> Other</label></div>
+      </div></div>
   </div>
   <div class="sec-head">Documentation</div>
 <div class="field-grid">
@@ -580,12 +592,209 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
   </div>
   <input type="hidden" id="aud_overall">
   <div class="sec-head">Comments &amp; Actions Required</div>
-  <div class="field-grid">
-    <div class="field-row lw">
-      <div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Observations &amp; Actions</div>
-      <div class="fc"><textarea id="aud_comments" style="min-height:120px;" placeholder="Record observations, actions required, and any follow-up needed..."></textarea></div>
+  <div class="notice">For each section where a rating of <strong>Fair</strong>, <strong>Poor</strong>, or <strong>N/A</strong> was given, select the relevant item and enter your comments and required actions below.</div>
+
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="background:var(--row-alt);padding:8px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleCommentSec('documentation')">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);flex:1;">Documentation</span>
+      <span id="caret_documentation" style="color:var(--green);font-size:14px;">&#9660;</span>
+    </div>
+    <div id="csec_documentation" style="padding:12px 16px;display:none;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Site specific risk assessment / method statement in place</div>
+        <textarea id="cmnt_aud_ssra" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">All staff signed onto these documents</div>
+        <textarea id="cmnt_aud_signed" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
     </div>
   </div>
+
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="background:var(--row-alt);padding:8px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleCommentSec('site_setup')">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);flex:1;">Site Setup</span>
+      <span id="caret_site_setup" style="color:var(--green);font-size:14px;">&#9660;</span>
+    </div>
+    <div id="csec_site_setup" style="padding:12px 16px;display:none;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Site Organisation</div>
+        <textarea id="cmnt_aud_org" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Fuelling point and fuel storage</div>
+        <textarea id="cmnt_aud_fuel" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Site set up and layout</div>
+        <textarea id="cmnt_aud_layout" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Correct Cordoning — pedestrian and traffic control</div>
+        <textarea id="cmnt_aud_cording" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Positioning of vehicles and machinery</div>
+        <textarea id="cmnt_aud_vehicles" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="background:var(--row-alt);padding:8px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleCommentSec('ppe__personnel')">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);flex:1;">PPE & Personnel</span>
+      <span id="caret_ppe__personnel" style="color:var(--green);font-size:14px;">&#9660;</span>
+    </div>
+    <div id="csec_ppe__personnel" style="padding:12px 16px;display:none;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">PPE — available and correctly used</div>
+        <textarea id="cmnt_aud_ppe" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Employees suitably qualified for tasks</div>
+        <textarea id="cmnt_aud_qualified" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Staff understand work specification / order</div>
+        <textarea id="cmnt_aud_understand" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Staff courteous, polite and smart in appearance</div>
+        <textarea id="cmnt_aud_staff_appear" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="background:var(--row-alt);padding:8px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleCommentSec('operations')">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);flex:1;">Operations</span>
+      <span id="caret_operations" style="color:var(--green);font-size:14px;">&#9660;</span>
+    </div>
+    <div id="csec_operations" style="padding:12px 16px;display:none;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Task organisation</div>
+        <textarea id="cmnt_aud_task_org" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Manual handling operations</div>
+        <textarea id="cmnt_aud_manual" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Climbing operations</div>
+        <textarea id="cmnt_aud_climbing" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Rigging operations</div>
+        <textarea id="cmnt_aud_rigging" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">MEWP use</div>
+        <textarea id="cmnt_aud_mewp" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Aerial Rescue Provision</div>
+        <textarea id="cmnt_aud_rescue" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Communication</div>
+        <textarea id="cmnt_aud_comms" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="background:var(--row-alt);padding:8px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleCommentSec('safety__emergency')">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);flex:1;">Safety & Emergency</span>
+      <span id="caret_safety__emergency" style="color:var(--green);font-size:14px;">&#9660;</span>
+    </div>
+    <div id="csec_safety__emergency" style="padding:12px 16px;display:none;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Emergency kit in the vans</div>
+        <textarea id="cmnt_aud_emergency" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Site issues / hazards adequately addressed</div>
+        <textarea id="cmnt_aud_hazards" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="background:var(--row-alt);padding:8px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleCommentSec('equipment__vehicles')">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);flex:1;">Equipment & Vehicles</span>
+      <span id="caret_equipment__vehicles" style="color:var(--green);font-size:14px;">&#9660;</span>
+    </div>
+    <div id="csec_equipment__vehicles" style="padding:12px 16px;display:none;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Machinery compliance</div>
+        <textarea id="cmnt_aud_machinery" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Vehicles standard</div>
+        <textarea id="cmnt_aud_veh_std" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Vehicles loaded and secured correctly</div>
+        <textarea id="cmnt_aud_veh_load" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="background:var(--row-alt);padding:8px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleCommentSec('work_quality')">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);flex:1;">Work Quality</span>
+      <span id="caret_work_quality" style="color:var(--green);font-size:14px;">&#9660;</span>
+    </div>
+    <div id="csec_work_quality" style="padding:12px 16px;display:none;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Works reflect specification / work order</div>
+        <textarea id="cmnt_aud_spec" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Works accord with BS3998</div>
+        <textarea id="cmnt_aud_bs3998" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">All cuts to target — suitable growth point</div>
+        <textarea id="cmnt_aud_cuts" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Crown clean — no nicks or overcuts</div>
+        <textarea id="cmnt_aud_crown" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Pruned trees appear natural shape</div>
+        <textarea id="cmnt_aud_shape" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Felling / stump / grinding specification</div>
+        <textarea id="cmnt_aud_felling" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Site left clean, tidy and safe</div>
+        <textarea id="cmnt_aud_clean" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="background:var(--row-alt);padding:8px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleCommentSec('client')">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);flex:1;">Client</span>
+      <span id="caret_client" style="color:var(--green);font-size:14px;">&#9660;</span>
+    </div>
+    <div id="csec_client" style="padding:12px 16px;display:none;">
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--mid);margin-bottom:4px;">Client happy and satisfied</div>
+        <textarea id="cmnt_aud_client" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:54px;outline:none;resize:vertical;" placeholder="Comments / actions required..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
+    <div class="sig-lbl">General Observations</div>
+    <textarea id="aud_comments" style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-family:'Barlow',sans-serif;font-size:12px;min-height:80px;outline:none;resize:vertical;" placeholder="Any additional observations not covered above..."></textarea>
+  </div>
+
   <div class="sec-head">Auditor Sign Off</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 140px;border-bottom:1px solid var(--border);">
     <div style="padding:14px 16px;border-right:1px solid var(--border);">
@@ -774,9 +983,22 @@ function buildAll() {
   buildCompTable();
   buildEquipTable();
   buildAiderChecks();
+  buildAudOpsChecks();
   buildOpSigs('opSigsPowa', 5, 'po');
   buildOpSigs('opSigsMethod', 8, 'ms');
   buildDailyRows(12);
+}
+
+function buildAudOpsChecks() {
+  var wrap = document.getElementById('aud_ops_checks');
+  if (!wrap) return;
+  var list = allStaff(), h = '';
+  for (var i = 0; i < list.length; i++) {
+    h += '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;padding:2px 0;">'
+      + '<input type="checkbox" id="aud_op_' + i + '" value="' + list[i] + '" style="width:15px;height:15px;accent-color:var(--green);">'
+      + ' ' + list[i] + '</label>';
+  }
+  wrap.innerHTML = h;
 }
 
 function buildCompTable() {
@@ -1192,6 +1414,15 @@ function restoreSig(id, dataUrl) {
 }
 
 // ── AUDIT OVERALL ──
+function toggleCommentSec(id) {
+  var el = document.getElementById('csec_' + id);
+  var caret = document.getElementById('caret_' + id);
+  if (!el) return;
+  var open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (caret) caret.innerHTML = open ? '&#9660;' : '&#9650;';
+}
+
 function setOverall(val) {
   document.getElementById('aud_overall').value = val;
   var keys = ['excellent','satisfactory','unsatisfactory'];
