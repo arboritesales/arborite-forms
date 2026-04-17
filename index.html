@@ -217,15 +217,22 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
         <div class="dash-tile-name">Documents</div>
         <div class="dash-tile-sub">Upload &amp; view files</div>
       </div>
-      <div class="dash-tile" onclick="openForm('audit')">
-        <div class="dash-tile-icon">&#9745;</div>
-        <div class="dash-tile-name">Audit</div>
-        <div class="dash-tile-sub">Site audit form</div>
-      </div>
       <div class="dash-tile emergency-tile" onclick="openForm('emergency')">
         <div class="dash-tile-icon">&#9888;</div>
         <div class="dash-tile-name">Emergency Procedure</div>
         <div class="dash-tile-sub">ATS emergency response</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFICE SECTION -->
+  <div class="dash-section" style="padding:0 20px 20px;">
+    <div class="dash-section-title">Office</div>
+    <div class="dash-tiles">
+      <div class="dash-tile" onclick="openOffice()">
+        <div class="dash-tile-icon">&#127970;</div>
+        <div class="dash-tile-name">Office</div>
+        <div class="dash-tile-sub">Audit &amp; Safety Checker</div>
       </div>
     </div>
   </div>
@@ -330,7 +337,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
     <div class="field-row lm"><div class="fc lbl">Designated Aerial Rescuer</div>
       <div class="fc"><select id="p_rescuer" class="staff-sel" onchange="handleStaffSel(this)"><option value="">-- Select aerial rescuer --</option><option value="Joe Grace">Joe Grace</option><option value="Liam Cooper">Liam Cooper</option><option value="Jason Hiscock">Jason Hiscock</option><option value="Jack Fisher">Jack Fisher</option><option value="Luke Richardson">Luke Richardson</option><option value="James Hilborn">James Hilborn</option><option value="Dave Norris">Dave Norris</option><option value="Haiden Rodbard-Brown">Haiden Rodbard-Brown</option><option value="Jon Challinor">Jon Challinor</option><option value="Joel Cripps">Joel Cripps</option><option value="Brook Taylor-Ware">Brook Taylor-Ware</option><option value="__new__">+ Add new name...</option></select></div></div>
     <div class="field-row lm"><div class="fc lbl">Site Supervisor</div>
-      <div class="fc"><select id="p_supervisor" class="staff-sel" onchange="handleStaffSel(this);syncShared()" style="width:100%;"></select></div></div>
+      <div class="fc"><select id="p_supervisor" class="staff-sel" onchange="handleStaffSel(this);syncShared()" onfocus="if(!this.options.length||this.options.length<2)this.innerHTML=makeStaffOpts('Select site supervisor')" style="width:100%;"></select></div></div>
   </div>
   <div class="sec-head">Communication</div>
   <div class="field-grid"><div class="field-row"><div class="fc" style="flex-direction:column;align-items:flex-start;gap:6px;padding:8px 12px;">
@@ -431,7 +438,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
   <div class="sec-head">Job Details</div>
   <div class="field-grid">
     <div class="field-row lw"><div class="fc lbl">Client Name</div>
-      <div class="fc"><input type="text" id="so_client" class="shared-ro"></div></div>
+      <div class="fc"><input type="text" id="so_client" class="shared-ro" oninput="var p=document.getElementById('p_client');if(p)p.value=this.value;syncShared()"></div></div>
     <div class="field-row c2"><div class="fc lbl">Quote Ref</div>
       <div class="fc"><input type="text" id="so_quote" class="shared-ro"></div>
       <div class="fc lbl">Site Location</div>
@@ -484,7 +491,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
     <div class="field-row lw"><div class="fc lbl">Project Scope</div>
       <div class="fc"><input type="text" id="ms_scope"></div></div>
     <div class="field-row lw"><div class="fc lbl">Client</div>
-      <div class="fc"><input type="text" id="ms_client" class="shared-ro"></div></div>
+      <div class="fc"><input type="text" id="ms_client" class="shared-ro" oninput="var p=document.getElementById('p_client');if(p)p.value=this.value;syncShared()"></div></div>
   </div>
   <div class="contractor-block"><strong>Contractor</strong>Arborite Tree Services Limited &nbsp;|&nbsp; 12-20 Oxford House, Oxford Street, NEWBURY, Berkshire, RG14 1JB</div>
   <div class="field-grid">
@@ -501,7 +508,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
       <div class="fc lbl">Contact Number</div>
       <div class="fc" style="font-size:12px;font-weight:600;padding:4px 8px;color:var(--green);word-break:break-word;flex-wrap:wrap;">07507787153 / 07919051021</div></div>
     <div class="field-row c4"><div class="fc lbl">Site Supervisor</div>
-      <div class="fc"><select id="ms_supervisor" class="staff-sel" onchange="handleStaffSel(this);if(this.value!='__new__')syncShared()" style="width:100%;"></select></div>
+      <div class="fc"><select id="ms_supervisor" class="staff-sel" onchange="handleStaffSel(this);if(this.value!='__new__')syncShared()" onfocus="if(!this.options.length||this.options.length<2)this.innerHTML=makeStaffOpts('Select site supervisor')" style="width:100%;"></select></div>
       <div class="fc lbl">Contact Number</div>
       <div class="fc"><input type="text" id="ms_super_tel"></div></div>
   </div>
@@ -1351,7 +1358,7 @@ function checkPass() {
 var SUPA_URL = 'https://labskiotmfvdgcfbhbbl.supabase.co';
 var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhYnNraW90bWZ2ZGdjZmJoYmJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNDQ4MjQsImV4cCI6MjA5MDYyMDgyNH0._TV9AxkwUTY_Ea4S7qUHoCRJ88NSRvPA3KUD4WiDroI';
 var TABLE    = 'job_forms';
-var PANELS   = ['powa','signoff','method','daily','documents','emergency','audit'];
+var PANELS   = ['powa','signoff','method','daily','documents','emergency','audit','safety'];
 var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads, drCount, docStore;
 
 function init() {
@@ -1690,6 +1697,8 @@ function setJobRef(ref) {
   if (appBtn) appBtn.disabled = !(ref && ref.length > 0);
   var appRef = document.getElementById('appBarRef');
   if (appRef) appRef.textContent = ref || 'No job loaded';
+  var offRef = document.getElementById('officeJobRef');
+  if (offRef) offRef.textContent = ref || 'No job loaded';
 }
 
 function onQuoteRefInput(val) {
@@ -2190,8 +2199,10 @@ function saveToGoogleDrive(panelId) {
 function showDashboard() {
   var dash = document.getElementById('dashboard');
   var app  = document.getElementById('appView');
+  var off  = document.getElementById('officeView');
   if (dash) dash.style.display = 'block';
   if (app)  app.style.display  = 'none';
+  if (off)  off.style.display  = 'none';
   var ref = currentJobRef || 'No job loaded';
   var el = document.getElementById('dash-job-ref-display');
   if (el) el.textContent = ref;
@@ -2203,12 +2214,21 @@ function showDashboard() {
 }
 
 function backToDashboard() {
-  showDashboard();
+  if (openedFromOffice) {
+    openedFromOffice = false;
+    document.getElementById('appView').style.display = 'none';
+    openOffice();
+  } else {
+    document.getElementById('officeView').style.display = 'none';
+    showDashboard();
+  }
 }
 
 var currentPanelId = 'signoff';
+var openedFromOffice = false;
 
 function openForm(panelId) {
+  if (!openedFromOffice) openedFromOffice = false;
   if (panelId === 'audit' && !auditUnlocked) {
     var p = prompt('Enter audit password:');
     if (p !== AUDIT_PASS) { alert('Incorrect audit password.'); return; }
@@ -2231,7 +2251,8 @@ function openForm(panelId) {
     powa:'POWA',
     audit:'Audit',
     documents:'Documents',
-    emergency:'Emergency Procedure'
+    emergency:'Emergency Procedure',
+    safety:'Safety Checks'
   };
   var titleEl = document.getElementById('appViewTitle');
   if (titleEl) titleEl.textContent = titles[panelId] || panelId;
@@ -2243,10 +2264,15 @@ function openForm(panelId) {
   var dashLogo = document.querySelector('.dash-header-logo img');
   var appLogo = document.getElementById('appHeaderLogo');
   if (dashLogo && appLogo) appLogo.src = dashLogo.src;
-  // Init signatures for this panel
+  // Update back button label
+  var backBtn = document.querySelector('#appViewHeader button[onclick="backToDashboard()"]');
+  if (backBtn) backBtn.textContent = openedFromOffice ? '\u2190 Office' : '\u2190 Dashboard';
+  // Init staff selects, signatures and auto-save for this panel
   setTimeout(function() {
+    initAllStaffSelects();
     var cs = document.querySelectorAll('#' + panelId + ' .sig-wrap canvas');
     for (var ci = 0; ci < cs.length; ci++) initSig(cs[ci].id);
+    attachAutoSave(panelId);
   }, 80);
   if (panelId === 'documents') setTimeout(renderAllDocLists, 100);
 }
@@ -2259,10 +2285,24 @@ function printCurrentForm() {
 var docStore = {};
 var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_survey','additional'];
 
+var MAX_DOCS_PER_CAT = 3;
+
 function handleDocUpload(input, categoryId) {
   var files = Array.from(input.files);
   if (!files.length) return;
   if (!docStore[categoryId]) docStore[categoryId] = [];
+  var existing = docStore[categoryId].length;
+  if (existing >= MAX_DOCS_PER_CAT) {
+    alert('Maximum ' + MAX_DOCS_PER_CAT + ' documents per category. Please remove one first.');
+    input.value = '';
+    return;
+  }
+  // Only take as many as allowed
+  var canAdd = MAX_DOCS_PER_CAT - existing;
+  files = files.slice(0, canAdd);
+  if (files.length < Array.from(input.files).length) {
+    alert('Only ' + canAdd + ' more document(s) can be added to this category (max ' + MAX_DOCS_PER_CAT + ').');
+  }
   var remaining = files.length;
   files.forEach(function(file) {
     var reader = new FileReader();
@@ -2299,27 +2339,32 @@ function viewDoc(categoryId, idx) {
   var doc = (docStore[categoryId] || [])[idx];
   if (!doc) return;
   var isImg = doc.type && doc.type.startsWith('image/');
-  if (isImg) {
-    var w = window.open('', '_blank');
-    w.document.write('<html><body style="margin:0;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh;"><img src="' + doc.data + '" style="max-width:100%;max-height:100vh;"></body></html>');
-  } else {
-    // PDF and others - use blob URL
-    try {
-      var byteString = atob(doc.data.split(',')[1]);
-      var ab = new ArrayBuffer(byteString.length);
-      var ia = new Uint8Array(ab);
-      for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      var blob = new Blob([ab], {type: doc.type || 'application/octet-stream'});
-      var url = URL.createObjectURL(blob);
+  var isPdf = doc.type === 'application/pdf';
+  try {
+    var byteString = atob(doc.data.split(',')[1]);
+    var ab = new ArrayBuffer(byteString.length);
+    var ia = new Uint8Array(ab);
+    for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    var blob = new Blob([ab], {type: doc.type || 'application/octet-stream'});
+    var url = URL.createObjectURL(blob);
+    if (isImg || isPdf) {
+      // Open inline in new tab - user can press back
+      window.open(url, '_blank');
+    } else {
+      // Word docs - trigger download
       var a = document.createElement('a');
       a.href = url;
-      a.target = '_blank';
+      a.download = doc.name;
       a.click();
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
-    } catch(e) {
-      // Fallback: open data URL directly
-      var w = window.open('', '_blank');
-      w.document.write('<iframe src="' + doc.data + '" style="width:100%;height:100%;border:none;"></iframe>');
+    }
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+  } catch(e) {
+    // Fallback for data URL
+    var w = window.open('', '_blank');
+    if (isImg) {
+      w.document.write('<html><body style="margin:0;background:#111;display:flex;justify-content:center;"><img src="' + doc.data + '" style="max-width:100%;"></body></html>');
+    } else {
+      w.document.write('<iframe src="' + doc.data + '" style="width:100%;height:100vh;border:none;"></iframe>');
     }
   }
 }
@@ -2338,6 +2383,60 @@ function dashPrintAll() {
   window.print();
 }
 
+// ── OFFICE SUB-DASHBOARD ──
+function openOffice() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('appView').style.display = 'none';
+  document.getElementById('officeView').style.display = 'block';
+  var ref = document.getElementById('officeJobRef');
+  if (ref) ref.textContent = currentJobRef || 'No job loaded';
+}
+
+function backFromOffice() {
+  document.getElementById('officeView').style.display = 'none';
+  showDashboard();
+}
+
+function openFormFromOffice(panelId) {
+  openedFromOffice = true;
+  document.getElementById('officeView').style.display = 'none';
+  openForm(panelId);
+}
+
+// ── AUTO-SAVE ──
+var autoSaveTimer = null;
+var AUTO_SAVE_PANELS = ['signoff', 'method', 'daily', 'powa', 'safety'];
+
+function scheduleAutoSave(panelId) {
+  if (!currentJobRef) return;
+  if (AUTO_SAVE_PANELS.indexOf(panelId) === -1) return;
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(function() {
+    autoSaveTimer = null;
+    saveJob();
+  }, 2000);
+}
+
+function attachAutoSave(panelId) {
+  var panel = document.getElementById(panelId);
+  if (!panel) return;
+  var inputs = panel.querySelectorAll('input[type="text"], input[type="date"], textarea, select');
+  for (var i = 0; i < inputs.length; i++) {
+    (function(el) {
+      el.addEventListener('change', function() { scheduleAutoSave(panelId); });
+      el.addEventListener('input', function() { scheduleAutoSave(panelId); });
+    })(inputs[i]);
+  }
+  // Canvas changes (signatures)
+  var canvases = panel.querySelectorAll('canvas');
+  for (var ci = 0; ci < canvases.length; ci++) {
+    (function(canvas) {
+      canvas.addEventListener('mouseup', function() { scheduleAutoSave(panelId); });
+      canvas.addEventListener('touchend', function() { scheduleAutoSave(panelId); });
+    })(canvases[ci]);
+  }
+}
+
 </script>
 
 <!-- ═══ DOCUMENTS ═══ -->
@@ -2347,42 +2446,42 @@ function dashPrintAll() {
   <div class="sec-head">Method Statement</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
     <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_method_statement').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_method_statement" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv" style="display:none;" onchange="handleDocUpload(this,'method_statement')">
+      <button onclick="document.getElementById('doc_input_method_statement').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_method_statement" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'method_statement')">
     </div>
     <div id="doc_list_method_statement" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
   </div>
-  <div class="sec-head">Risk Assessment</div>
+  <div class="sec-head">Common Factor Risk Assessment</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
     <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_risk_assessment').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_risk_assessment" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv" style="display:none;" onchange="handleDocUpload(this,'risk_assessment')">
+      <button onclick="document.getElementById('doc_input_risk_assessment').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_risk_assessment" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'risk_assessment')">
     </div>
     <div id="doc_list_risk_assessment" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
   </div>
-  <div class="sec-head">Plans</div>
+  <div class="sec-head">Site Plan</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
     <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_plans').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_plans" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv" style="display:none;" onchange="handleDocUpload(this,'plans')">
+      <button onclick="document.getElementById('doc_input_plans').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_plans" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'plans')">
     </div>
     <div id="doc_list_plans" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
   </div>
-  <div class="sec-head">Reports</div>
+  <div class="sec-head">Tree Survey Reports</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
     <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_reports').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_reports" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv" style="display:none;" onchange="handleDocUpload(this,'reports')">
+      <button onclick="document.getElementById('doc_input_reports').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_reports" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'reports')">
     </div>
     <div id="doc_list_reports" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
   </div>
-  <div class="sec-head">Tree Survey</div>
+  <div class="sec-head">Ecology Reports</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
     <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_tree_survey').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_tree_survey" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv" style="display:none;" onchange="handleDocUpload(this,'tree_survey')">
+      <button onclick="document.getElementById('doc_input_tree_survey').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_tree_survey" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tree_survey')">
     </div>
     <div id="doc_list_tree_survey" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
   </div>
-  <div class="sec-head">Additional</div>
+  <div class="sec-head">Service Drawing Reports</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
     <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_additional').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_additional" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv" style="display:none;" onchange="handleDocUpload(this,'additional')">
+      <button onclick="document.getElementById('doc_input_additional').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_additional" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'additional')">
     </div>
     <div id="doc_list_additional" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
   </div>
@@ -2390,7 +2489,630 @@ function dashPrintAll() {
 </div></div>
 
 
+
+<!-- ═══ SAFETY CHECKS ═══ -->
+<div id="safety" class="panel"><div class="form-wrap" style="background:#f7f7f5;">
+
+  <!-- Header -->
+  <div class="form-header" style="background:#1a2e10;">
+    <div>
+      <h1 style="color:#7ec820;">Tree Surgery Safety Guide</h1>
+      <div class="sub" style="color:rgba(255,255,255,.7);">Arborite Tree Services Ltd &middot; PPE &amp; Equipment Reference</div>
+    </div>
+  </div>
+
+  <!-- Mandatory notice -->
+  <div style="background:#c0392b;color:white;padding:14px 20px;display:flex;align-items:center;gap:12px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;">
+    <span style="font-size:22px;">&#9888;</span>
+    ALL PPE LISTED IS MANDATORY ON SITE. FAILURE TO WEAR CORRECT PPE IS A DISCIPLINARY MATTER AND MAY RESULT IN REMOVAL FROM SITE.
+  </div>
+
+  <!-- ══ SECTION 1: MANDATORY PPE ══ -->
+  <div style="padding:24px 20px 0;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #7ec820;padding-bottom:8px;margin-bottom:20px;">
+      &#128737; Section 1 — Mandatory PPE for All Operatives
+    </div>
+
+    <!-- PPE Grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;">
+
+      <!-- Helmet -->
+      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#9745;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Safety Helmet</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
+            <ellipse cx="35" cy="45" rx="28" ry="8" fill="#ddd"/>
+            <path d="M10 40 Q10 15 35 12 Q60 15 60 40 Z" fill="#FF6B00"/>
+            <rect x="8" y="38" width="54" height="6" rx="3" fill="#E55A00"/>
+            <path d="M22 38 Q22 28 35 26 Q48 28 48 38" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.4"/>
+            <rect x="28" y="12" width="14" height="4" rx="2" fill="#E55A00"/>
+          </svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN 397 / EN 12492</div>
+            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+              <li>Class P (penetration resistant)</li>
+              <li>Must carry current inspection sticker</li>
+              <li>Replace after any impact — even minor</li>
+              <li>Replace every 3 years regardless</li>
+              <li>Chinstrap must be worn when climbing</li>
+            </ul>
+          </div>
+        </div>
+        <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:8px 16px;font-size:11px;color:#7b5e00;font-weight:600;">
+          &#9888; Check for cracks, dents and UV degradation daily
+        </div>
+      </div>
+
+      <!-- Face Protection -->
+      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#9745;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Face / Eye Protection</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
+            <rect x="10" y="25" width="50" height="22" rx="4" fill="#90CAF9" opacity="0.8"/>
+            <rect x="10" y="25" width="50" height="4" rx="2" fill="#1565C0"/>
+            <line x1="10" y1="27" x2="5" y2="20" stroke="#1565C0" stroke-width="2.5"/>
+            <line x1="60" y1="27" x2="65" y2="20" stroke="#1565C0" stroke-width="2.5"/>
+            <rect x="8" y="43" width="54" height="5" rx="2.5" fill="#1565C0"/>
+          </svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN 166 / EN 1731</div>
+            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+              <li>Full mesh visor for chainsaw work</li>
+              <li>Safety glasses for chipper operation</li>
+              <li>Anti-scratch &amp; anti-fog lenses</li>
+              <li>Clean mesh before use — no blocked vision</li>
+              <li>Replace if mesh is damaged or distorted</li>
+            </ul>
+          </div>
+        </div>
+        <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:8px 16px;font-size:11px;color:#7b5e00;font-weight:600;">
+          &#9888; Flying debris is the leading cause of eye injuries in arboriculture
+        </div>
+      </div>
+
+      <!-- Hearing Protection -->
+      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#9745;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Hearing Protection</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
+            <path d="M20 35 Q20 18 35 18 Q50 18 50 35" fill="none" stroke="#888" stroke-width="4"/>
+            <circle cx="18" cy="36" r="8" fill="#FF6B00"/>
+            <circle cx="52" cy="36" r="8" fill="#FF6B00"/>
+            <circle cx="18" cy="36" r="4" fill="#E55A00"/>
+            <circle cx="52" cy="36" r="4" fill="#E55A00"/>
+          </svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN 352 — SNR 28dB minimum</div>
+            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+              <li>Chainsaws produce 100–115 dB(A)</li>
+              <li>Ear defenders must be worn when chainsaw is running</li>
+              <li>Helmet-mounted defenders preferred</li>
+              <li>Earplugs acceptable as secondary protection</li>
+              <li>Hearing damage is cumulative and permanent</li>
+            </ul>
+          </div>
+        </div>
+        <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:8px 16px;font-size:11px;color:#7b5e00;font-weight:600;">
+          &#9888; Noise above 85 dB(A) sustained exposure requires mandatory protection (COSHH)
+        </div>
+      </div>
+
+      <!-- Chainsaw Gloves -->
+      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#9745;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Chainsaw Gloves</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
+            <path d="M25 55 L20 30 Q20 22 28 22 L30 22 L30 18 Q30 14 34 14 Q38 14 38 18 L38 22 L40 22 Q44 22 44 26 L44 28 Q46 28 46 32 L46 34 Q48 34 48 38 L48 52 Q48 58 42 58 L28 58 Z" fill="#FF8F00"/>
+            <path d="M30 22 L30 38" stroke="#E65100" stroke-width="1.5" opacity="0.5"/>
+            <path d="M34 20 L34 38" stroke="#E65100" stroke-width="1.5" opacity="0.5"/>
+            <path d="M38 22 L38 38" stroke="#E65100" stroke-width="1.5" opacity="0.5"/>
+            <path d="M20 30 L48 30" stroke="#E65100" stroke-width="1.5" opacity="0.5"/>
+            <rect x="19" y="50" width="30" height="6" rx="2" fill="#7ec820" opacity="0.8"/>
+          </svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN 381-7 Class 1 minimum</div>
+            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+              <li>Cut-resistant protective layers on back of hand</li>
+              <li>Left hand must have full chainsaw protection</li>
+              <li>Must fit snugly — no loose material near chain</li>
+              <li>Inspect padding layers for damage before use</li>
+              <li>Replace immediately if cut protection is damaged</li>
+            </ul>
+          </div>
+        </div>
+        <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:8px 16px;font-size:11px;color:#7b5e00;font-weight:600;">
+          &#9888; Hand injuries are among the most common chainsaw accidents
+        </div>
+      </div>
+
+      <!-- Chainsaw Trousers -->
+      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#9745;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Chainsaw Trousers</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
+            <path d="M18 15 L52 15 L48 55 L38 55 L35 40 L32 55 L22 55 Z" fill="#1565C0"/>
+            <path d="M18 15 L52 15 L50 28 L20 28 Z" fill="#0D47A1"/>
+            <rect x="20" y="28" width="30" height="3" fill="#7ec820" opacity="0.8"/>
+            <line x1="35" y1="15" x2="35" y2="55" stroke="#0D47A1" stroke-width="1.5" opacity="0.5"/>
+          </svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN 381-5 Class 1 (20 m/s)</div>
+            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+              <li>Type A (front) protection minimum for ground work</li>
+              <li>Type C (all-round) required for climbing</li>
+              <li>Anti-clog layers must be intact — check before use</li>
+              <li>Never wear if cut layer is exposed or damaged</li>
+              <li>Wash per manufacturer instructions only</li>
+            </ul>
+          </div>
+        </div>
+        <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:8px 16px;font-size:11px;color:#7b5e00;font-weight:600;">
+          &#9888; If a chainsaw contacts the trousers, retire them immediately even if no visible damage
+        </div>
+      </div>
+
+      <!-- Safety Boots -->
+      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#9745;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Safety Boots</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
+            <path d="M10 50 L10 35 Q10 28 20 28 L32 28 L32 24 Q32 20 36 20 L42 20 Q46 20 46 25 L46 35 L58 42 L58 50 Z" fill="#5D4037"/>
+            <path d="M10 50 L58 50 L58 55 L10 55 Z" fill="#4E342E"/>
+            <path d="M32 28 L32 50" stroke="#3E2723" stroke-width="1.5" opacity="0.5"/>
+            <ellipse cx="20" cy="38" rx="4" ry="3" fill="#7ec820" opacity="0.7"/>
+          </svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN ISO 20345 S3 / EN 381-3</div>
+            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+              <li>Steel or composite toecap (200J impact)</li>
+              <li>Chainsaw protection on top of foot</li>
+              <li>Midsole penetration protection (nails)</li>
+              <li>Anti-slip sole — check tread depth weekly</li>
+              <li>Ankle support essential on uneven ground</li>
+            </ul>
+          </div>
+        </div>
+        <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:8px 16px;font-size:11px;color:#7b5e00;font-weight:600;">
+          &#9888; No trainers, wellingtons or non-rated footwear on site under any circumstances
+        </div>
+      </div>
+
+      <!-- Hi-Vis -->
+      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#9745;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Hi-Visibility Vest</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
+          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
+            <path d="M15 20 L28 20 L35 30 L42 20 L55 20 L55 55 L42 55 L42 40 L28 40 L28 55 L15 55 Z" fill="#FFEB3B"/>
+            <rect x="15" y="30" width="40" height="4" fill="#ccc" opacity="0.8"/>
+            <rect x="15" y="42" width="40" height="4" fill="#ccc" opacity="0.8"/>
+          </svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN ISO 20471 Class 2 minimum</div>
+            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+              <li>Class 3 required near live traffic</li>
+              <li>Must be clean and retro-reflective strips intact</li>
+              <li>Worn over all other PPE — always visible</li>
+              <li>Replace if fluorescent material fades significantly</li>
+              <li>Essential near roads, driveways and public areas</li>
+            </ul>
+          </div>
+        </div>
+        <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:8px 16px;font-size:11px;color:#7b5e00;font-weight:600;">
+          &#9888; Required at all times when on or near a public road or highway
+        </div>
+      </div>
+
+    </div><!-- end PPE grid -->
+  </div>
+
+  <!-- ══ SECTION 2: CLIMBING PPE ══ -->
+  <div style="padding:0 20px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #2196F3;padding-bottom:8px;margin-bottom:20px;">
+      &#128736; Section 2 — Climbing &amp; Working at Height PPE
+    </div>
+    <div style="background:#E3F2FD;border-left:4px solid #1565C0;padding:12px 16px;border-radius:4px;margin-bottom:16px;font-size:13px;color:#0D47A1;font-weight:600;">
+      &#8505; All climbing equipment must be inspected before EVERY use and recorded in the equipment log. Any item with visible damage must be withdrawn from service immediately.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;">
+
+      <!-- Climbing Harness -->
+      <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#0D47A1;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#128279;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#90CAF9;text-transform:uppercase;letter-spacing:.5px;">Climbing Harness</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">CLIMBING</span>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN 358 / EN 813 / EN 361</div>
+          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+            <li>Full body harness for all aerial work</li>
+            <li>Sit harness for tree climbing with secondary anchor</li>
+            <li>Check all stitching, webbing and buckles daily</li>
+            <li>Retire after any fall arrest event</li>
+            <li>10-year maximum life from manufacture date</li>
+            <li>Store away from UV, chemicals and heat</li>
+          </ul>
+          <div style="background:#FFF3E0;border-radius:4px;padding:8px;margin-top:10px;font-size:11px;color:#E65100;font-weight:600;">
+            &#9888; Pre-use check: inspect every stitch point, every buckle, every attachment point
+          </div>
+        </div>
+      </div>
+
+      <!-- Lanyards & Karabiners -->
+      <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#0D47A1;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#128279;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#90CAF9;text-transform:uppercase;letter-spacing:.5px;">Lanyards &amp; Karabiners</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">CLIMBING</span>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN 354 / EN 362 / EN 12275</div>
+          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+            <li>Minimum 2 lanyards in use at all times when climbing</li>
+            <li>Work positioning lanyard (EN 358) + fall arrest (EN 354)</li>
+            <li>Karabiners: triple-action lock minimum</li>
+            <li>Check gate operation and lock function before use</li>
+            <li>Inspect for corrosion, cracks and deformation</li>
+            <li>Never load a karabiner on its minor axis</li>
+          </ul>
+          <div style="background:#FFF3E0;border-radius:4px;padding:8px;margin-top:10px;font-size:11px;color:#E65100;font-weight:600;">
+            &#9888; Always maintain 2-point connection — never unclip both lanyards simultaneously
+          </div>
+        </div>
+      </div>
+
+      <!-- Climbing Rope -->
+      <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="background:#0D47A1;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">&#128279;</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#90CAF9;text-transform:uppercase;letter-spacing:.5px;">Climbing Rope</span>
+          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">CLIMBING</span>
+        </div>
+        <div style="padding:14px 16px;">
+          <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:6px;">Standard: EN 1891 Type A — 11mm minimum</div>
+          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+            <li>Tree climbing rope: kernmantle low-stretch</li>
+            <li>Inspect every metre for cuts, abrasion, stiffness</li>
+            <li>Never use near chainsaw without rope guard</li>
+            <li>Log every use, fall and inspection</li>
+            <li>Retire if core integrity is uncertain</li>
+            <li>Do not stand on rope or allow vehicle contact</li>
+          </ul>
+          <div style="background:#FFF3E0;border-radius:4px;padding:8px;margin-top:10px;font-size:11px;color:#E65100;font-weight:600;">
+            &#9888; A rope weakened by chainsaw contact may still look intact — retire immediately
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ SECTION 3: CHAINSAW SAFETY ══ -->
+  <div style="padding:0 20px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #c0392b;padding-bottom:8px;margin-bottom:20px;">
+      &#9889; Section 3 — Chainsaw Safe Operation
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+      <div style="background:white;border-radius:10px;border:2px solid #FFCDD2;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:#c0392b;text-transform:uppercase;margin-bottom:10px;">&#10004; Before Starting</div>
+        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
+          <li>All PPE on and correctly fitted</li>
+          <li>Chain tension correct — not too loose/tight</li>
+          <li>Chain sharp — blunt chains cause fatigue &amp; kickback</li>
+          <li>Chain brake tested — push forward, saw must stop</li>
+          <li>Throttle interlock operational</li>
+          <li>Oil tank topped up — never run without bar oil</li>
+          <li>Area clear of people — 2x tree height exclusion zone</li>
+          <li>Escape route identified before cutting</li>
+        </ul>
+      </div>
+      <div style="background:white;border-radius:10px;border:2px solid #FFCDD2;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:#c0392b;text-transform:uppercase;margin-bottom:10px;">&#10008; Kickback Zones</div>
+        <div style="display:flex;justify-content:center;margin-bottom:10px;">
+          <svg width="160" height="130" viewBox="0 0 160 130">
+            <rect x="55" y="70" width="70" height="30" rx="4" fill="#555"/>
+            <rect x="55" y="56" width="70" height="16" rx="3" fill="#777"/>
+            <rect x="65" y="72" width="50" height="6" rx="3" fill="#333"/>
+            <rect x="120" y="60" width="30" height="8" rx="2" fill="#555"/>
+            <!-- Kickback arc -->
+            <path d="M 125 64 A 60 60 0 0 1 75 10" fill="none" stroke="#c0392b" stroke-width="3" stroke-dasharray="6,3"/>
+            <polygon points="75,10 65,20 82,22" fill="#c0392b"/>
+            <text x="100" y="30" font-size="10" fill="#c0392b" font-weight="bold" font-family="sans-serif">KICKBACK</text>
+            <text x="104" y="42" font-size="10" fill="#c0392b" font-weight="bold" font-family="sans-serif">ZONE</text>
+            <!-- Safe cutting zones -->
+            <rect x="58" y="110" width="12" height="3" fill="#7ec820"/>
+            <text x="72" y="114" font-size="9" fill="#7ec820" font-family="sans-serif">Safe zone</text>
+            <rect x="58" y="120" width="12" height="3" fill="#c0392b"/>
+            <text x="72" y="124" font-size="9" fill="#c0392b" font-family="sans-serif">Kickback zone</text>
+          </svg>
+        </div>
+        <ul style="font-size:11px;color:#555;margin:0;padding-left:16px;line-height:1.7;">
+          <li>Never cut with the tip of the bar</li>
+          <li>Keep thumb wrapped around handle</li>
+          <li>Maintain firm two-handed grip</li>
+          <li>Stand to side — never directly behind</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Chainsaw cutting techniques -->
+    <div style="background:white;border-radius:10px;border:2px solid #FFCDD2;padding:16px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:#c0392b;text-transform:uppercase;margin-bottom:12px;">Safe Felling Cuts — Notch &amp; Felling</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+        <svg width="200" height="120" viewBox="0 0 200 120">
+          <!-- Tree trunk -->
+          <rect x="80" y="10" width="40" height="100" fill="#8B6914"/>
+          <!-- Notch cut (face cut) -->
+          <path d="M80 45 L60 55 L80 65" fill="#F5DEB3" stroke="#555" stroke-width="1.5"/>
+          <!-- Back cut -->
+          <line x1="120" y1="60" x2="95" y2="60" stroke="#c0392b" stroke-width="2.5" stroke-dasharray="4,2"/>
+          <!-- Hinge -->
+          <rect x="80" y="55" width="15" height="10" fill="#2a4a1a" opacity="0.6"/>
+          <!-- Labels -->
+          <text x="35" y="42" font-size="9" fill="#555" font-family="sans-serif">Face cut</text>
+          <text x="35" y="55" font-size="9" fill="#555" font-family="sans-serif">(notch)</text>
+          <text x="126" y="58" font-size="9" fill="#c0392b" font-family="sans-serif">Back cut</text>
+          <text x="85" y="90" font-size="9" fill="#2a4a1a" font-family="sans-serif" font-weight="bold">Hinge</text>
+          <!-- Arrow showing fall direction -->
+          <path d="M55 20 L20 50" stroke="#7ec820" stroke-width="2"/>
+          <polygon points="20,50 28,42 24,55" fill="#7ec820"/>
+          <text x="5" y="18" font-size="9" fill="#7ec820" font-family="sans-serif">Fall</text>
+        </svg>
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">Felling Procedure</div>
+          <ol style="font-size:12px;color:#555;margin:0;padding-left:18px;line-height:1.9;">
+            <li><strong>Assess:</strong> lean, dead wood, wind, escape routes</li>
+            <li><strong>Clear:</strong> 2m radius, identify 2 escape routes (45° behind)</li>
+            <li><strong>Notch:</strong> face cut 1/4 trunk diameter, horizontal cut first</li>
+            <li><strong>Back cut:</strong> 50mm above base of notch — leave hinge</li>
+            <li><strong>Hinge:</strong> 1/10 diameter, full width of fall face</li>
+            <li><strong>Retreat:</strong> use escape route before tree moves</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SECTION 4: WORKING AT HEIGHT ══ -->
+  <div style="padding:0 20px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #9C27B0;padding-bottom:8px;margin-bottom:20px;">
+      &#128198; Section 4 — Working at Height &amp; Aerial Rescue
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;">
+      <div style="background:white;border-radius:10px;border:2px solid #E1BEE7;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#6A1B9A;text-transform:uppercase;margin-bottom:10px;">&#128269; Pre-Climb Checks</div>
+        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
+          <li>Inspect entire tree — dead wood, decay, cavities</li>
+          <li>Check attachment point — minimum 5x working load</li>
+          <li>Wind speed acceptable — max Beaufort 5 (20 mph)</li>
+          <li>Spotter / ground crew briefed and in position</li>
+          <li>First aid kit accessible on ground</li>
+          <li>Emergency rescue plan established</li>
+          <li>All climbing equipment pre-use checked</li>
+        </ul>
+      </div>
+      <div style="background:white;border-radius:10px;border:2px solid #E1BEE7;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#6A1B9A;text-transform:uppercase;margin-bottom:10px;">&#128680; Aerial Rescue Procedure</div>
+        <div style="background:#FFF3E0;border-radius:4px;padding:8px;margin-bottom:10px;font-size:11px;color:#E65100;font-weight:700;">
+          Must be rehearsed before work begins every day
+        </div>
+        <ol style="font-size:12px;color:#555;margin:0;padding-left:18px;line-height:1.9;">
+          <li>Assess — ensure scene is safe for rescuer</li>
+          <li>Call 999 immediately — do not delay</li>
+          <li>Second qualified climber to ascend with rescue line</li>
+          <li>Attach rescue lanyard to casualty harness</li>
+          <li>Lower casualty in controlled descent</li>
+          <li>Place in recovery position on ground</li>
+          <li>Trained first-aider takes over</li>
+        </ol>
+      </div>
+      <div style="background:white;border-radius:10px;border:2px solid #E1BEE7;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#6A1B9A;text-transform:uppercase;margin-bottom:10px;">&#128386; Suspension Trauma</div>
+        <div style="background:#FFEBEE;border-radius:4px;padding:8px;margin-bottom:10px;font-size:11px;color:#c0392b;font-weight:700;">
+          LIFE-THREATENING — can occur in as little as 5 minutes
+        </div>
+        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
+          <li>Occurs when hanging motionless in harness</li>
+          <li>Blood pools in legs — cardiac arrest risk</li>
+          <li>Signs: pale, sweating, faint, confused</li>
+          <li>Rescue within 5 minutes if unconscious</li>
+          <li>Do not place recovered climber flat — sit upright</li>
+          <li>Call 999 for all suspension incidents</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SECTION 5: HAZARDS & LEGISLATION ══ -->
+  <div style="padding:0 20px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #FF6F00;padding-bottom:8px;margin-bottom:20px;">
+      &#128218; Section 5 — Key Hazards &amp; Legal Framework
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:24px;">
+
+      <div style="background:white;border-radius:10px;border:2px solid #FFE0B2;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#E65100;text-transform:uppercase;margin-bottom:10px;">&#9889; Utility Hazards</div>
+        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
+          <li>Check for overhead power lines before felling</li>
+          <li>Minimum 6m exclusion zone from uninsulated HV lines</li>
+          <li>Contact DNO to isolate if working within exclusion</li>
+          <li>Use CAT &amp; Genny for underground services</li>
+          <li>Never assume cables are insulated or dead</li>
+        </ul>
+      </div>
+
+      <div style="background:white;border-radius:10px;border:2px solid #FFE0B2;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#E65100;text-transform:uppercase;margin-bottom:10px;">&#128657; Traffic Management</div>
+        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
+          <li>Chapter 8 TM required for any road closures</li>
+          <li>Traffic Management Officer must be briefed</li>
+          <li>Cones, signs and stop/go boards as per plan</li>
+          <li>Hi-vis Class 3 mandatory near live traffic</li>
+          <li>Never work into live lanes</li>
+        </ul>
+      </div>
+
+      <div style="background:white;border-radius:10px;border:2px solid #FFE0B2;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#E65100;text-transform:uppercase;margin-bottom:10px;">&#128196; Key Legislation</div>
+        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
+          <li><strong>HASAWA 1974</strong> — employer &amp; employee duties</li>
+          <li><strong>PUWER 1998</strong> — chainsaw inspection &amp; maintenance</li>
+          <li><strong>WAHR 2005</strong> — work at height hierarchy</li>
+          <li><strong>COSHH 2002</strong> — noise, dust, fuel vapour</li>
+          <li><strong>PPE Regs 2022</strong> — provision &amp; maintenance</li>
+          <li><strong>LOLER 1998</strong> — lifting equipment (MEWP/crane)</li>
+        </ul>
+      </div>
+
+      <div style="background:white;border-radius:10px;border:2px solid #FFE0B2;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#E65100;text-transform:uppercase;margin-bottom:10px;">&#128657; MEWP / Chipper Safety</div>
+        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
+          <li>MEWP: full body harness + fall arrest in basket</li>
+          <li>IPAF licence required for MEWP operation</li>
+          <li>Chipper: guards must be in place at all times</li>
+          <li>Minimum 2 operatives when chipping</li>
+          <li>Never reach inside feed chute</li>
+          <li>Emergency stop tested before each use</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ SECTION 6: EMERGENCY ══ -->
+  <div style="padding:0 20px 24px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #c0392b;padding-bottom:8px;margin-bottom:20px;">
+      &#9874; Section 6 — Emergency Information
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;">
+
+      <div style="background:#c0392b;border-radius:10px;padding:16px;color:white;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;text-transform:uppercase;margin-bottom:10px;">&#128222; Emergency Numbers</div>
+        <div style="font-size:28px;font-weight:900;letter-spacing:2px;margin-bottom:8px;">999</div>
+        <div style="font-size:12px;opacity:.9;margin-bottom:12px;">Fire / Police / Ambulance</div>
+        <div style="font-size:20px;font-weight:900;letter-spacing:2px;margin-bottom:4px;">0800 404 090</div>
+        <div style="font-size:12px;opacity:.9;margin-bottom:12px;">National Gas Emergency</div>
+        <div style="font-size:20px;font-weight:900;letter-spacing:2px;margin-bottom:4px;">105</div>
+        <div style="font-size:12px;opacity:.9;">Power Cut / Electricity Emergency</div>
+      </div>
+
+      <div style="background:white;border-radius:10px;border:2px solid #FFCDD2;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#c0392b;text-transform:uppercase;margin-bottom:10px;">&#10133; Chainsaw Wound First Aid</div>
+        <ol style="font-size:12px;color:#555;margin:0;padding-left:18px;line-height:1.9;">
+          <li><strong>STOP the saw immediately</strong></li>
+          <li>Call 999 — all chainsaw lacerations are serious</li>
+          <li>Apply firm direct pressure — do not remove</li>
+          <li>Elevate the limb if possible</li>
+          <li>Tourniquet only if bleeding uncontrolled</li>
+          <li>Keep casualty warm and still</li>
+          <li>Do not leave casualty alone</li>
+        </ol>
+      </div>
+
+      <div style="background:white;border-radius:10px;border:2px solid #FFCDD2;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#c0392b;text-transform:uppercase;margin-bottom:10px;">&#128203; Incident Reporting</div>
+        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
+          <li>All accidents must be recorded in accident book</li>
+          <li>RIDDOR report: over 7 day injuries, hospitalisations</li>
+          <li>Near misses must be reported to supervisor</li>
+          <li>HSE notified within 10 days of RIDDOR event</li>
+          <li>Preserve scene for investigation</li>
+          <li>Witness statements taken immediately</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="background:#1a2e10;padding:14px 20px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,.6);letter-spacing:.5px;">
+    Arborite Tree Services Ltd &nbsp;|&nbsp; Safety Reference Document &nbsp;|&nbsp; Review annually or when legislation changes
+  </div>
+
+  <div class="print-bar">
+    <button class="btn btn-print" onclick="printPanel('safety')">&#128424; Print / Save as PDF</button>
+  </div>
+</div></div>
+
 </div><!-- end appView -->
+<!-- ═══ OFFICE SUB-DASHBOARD ═══ -->
+<div id="officeView" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#2d5218;overflow-y:auto;z-index:900;padding:0 0 40px;">
+
+  <!-- Office header -->
+  <div style="background:#1a3210;padding:14px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,.4);">
+    <button onclick="backFromOffice()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8592; Dashboard</button>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;flex:1;">&#127970; Office</div>
+  </div>
+
+  <!-- Office job bar -->
+  <div style="padding:16px 20px 0;">
+    <div style="background:#1a3210;border:1px solid rgba(126,200,32,.2);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--lime);letter-spacing:1px;">
+        <span style="color:rgba(255,255,255,.5);font-size:11px;font-weight:400;display:block;letter-spacing:0;">Current Job</span>
+        <span id="officeJobRef">No job loaded</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Office tiles -->
+  <div style="padding:20px 20px 0;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;">Select a form</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px;">
+
+      <div style="background:#305818;border:1px solid rgba(126,200,32,.5);border-radius:10px;padding:26px 20px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px;-webkit-tap-highlight-color:transparent;"
+           onmouseover="this.style.background='#3d6a1b';this.style.transform='translateY(-2px)'"
+           onmouseout="this.style.background='#305818';this.style.transform=''"
+           onclick="openFormFromOffice('audit')">
+        <div style="font-size:40px;line-height:1;margin-bottom:4px;">&#9745;</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:white;line-height:1.2;">Audit</div>
+        <div style="font-size:12px;color:rgba(200,255,100,.7);letter-spacing:.3px;margin-top:2px;">Site audit form</div>
+      </div>
+
+      <div style="background:#305818;border:1px solid rgba(126,200,32,.5);border-radius:10px;padding:26px 20px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px;-webkit-tap-highlight-color:transparent;"
+           onmouseover="this.style.background='#3d6a1b';this.style.transform='translateY(-2px)'"
+           onmouseout="this.style.background='#305818';this.style.transform=''"
+           onclick="openFormFromOffice('safety')">
+        <div style="font-size:40px;line-height:1;margin-bottom:4px;">&#128737;</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:white;line-height:1.2;">Safety Checker</div>
+        <div style="font-size:12px;color:rgba(200,255,100,.7);letter-spacing:.3px;margin-top:2px;">Equipment &amp; PPE checks</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
 <!-- NEW JOB MODAL -->
 <div class="modal-bg" id="newJobModal">
   <div class="modal">
