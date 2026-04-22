@@ -366,7 +366,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
     <div class="field-row lm"><div class="fc lbl">Designated Aerial Rescuer</div>
       <div class="fc"><select id="p_rescuer" class="staff-sel" onchange="handleStaffSel(this)"><option value="">-- Select aerial rescuer --</option><option value="Joe Grace">Joe Grace</option><option value="Liam Cooper">Liam Cooper</option><option value="Jason Hiscock">Jason Hiscock</option><option value="Jack Fisher">Jack Fisher</option><option value="Luke Richardson">Luke Richardson</option><option value="James Hilborn">James Hilborn</option><option value="Dave Norris">Dave Norris</option><option value="Haiden Rodbard-Brown">Haiden Rodbard-Brown</option><option value="Jon Challinor">Jon Challinor</option><option value="Joel Cripps">Joel Cripps</option><option value="Brook Taylor-Ware">Brook Taylor-Ware</option><option value="__new__">+ Add new name...</option></select></div></div>
     <div class="field-row lm"><div class="fc lbl">Site Supervisor</div>
-      <div class="fc"><select id="p_supervisor" class="staff-sel" onchange="handleStaffSel(this);syncShared()" onfocus="if(!this.options.length||this.options.length<2)this.innerHTML=makeStaffOpts('Select site supervisor')" style="width:100%;"></select></div></div>
+      <div class="fc"><select id="p_supervisor" class="staff-sel" onchange="handleStaffSel(this)" onfocus="if(!this.options.length||this.options.length<2)this.innerHTML=makeStaffOpts('Select site supervisor')" style="width:100%;"></select></div></div>
   </div>
   <div class="sec-head">Communication</div>
   <div class="field-grid"><div class="field-row"><div class="fc" style="flex-direction:column;align-items:flex-start;gap:6px;padding:8px 12px;">
@@ -551,7 +551,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
       <div class="kp-cell kp-lbl-cell">
         <div class="sig-lbl" style="margin-bottom:3px;">Site Supervisor</div>
         <select id="ms_supervisor" class="staff-sel"
-          onchange="handleStaffSel(this);if(this.value!='__new__'){syncShared();var sn=document.getElementById('ms_super_name');if(sn&&this.value)sn.value=this.value;}"
+          onchange="handleStaffSel(this)"
           style="width:100%;font-size:13px;padding:6px 4px;border:1px solid var(--border);border-radius:3px;background:white;">
         </select>
       </div>
@@ -579,7 +579,12 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
   <div class="notice" style="font-style:italic;background:var(--green-light);border-left:4px solid var(--green);padding:12px 16px;font-size:12.5px;line-height:1.6;">I confirm that I have received this method statement and relevant attachments prior to giving this briefing and to the best of my knowledge details contained within are correct, up to date and that a safe system of work will be instigated.</div>
   <div style="background:var(--green-light);padding:12px 16px;border-bottom:1px solid var(--border);"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--green);margin-bottom:8px;">Person Responsible for Briefing</div><div style="display:grid;grid-template-columns:1fr 1fr 140px;gap:16px;align-items:end;"><div><div class="sig-lbl">Name</div><select id="ms_brief_name" class="staff-sel" onchange="handleStaffSel(this)" style="width:100%;font-size:12px;padding:4px 2px;border:none;border-bottom:1.5px solid var(--border);background:transparent;outline:none;-webkit-appearance:auto;appearance:auto;"></select></div><div><div class="sig-lbl">Signature</div><div class="sig-wrap"><canvas id="s-brief" height="90"></canvas><button class="sig-clr" data-sig="s-brief" onclick="clrSig(this.dataset.sig)">Clear</button></div></div><div><div class="sig-lbl">Date</div><input type="date" id="ms_brief_date" style="font-size:12px;border-bottom:1.5px solid var(--border);padding:3px 0;background:transparent;border-top:none;border-left:none;border-right:none;outline:none;"></div></div></div>
   <div class="notice" style="font-style:italic;background:#fff8f0;border-left:4px solid var(--green);padding:12px 16px;font-size:12.5px;line-height:1.6;margin-top:0;">As Site Supervisor, I confirm that I have received a briefing on, and understand the contents of this method statement and risk assessment. Furthermore, I understand and confirm that I will check the details of the method statement prior to commencing work to ensure a safe system of work is instigated.</div>
-  <div style="padding:12px 16px;border-bottom:1px solid var(--border);"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--green);margin-bottom:6px;">Site Supervisor</div><div style="display:grid;grid-template-columns:1fr 1fr 140px;gap:16px;align-items:end;"><div><div class="sig-lbl">Name</div><select id="ms_super_name" class="staff-sel" onchange="handleStaffSel(this);if(this.value!=='__new__'){var p=document.getElementById('ms_supervisor');if(p)p.value=this.value;syncShared();}" style="width:100%;font-size:12px;padding:4px 2px;border:none;border-bottom:1.5px solid var(--border);background:transparent;outline:none;-webkit-appearance:auto;appearance:auto;"></select></div><div><div class="sig-lbl">Signature</div><div class="sig-wrap"><canvas id="s-super" height="90"></canvas><button class="sig-clr" data-sig="s-super" onclick="clrSig(this.dataset.sig)">Clear</button></div></div><div><div class="sig-lbl">Date</div><input type="date" id="ms_super_date" style="font-size:12px;border-bottom:1.5px solid var(--border);padding:3px 0;background:transparent;border-top:none;border-left:none;border-right:none;outline:none;"></div></div></div>
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border);"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--green);margin-bottom:6px;">Site Supervisor</div><div style="display:grid;grid-template-columns:1fr 1fr 140px;gap:16px;align-items:end;"><div><div class="sig-lbl">Name</div>
+<select id="ms_super_name" class="staff-sel" onchange="handleStaffSel(this)" style="width:100%;font-size:12px;padding:4px 2px;border:none;border-bottom:1.5px solid var(--border);background:transparent;outline:none;-webkit-appearance:auto;appearance:auto;margin-bottom:2px;"></select>
+<input type="text" id="ms_super_name_text" placeholder="Or type a name..."
+  oninput="syncSuperNameText()"
+  style="width:100%;font-size:11px;padding:3px;border:none;border-bottom:1px dashed var(--border);background:transparent;outline:none;margin-top:2px;color:var(--mid);">
+</div><div><div class="sig-lbl">Signature</div><div class="sig-wrap"><canvas id="s-super" height="90"></canvas><button class="sig-clr" data-sig="s-super" onclick="clrSig(this.dataset.sig)">Clear</button></div></div><div><div class="sig-lbl">Date</div><input type="date" id="ms_super_date" style="font-size:12px;border-bottom:1.5px solid var(--border);padding:3px 0;background:transparent;border-top:none;border-left:none;border-right:none;outline:none;"></div></div></div>
 
   <div style="background:var(--green);color:white;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:7px 16px;display:grid;grid-template-columns:1fr 1fr 1fr 110px;gap:10px;"><span>Name</span><span>Signature</span><span>Responsibility</span><span>Date</span></div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr 110px;gap:10px;align-items:end;padding:10px 16px;border-bottom:1px solid var(--border);">
@@ -685,7 +690,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
       <div class="fc lbl">Quote Ref</div><div class="fc"><input type="text" id="dr_quote" class="shared-ro"></div>
     </div>
     <div class="field-row c2">
-      <div class="fc lbl">Site Supervisor</div><div class="fc"><select id="dr_supervisor" class="shared-ro staff-sel" onchange="handleStaffSel(this)" style="width:100%;"><option value="">-- Select supervisor --</option><option value="Joe Grace">Joe Grace</option><option value="Liam Cooper">Liam Cooper</option><option value="Jason Hiscock">Jason Hiscock</option><option value="Jack Fisher">Jack Fisher</option><option value="Luke Richardson">Luke Richardson</option><option value="James Hilborn">James Hilborn</option><option value="Dave Norris">Dave Norris</option><option value="Haiden Rodbard-Brown">Haiden Rodbard-Brown</option><option value="Jon Challinor">Jon Challinor</option><option value="Joel Cripps">Joel Cripps</option><option value="Brook Taylor-Ware">Brook Taylor-Ware</option></select></div>
+      <div class="fc lbl">Site Supervisor</div><div class="fc"><select id="dr_supervisor" class="staff-sel" onchange="handleStaffSel(this)" style="width:100%;"></select></div>
       <div class="fc lbl">Week Commencing</div><div class="fc"><input type="date" id="dr_week"></div>
     </div>
   </div>
@@ -1421,8 +1426,8 @@ var SHARED_MAP = {
   p_client:     ['so_client','ms_client'],
   p_address:    ['so_site','ms_site','dr_site'],
   p_quote:      ['so_quote','ms_jobno','dr_quote'],
-  p_supervisor: ['ms_supervisor','ms_super_name','dr_supervisor'],
   p_w3w:        ['so_w3w','ms_w3w']
+  // p_supervisor intentionally removed — each form's supervisor is independent
 };
 
 function buildSupervisorList() {
@@ -1747,18 +1752,29 @@ function attachSigListeners(canvas, id) {
     pad.ctx.beginPath(); pad.ctx.moveTo(lx, ly); pad.ctx.lineTo(p[0], p[1]); pad.ctx.stroke();
     lx = p[0]; ly = p[1];
   }
+  function saveDataUrl() {
+    try {
+      var url = canvas.toDataURL('image/png');
+      if (url && url.length > 100 && url !== 'data:,') {
+        pads[id].dataUrl = url;
+      }
+    } catch(e) {}
+  }
   canvas.addEventListener('mousedown',  function(e){ startDraw(e); });
   canvas.addEventListener('mousemove',  function(e){ doDraw(e); });
-  canvas.addEventListener('mouseup',    function(){ drawing = false; });
+  canvas.addEventListener('mouseup',    function(){ drawing = false; saveDataUrl(); });
   canvas.addEventListener('mouseleave', function(){ drawing = false; });
   canvas.addEventListener('touchstart', function(e){ e.preventDefault(); startDraw(e); }, {passive:false});
   canvas.addEventListener('touchmove',  function(e){ e.preventDefault(); doDraw(e); },   {passive:false});
-  canvas.addEventListener('touchend',   function(){ drawing = false; });
+  canvas.addEventListener('touchend',   function(){ drawing = false; saveDataUrl(); });
 }
 
 function clrSig(id) {
   var p = pads[id];
-  if (p && p.ctx && p.sized) p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
+  if (p) {
+    if (p.ctx && p.sized) p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
+    p.dataUrl = null;
+  }
 }
 function initAllSigs() {
   var cs = document.querySelectorAll('.sig-wrap canvas');
@@ -1962,7 +1978,7 @@ function loadJobByRef(ref) {
         syncShared();
         var fd = rows[0].form_data;
         if (fd) {
-          var superSels = ['ms_supervisor','p_supervisor','dr_supervisor','p_completed_by'];
+          var superSels = ['p_completed_by']; // supervisor fields restored independently by their own IDs
           for (var si = 0; si < superSels.length; si++) {
             var sel = document.getElementById(superSels[si]);
             if (sel && fd[superSels[si]]) {
@@ -1979,6 +1995,15 @@ function loadJobByRef(ref) {
               }
               sel.value = fd[superSels[si]];
             }
+          }
+          // Restore text override fields
+          if (fd.ms_supervisor_text) {
+            var mst = document.getElementById('ms_supervisor_text');
+            if (mst) mst.value = fd.ms_supervisor_text;
+          }
+          if (fd.ms_super_name_text) {
+            var msnt = document.getElementById('ms_super_name_text');
+            if (msnt) msnt.value = fd.ms_super_name_text;
           }
           // Also ensure shared text fields are properly restored
           var sharedFields = ['so_client','ms_client','so_site','ms_site','so_quote','ms_jobno','dr_quote','dr_site'];
@@ -2089,19 +2114,35 @@ function collectFormData() {
   var checks = document.querySelectorAll('input[type="checkbox"][id]');
   for (var i = 0; i < checks.length; i++) data[checks[i].id] = checks[i].checked;
   for (var id in pads) {
-    if (pads[id] && pads[id].canvas && pads[id].sized) {
-      try { data.signatures[id] = pads[id].canvas.toDataURL('image/png'); } catch(e){}
+    if (pads[id] && pads[id].canvas) {
+      // Prefer cached dataUrl (always valid even if canvas is hidden)
+      if (pads[id].dataUrl && pads[id].dataUrl.length > 100) {
+        data.signatures[id] = pads[id].dataUrl;
+      } else if (pads[id].sized) {
+        // Fallback: try to read directly from canvas
+        try {
+          var url = pads[id].canvas.toDataURL('image/png');
+          if (url && url.length > 100 && url !== 'data:,') {
+            data.signatures[id] = url;
+          }
+        } catch(e){}
+      }
     }
   }
-  // Also save dynamic sig canvases (POWA operators, daily register rows)
+  // Also collect dynamic canvases not yet in pads (newly built rows)
   var dynCanvases = document.querySelectorAll('.sig-wrap canvas[id]');
   for (var di = 0; di < dynCanvases.length; di++) {
     var cid = dynCanvases[di].id;
     if (!data.signatures[cid]) {
-      try {
-        var durl = dynCanvases[di].toDataURL('image/png');
-        if (durl !== 'data:,' && durl.length > 100) data.signatures[cid] = durl;
-      } catch(e){}
+      var dynPad = pads[cid];
+      if (dynPad && dynPad.dataUrl && dynPad.dataUrl.length > 100) {
+        data.signatures[cid] = dynPad.dataUrl;
+      } else {
+        try {
+          var durl = dynCanvases[di].toDataURL('image/png');
+          if (durl !== 'data:,' && durl.length > 100) data.signatures[cid] = durl;
+        } catch(e){}
+      }
     }
   }
   // Restore hidden panels
@@ -2174,6 +2215,9 @@ function restoreFormData(data) {
       }
     }, 800);
   }
+  // Restore w3w link buttons
+  if (data.so_w3w) updateW3WLink('so_w3w_link', data.so_w3w);
+  if (data.ms_w3w) updateW3WLink('ms_w3w_link', data.ms_w3w);
   // Restore documents
   if (data._documents && typeof docStore !== 'undefined') {
     docStore = {};
@@ -2183,10 +2227,15 @@ function restoreFormData(data) {
 }
 
 function restoreSig(id, dataUrl) {
+  if (!dataUrl || dataUrl === 'data:,') return;
+  // Cache the dataUrl immediately so save works even before canvas renders
+  if (!pads[id]) pads[id] = {canvas:null, ctx:null, sized:false, dataUrl:dataUrl};
+  else pads[id].dataUrl = dataUrl;
   setTimeout(function() {
     initSig(id);
     var p = pads[id];
-    if (!p || !dataUrl || dataUrl === 'data:,') return;
+    if (!p || !p.canvas) return;
+    p.dataUrl = dataUrl; // ensure it's set after initSig
     var img = new Image();
     img.onload = function() {
       if (p.ctx) p.ctx.drawImage(img, 0, 0,
@@ -2583,6 +2632,23 @@ function openW3W(fieldId) {
     window.open('https://what3words.com/' + cleaned, '_blank');
   }
   return false;
+}
+
+// ── SUPERVISOR TEXT OVERRIDES ──
+function syncSuperText() {
+  // Text override for ms_supervisor — updates ms_supervisor only, no cross-form sync
+  var tv = document.getElementById('ms_supervisor_text');
+  if (!tv) return;
+  var val = tv.value.trim();
+  if (!val) return;
+  var sel = document.getElementById('ms_supervisor');
+  if (sel) sel.value = '';
+}
+
+function syncSuperNameText() {
+  // Text override for ms_super_name — updates ms_super_name only, no cross-form sync
+  var tv = document.getElementById('ms_super_name_text');
+  if (!tv) return;
 }
 
 // ── AUTO-SAVE ──
