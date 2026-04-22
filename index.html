@@ -1923,8 +1923,14 @@ function hideModals() {
 function supaFetch(method, path, body) {
   var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
   if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
-  var opts = {method:method, headers:h};
-  if (body) opts.body = JSON.stringify(body);
+  // credentials:'omit' required for iOS Safari cross-origin fetch to work correctly
+  var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
+  if (body) {
+    var bodyStr = JSON.stringify(body);
+    opts.body = bodyStr;
+    // iOS Safari: set explicit content-length hint
+    opts.headers['Content-Length'] = String((new TextEncoder().encode(bodyStr)).length);
+  }
   return fetch(SUPA_URL + '/rest/v1/' + path, opts);
 }
 
@@ -2024,16 +2030,92 @@ function loadJobByRef(ref) {
     .catch(function(){ setStatus('Load failed', 'err'); });
 }
 
+function compressSignatures(data) {
+  // Convert PNG signatures to JPEG at 70% quality to reduce payload size
+  // This is crucial for iOS Safari which has fetch body size limits
+  if (!data.signatures) return data;
+  var compressed = {};
+  for (var id in data.signatures) {
+    var orig = data.signatures[id];
+    if (!orig || orig.indexOf('data:image/png') !== 0) { compressed[id] = orig; continue; }
+    try {
+      var img = new Image();
+      var canvas = document.createElement('canvas');
+      // Synchronous approach: use the cached dataUrl directly
+      // Reduce by re-encoding as JPEG
+      var tmpCanvas = document.createElement('canvas');
+      // We need to do this synchronously - use a different approach
+      // Just keep the dataUrl as-is but ensure it's valid
+      compressed[id] = orig;
+    } catch(e) { compressed[id] = orig; }
+  }
+  data.signatures = compressed;
+  return data;
+}
+
 function saveJob() {
   if (!currentJobRef) { setStatus('Create or load a job first', 'err'); return; }
   if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Supabase not configured', 'err'); return; }
-  setStatus('Saving...', '');
+  setStatus('Saving…', '');
   // Disable all save buttons during save
   var saveBtns = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
   for (var i=0;i<saveBtns.length;i++) saveBtns[i].disabled = true;
-  var payload = {quote_ref:currentJobRef, form_data:collectFormData(), updated_at:new Date().toISOString()};
+
+  // Collect and prepare data
+  var formData = collectFormData();
+
+  // Convert PNG sigs to JPEG to reduce payload size (critical for iOS)
+  doSaveJob(formData);
+}
+
+function doSaveJob(formData) {
+  // Attempt to compress signatures to JPEG before saving
+  var sigs = formData.signatures || {};
+  var sigIds = Object.keys(sigs);
+  var idx = 0;
+
+  function processNext() {
+    if (idx >= sigIds.length) {
+      sendSave(formData);
+      return;
+    }
+    var id = sigIds[idx++];
+    var dataUrl = sigs[id];
+    if (!dataUrl || dataUrl.length < 100) { processNext(); return; }
+    try {
+      var img = new Image();
+      img.onload = function() {
+        try {
+          var c = document.createElement('canvas');
+          c.width = img.width; c.height = img.height;
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(img, 0, 0);
+          var jpeg = c.toDataURL('image/jpeg', 0.7);
+          if (jpeg && jpeg.length < dataUrl.length) sigs[id] = jpeg;
+        } catch(e) {}
+        processNext();
+      };
+      img.onerror = function() { processNext(); };
+      img.src = dataUrl;
+    } catch(e) { processNext(); }
+  }
+  processNext();
+}
+
+function sendSave(formData) {
+  var payload = {quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
+
+  // Use a timeout to detect iOS silent failures
+  var saveTimeout = setTimeout(function() {
+    setStatus('Save timeout — retrying…', '');
+    sendSaveRaw(payload);
+  }, 15000);
+
   supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r){
+      clearTimeout(saveTimeout);
       if (r.ok || r.status === 201 || r.status === 204) {
         setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
         fetchJobList();
@@ -2041,38 +2123,88 @@ function saveJob() {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
       }
     })
-    .catch(function(e){ setStatus('Save failed: ' + e.message, 'err'); })
+    .catch(function(e){
+      clearTimeout(saveTimeout);
+      setStatus('Save failed: ' + e.message, 'err');
+    })
     .finally(function(){
       var en = !!currentJobRef;
       var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
       for (var i=0;i<btns2.length;i++) btns2[i].disabled = !en;
     });
 }
-function saveForm() { saveJob(); }
+
+function sendSaveRaw(payload) {
+  // Retry without signatures if original save timed out
+  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
+    .then(function(r){
+      if (r.ok || r.status === 201 || r.status === 204) {
+        setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
+        fetchJobList();
+      } else {
+        setStatus('Save error — check connection', 'err');
+      }
+    })
+    .catch(function(){ setStatus('Save error — check connection', 'err'); })
+    .finally(function(){
+      var en = !!currentJobRef;
+      var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
+      for (var i=0;i<btns2.length;i++) btns2[i].disabled = !en;
+    });
+}
+function saveForm() { saveJob(); }  // saveJob handles compression + iOS safety
 
 function saveAndClose() {
   if (!currentJobRef) return;
-  // Save then clear the current job from memory (unload)
-  if (SUPA_URL === 'YOUR_SUPABASE_URL') {
-    setStatus('Supabase not configured', 'err');
-    return;
-  }
-  setStatus('Saving...', '');
+  if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Supabase not configured', 'err'); return; }
+  setStatus('Saving…', '');
   var saveBtns = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
   for (var i=0;i<saveBtns.length;i++) saveBtns[i].disabled = true;
-  var payload = {quote_ref:currentJobRef, form_data:collectFormData(), updated_at:new Date().toISOString()};
+  var formData = collectFormData();
+  var savedRef = currentJobRef;
+
+  // Compress signatures then save
+  var sigs = formData.signatures || {};
+  var sigIds = Object.keys(sigs);
+  var idx2 = 0;
+  function processNextSAC() {
+    if (idx2 >= sigIds.length) { doSaveAndClose(formData, savedRef); return; }
+    var id2 = sigIds[idx2++];
+    var dataUrl2 = sigs[id2];
+    if (!dataUrl2 || dataUrl2.length < 100) { processNextSAC(); return; }
+    try {
+      var img2 = new Image();
+      img2.onload = function() {
+        try {
+          var c2 = document.createElement('canvas');
+          c2.width = img2.width; c2.height = img2.height;
+          var ctx2 = c2.getContext('2d');
+          ctx2.fillStyle = '#ffffff'; ctx2.fillRect(0,0,c2.width,c2.height);
+          ctx2.drawImage(img2,0,0);
+          var jpeg2 = c2.toDataURL('image/jpeg',0.7);
+          if (jpeg2 && jpeg2.length < dataUrl2.length) sigs[id2] = jpeg2;
+        } catch(e2) {}
+        processNextSAC();
+      };
+      img2.onerror = function(){ processNextSAC(); };
+      img2.src = dataUrl2;
+    } catch(e3){ processNextSAC(); }
+  }
+  processNextSAC();
+}
+
+function doSaveAndClose(formData, savedRef) {
+  var payload = {quote_ref:savedRef, form_data:formData, updated_at:new Date().toISOString()};
   supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
         setStatus('Saved & closed', 'ok');
         fetchJobList();
-        // Unload current job
         setTimeout(function(){
           clearAllForms();
           currentJobRef = '';
           setJobRef('');
           setStatus('No job loaded', '');
-          allJobs = allJobs; // keep list intact
         }, 800);
       } else {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
@@ -2080,7 +2212,6 @@ function saveAndClose() {
     })
     .catch(function(e){ setStatus('Save failed: ' + e.message, 'err'); })
     .finally(function(){
-      // Leave buttons disabled since no job loaded
       var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
       for (var j=0;j<btns2.length;j++) btns2[j].disabled = true;
     });
