@@ -480,7 +480,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
       <div class="fc"><input type="text" id="so_site" class="shared-ro"></div></div>
     <div class="field-row lw">
       <div class="fc lbl">What3Words</div>
-      <div class="fc" style="display:flex;align-items:center;gap:6px;"><input type="text" id="so_w3w" placeholder="///word.word.word" style="flex:1;min-width:0;" oninput="var pw=document.getElementById('p_w3w');if(pw)pw.value=this.value;syncShared();updateW3WLink('so_w3w_link',this.value);scheduleAutoSave('signoff')"><a id="so_w3w_link" href="#" target="_blank" onclick="return openW3W('so_w3w')" style="display:none;background:#e11f26;color:white;border-radius:4px;padding:5px 9px;font-size:11px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-decoration:none;white-space:nowrap;">&#128205; w3w</a></div></div>
+      <div class="fc" style="display:flex;align-items:center;gap:6px;"><input type="text" id="so_w3w" placeholder="///word.word.word" style="flex:1;min-width:0;" oninput="var mw=document.getElementById('ms_w3w');if(mw)mw.value=this.value;updateW3WLink('so_w3w_link',this.value);updateW3WLink('ms_w3w_link',this.value);scheduleAutoSave('signoff')"><a id="so_w3w_link" href="#" target="_blank" onclick="return openW3W('so_w3w')" style="display:none;background:#e11f26;color:white;border-radius:4px;padding:5px 9px;font-size:11px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-decoration:none;white-space:nowrap;">&#128205; w3w</a></div></div>
     <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Works Completed</div>
       <div class="fc" style="padding:8px 12px;"><textarea id="so_works" style="min-height:120px;" placeholder="Describe the arboricultural works completed..."></textarea></div></div>
   </div>
@@ -533,7 +533,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
     <div class="field-row lw"><div class="fc lbl">Site Location</div>
       <div class="fc"><input type="text" id="ms_site" class="shared-ro"></div></div>
     <div class="field-row lw"><div class="fc lbl">What3Words</div>
-      <div class="fc" style="display:flex;align-items:center;gap:6px;"><input type="text" id="ms_w3w" placeholder="///word.word.word" style="flex:1;min-width:0;" oninput="var pw=document.getElementById('p_w3w');if(pw)pw.value=this.value;syncShared();updateW3WLink('ms_w3w_link',this.value);scheduleAutoSave('method')"><a id="ms_w3w_link" href="#" target="_blank" onclick="return openW3W('ms_w3w')" style="display:none;background:#e11f26;color:white;border-radius:4px;padding:5px 9px;font-size:11px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-decoration:none;white-space:nowrap;">&#128205; w3w</a></div></div>
+      <div class="fc" style="display:flex;align-items:center;gap:6px;"><input type="text" id="ms_w3w" placeholder="///word.word.word" style="flex:1;min-width:0;" oninput="var sw=document.getElementById('so_w3w');if(sw)sw.value=this.value;updateW3WLink('ms_w3w_link',this.value);updateW3WLink('so_w3w_link',this.value);scheduleAutoSave('method')"><a id="ms_w3w_link" href="#" target="_blank" onclick="return openW3W('ms_w3w')" style="display:none;background:#e11f26;color:white;border-radius:4px;padding:5px 9px;font-size:11px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-decoration:none;white-space:nowrap;">&#128205; w3w</a></div></div>
   </div>
   
   <div class="sec-head">Key Personnel</div>
@@ -1422,9 +1422,9 @@ function init() {
 var SHARED_MAP = {
   p_client:     ['so_client','ms_client'],
   p_address:    ['so_site','ms_site','dr_site'],
-  p_quote:      ['so_quote','ms_jobno','dr_quote'],
-  p_w3w:        ['so_w3w','ms_w3w']
-  // p_supervisor intentionally removed — each form's supervisor is independent
+  p_quote:      ['so_quote','ms_jobno','dr_quote']
+  // p_w3w removed — w3w fields sync directly to avoid restore wipe
+  // p_supervisor removed — each form's supervisor is independent
 };
 
 function buildSupervisorList() {
@@ -2013,7 +2013,7 @@ function loadJobByRef(ref) {
             if (msnt) msnt.value = fd.ms_super_name_text;
           }
           // Also ensure shared text fields are properly restored
-          var sharedFields = ['so_client','ms_client','so_site','ms_site','so_quote','ms_jobno','dr_quote','dr_site'];
+          var sharedFields = ['so_client','ms_client','so_site','ms_site','so_quote','ms_jobno','dr_quote','dr_site','so_w3w','ms_w3w'];
           for (var sf = 0; sf < sharedFields.length; sf++) {
             var fld = document.getElementById(sharedFields[sf]);
             if (fld && fd[sharedFields[sf]]) fld.value = fd[sharedFields[sf]];
@@ -2302,7 +2302,7 @@ function restoreFormData(data) {
   if (!data) return;
   if (data._custom_staff)    CUSTOM_STAFF    = data._custom_staff;
   if (data._custom_machines) CUSTOM_MACHINES = data._custom_machines;
-  var SKIP = {signatures:1,id:1,created_at:1,updated_at:1,_custom_staff:1,_custom_machines:1};
+  var SKIP = {signatures:1,id:1,created_at:1,updated_at:1,_custom_staff:1,_custom_machines:1,p_w3w:1};
   for (var key in data) {
     if (SKIP[key]) continue;
     var el = document.getElementById(key);
