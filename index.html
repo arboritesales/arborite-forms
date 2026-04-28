@@ -415,8 +415,6 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
       <tr><td><textarea id="risk2a" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk2b" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk2c" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk2d" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td></tr>
       <tr><td><textarea id="risk3a" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk3b" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk3c" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk3d" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td></tr>
       <tr><td><textarea id="risk4a" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk4b" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk4c" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk4d" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td></tr>
-      <tr><td><textarea id="risk5a" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk5b" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk5c" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk5d" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td></tr>
-      <tr><td><textarea id="risk6a" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk6b" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk6c" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td><td><textarea id="risk6d" style="min-height:50px;font-size:12px;padding:4px;"></textarea></td></tr>
     </tbody>
   </table>
   <div class="sec-head">Emergency Planning</div>
@@ -483,8 +481,8 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
     <div class="field-row lw">
       <div class="fc lbl">What3Words</div>
       <div class="fc" style="display:flex;align-items:center;gap:6px;"><input type="text" id="so_w3w" placeholder="///word.word.word" style="flex:1;min-width:0;" oninput="var mw=document.getElementById('ms_w3w');if(mw)mw.value=this.value;updateW3WLink('so_w3w_link',this.value);updateW3WLink('ms_w3w_link',this.value);scheduleAutoSave('signoff')"><a id="so_w3w_link" href="#" target="_blank" onclick="return openW3W('so_w3w')" style="display:none;background:#e11f26;color:white;border-radius:4px;padding:5px 9px;font-size:11px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-decoration:none;white-space:nowrap;">&#128205; w3w</a></div></div>
-    <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Works Completed</div>
-      <div class="fc" style="padding:8px 12px;"><textarea id="so_works" style="min-height:120px;" placeholder="Describe the arboricultural works completed..."></textarea></div></div>
+    <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Project Scope</div>
+      <div class="fc" style="padding:8px 12px;"><textarea id="so_works" style="min-height:120px;" placeholder="Describe the project scope..." oninput="var ms=document.getElementById('ms_scope');if(ms)ms.value=this.value;scheduleAutoSave('signoff')"></textarea></div></div>
   </div>
   <div class="sec-head">Client Sign Off</div>
   <div class="notice">I certify that all the above works have been fully completed to my satisfaction.</div>
@@ -525,8 +523,8 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
   <div class="field-grid">
     <div class="field-row lw"><div class="fc lbl">Document / Job Number</div>
       <div class="fc"><input type="text" id="ms_jobno" class="shared-ro"></div></div>
-    <div class="field-row lw"><div class="fc lbl">Project Scope</div>
-      <div class="fc"><input type="text" id="ms_scope"></div></div>
+    <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Project Scope</div>
+      <div class="fc" style="padding:8px 12px;"><textarea id="ms_scope" style="min-height:180px;" placeholder="Auto-populated from Work Spec & Sign Off..."></textarea></div></div>
     <div class="field-row lw"><div class="fc lbl">Client</div>
       <div class="fc"><input type="text" id="ms_client" class="shared-ro" oninput="var p=document.getElementById('p_client');if(p)p.value=this.value;syncShared()"></div></div>
   </div>
