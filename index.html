@@ -126,7 +126,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
 .ovr-btn.sel-excellent{background:#2d5a1b;color:white;border-color:#2d5a1b;}
 .ovr-btn.sel-satisfactory{background:#e65100;color:white;border-color:#e65100;}
 .ovr-btn.sel-unsatisfactory{background:#c62828;color:white;border-color:#c62828;}
-@media print{.lock-screen,.tab-bar,.job-bar,.print-bar,.modal-bg{display:none!important;}.panel{display:block!important;}.form-wrap{box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;}}
+@media print{.lock-screen,.tab-bar,.job-bar,.print-bar,.modal-bg{display:none!important;}.panel{display:none!important;}.panel.printing-active{display:block!important;}.form-wrap{box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;}}
 @media(max-width:600px){
   .field-row.c2{grid-template-columns:1fr!important;}
   .field-row.c4{grid-template-columns:1fr!important;}
@@ -1422,7 +1422,7 @@ var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads
 
 function init() {
   CUSTOM_STAFF = []; CUSTOM_MACHINES = []; allJobs = []; currentJobRef = ''; pads = {}; drCount = 0; docStore = {};
-  STAFF    = ["Joe Grace", "Liam Cooper", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Haiden Rodbard-Brown", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware"];
+  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Haiden Rodbard-Brown", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware"];
   MACHINES = ["ARB Team", "Kubota 2.7", "CC145", "Cutter", "LV800", "Climber", "MEWP", "Hinowa 2010", "TPF", "FSID74", "Sub Contractor"];
 }
 
@@ -2422,17 +2422,19 @@ function setOverall(val) {
 
 // ── PRINT / CLEAR ──
 function printPanel(id) {
-  // Make sure only the target panel is visible for printing
+  // Add printing-active class only to the target panel so only it prints
   var allPanels = document.querySelectorAll('.panel');
   for (var i = 0; i < allPanels.length; i++) {
-    allPanels[i].style.display = (allPanels[i].id === id) ? 'block' : 'none';
+    allPanels[i].classList.remove('printing-active');
   }
+  var target = document.getElementById(id);
+  if (target) target.classList.add('printing-active');
   window.print();
-  // After print, restore correct state
+  // After print dialog closes, remove the class
   setTimeout(function(){
     var allP = document.querySelectorAll('.panel');
     for (var j = 0; j < allP.length; j++) {
-      allP[j].style.display = (allP[j].id === id) ? 'block' : 'none';
+      allP[j].classList.remove('printing-active');
     }
   }, 1000);
 }
@@ -2853,15 +2855,10 @@ function attachAutoSave(panelId) {
 
   <div class="sec-head">Common Factor Risk Assessment</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div style="background:#f0f4e8;border:1px solid #c8dda0;border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span style="font-size:22px;">&#128196;</span>
-      <div style="flex:1;min-width:160px;">
-        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:2px;">ATS Ltd Common Factor Risk Assessments V9</div>
-        <div style="font-size:11px;color:var(--mid);">Permanent document &mdash; 13.06.2025 &mdash; PDF</div>
-      </div>
-      <button onclick="viewPermanentDoc('ats_cfra')" style="background:var(--green);color:white;padding:6px 14px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;border:none;flex-shrink:0;">&#128065; View</button>
+    <div style="margin-bottom:10px;">
+      <button onclick="document.getElementById('doc_input_risk_assessment').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_risk_assessment" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'risk_assessment')">
     </div>
-    <div id="doc_list_risk_assessment" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:0;"></div>
+    <div id="doc_list_risk_assessment" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
   </div>
 
   <div class="sec-head">Method Statement</div>
