@@ -319,8 +319,8 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
       <div class="fc"><input type="text" id="p_client" oninput="syncShared()" placeholder="Auto-populates other forms"></div></div>
     <div class="field-row c2"><div class="fc lbl">Quote Ref</div>
       <div class="fc"><input type="text" id="p_quote" oninput="onQuoteRefInput(this.value)" placeholder="e.g. QU-2714" style="text-transform:uppercase;"></div>
-      <div class="fc lbl">Site Address incl. Postcode</div>
-      <div class="fc"><input type="text" id="p_address" oninput="syncShared()"></div></div>
+      <div class="fc lbl">Site Location</div>
+      <div class="fc"><input type="text" id="p_address" class="shared-ro" oninput="syncShared()"></div></div>
     <div class="field-row lw"><div class="fc lbl">Client Contact Details</div>
       <div class="fc"><input type="text" id="p_client_contact"></div></div>
     <div class="field-row lw"><div class="fc lbl">Nearest A&amp;E (telephone)</div>
@@ -533,7 +533,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
       <div class="fc"><input type="text" id="ms_jobno" class="shared-ro"></div></div>
     <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Project Scope</div>
       <div class="fc" style="padding:8px 12px;"><textarea id="ms_scope" style="min-height:160px;" placeholder="Describe the arboricultural works completed..."></textarea></div></div>
-    <div class="field-row lw"><div class="fc lbl">Client</div>
+    <div class="field-row lw"><div class="fc lbl">Client Name</div>
       <div class="fc"><input type="text" id="ms_client" class="shared-ro" oninput="var p=document.getElementById('p_client');if(p)p.value=this.value;syncShared()"></div></div>
   </div>
   <div class="contractor-block"><strong>Contractor</strong>Arborite Tree Services Limited &nbsp;|&nbsp; 12-20 Oxford House, Oxford Street, NEWBURY, Berkshire, RG14 1JB</div>
@@ -691,7 +691,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
   <div class="sec-head">Register Details</div>
   <div class="field-grid">
     <div class="field-row c2">
-      <div class="fc lbl">Site / Job Name</div><div class="fc"><input type="text" id="dr_site" class="shared-ro" oninput="var p=document.getElementById('p_address');if(p)p.value=this.value;syncShared()"></div>
+      <div class="fc lbl">Client Name</div><div class="fc"><input type="text" id="dr_site" class="shared-ro" oninput="var p=document.getElementById('p_client');if(p)p.value=this.value;syncShared()"></div>
       <div class="fc lbl">Quote Ref</div><div class="fc"><input type="text" id="dr_quote" class="shared-ro"></div>
     </div>
     <div class="field-row c2">
@@ -1428,8 +1428,8 @@ function init() {
 
 // ── SHARED FIELD MAP ──
 var SHARED_MAP = {
-  p_client:     ['so_client','ms_client'],
-  p_address:    ['so_site','ms_site','dr_site'],
+  p_client:     ['so_client','ms_client','dr_site'],
+  p_address:    ['so_site','ms_site'],
   p_quote:      ['so_quote','ms_jobno','dr_quote'],
   so_works:     ['ms_scope']
   // p_w3w removed — w3w fields sync directly to avoid restore wipe
