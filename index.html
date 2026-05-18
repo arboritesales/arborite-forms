@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2d5a1b">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="arborite-logo-192.png" type="image/png">
+<link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap');
@@ -4051,5 +4055,12 @@ function attachAutoSave(panelId) {
   </div>
 </div>
 
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  });
+}
+</script>
 </body>
 </html>
