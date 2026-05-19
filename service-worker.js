@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arborite-field-forms-new-pwa-v1';
+const CACHE_NAME = 'arborite-field-forms-v2';
 const APP_SHELL = [
   './',
   './index.html',
