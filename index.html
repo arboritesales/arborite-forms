@@ -1960,6 +1960,46 @@ function setStatus(msg, type) {
   el.className = 'job-status' + (type ? ' ' + type : '');
 }
 
+// ── SUPABASE STORAGE (signatures) ──
+var SIG_BUCKET = 'signatures';
+
+function _storagePath(quoteRef, sigId) {
+  return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + sigId + '.jpg';
+}
+function _storagePublicUrl(path) {
+  return SUPA_URL + '/storage/v1/object/public/' + SIG_BUCKET + '/' + path;
+}
+function _uploadSig(path, jpegDataUrl) {
+  var base64 = jpegDataUrl.split(',')[1];
+  if (!base64) return Promise.reject(new Error('bad dataUrl'));
+  var chars = atob(base64), bytes = new Uint8Array(chars.length);
+  for (var i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
+  return fetch(SUPA_URL + '/storage/v1/object/' + SIG_BUCKET + '/' + path, {
+    method: 'POST',
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},
+    body: bytes, credentials: 'omit', mode: 'cors'
+  });
+}
+function _deleteStorageFolder(quoteRef) {
+  var prefix = quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/';
+  fetch(SUPA_URL + '/storage/v1/object/list/' + SIG_BUCKET, {
+    method: 'POST',
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+    body: JSON.stringify({prefix:prefix, limit:500}), credentials:'omit'
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(files){
+    if (!files || !files.length) return;
+    var names = files.map(function(f){ return prefix + f.name; });
+    fetch(SUPA_URL + '/storage/v1/object/' + SIG_BUCKET, {
+      method: 'DELETE',
+      headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+      body: JSON.stringify({prefixes: names}), credentials: 'omit'
+    });
+  })
+  .catch(function(){});
+}
+
 function fetchJobList() {
   supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&order=updated_at.desc&limit=200')
     .then(function(r) {
@@ -1982,6 +2022,7 @@ function deleteJob(ref) {
   supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))
     .then(function(r) {
       if (r.ok || r.status === 204) {
+        _deleteStorageFolder(ref); // clean up signature files from Storage
         allJobs = allJobs.filter(function(j){ return j.quote_ref !== ref; });
         renderJobList(allJobs);
         if (currentJobRef === ref) {
@@ -2091,18 +2132,18 @@ function saveJob() {
   for (var i=0;i<saveBtns.length;i++) saveBtns[i].disabled = true;
 
   // Flush current canvas pixel data into pads[id].dataUrl before collecting.
-  // This catches signatures where the user lifted the pen outside the canvas
-  // boundary (mouseup/touchend never fired on the element in that case).
+  // Skip canvases already pointing at a Storage ref — only flush ones the
+  // user has drawn on (dataUrl is base64 or unset).
   for (var _sid in pads) {
     var _sp = pads[_sid];
-    if (_sp && _sp.sized) {
-      var _sc = _sp.canvas || document.getElementById(_sid);
-      if (_sc) {
-        try {
-          var _su = _sc.toDataURL('image/png');
-          if (_su && _su.length > 100 && _su !== 'data:,') _sp.dataUrl = _su;
-        } catch(e) {}
-      }
+    if (!_sp || !_sp.sized) continue;
+    if (_sp.dataUrl && _sp.dataUrl.indexOf('storage:') === 0) continue;
+    var _sc = _sp.canvas || document.getElementById(_sid);
+    if (_sc) {
+      try {
+        var _su = _sc.toDataURL('image/png');
+        if (_su && _su.length > 100 && _su !== 'data:,') _sp.dataUrl = _su;
+      } catch(e) {}
     }
   }
 
@@ -2114,19 +2155,17 @@ function saveJob() {
 }
 
 function doSaveJob(formData) {
-  // Attempt to compress signatures to JPEG before saving
+  // Step 1: compress PNG signatures to JPEG
   var sigs = formData.signatures || {};
   var sigIds = Object.keys(sigs);
   var idx = 0;
 
-  function processNext() {
-    if (idx >= sigIds.length) {
-      sendSave(formData);
-      return;
-    }
+  function compressNext() {
+    if (idx >= sigIds.length) { uploadSigsToStorage(formData); return; }
     var id = sigIds[idx++];
     var dataUrl = sigs[id];
-    if (!dataUrl || dataUrl.length < 100) { processNext(); return; }
+    // Skip already-stored refs and short/empty values
+    if (!dataUrl || dataUrl.length < 100 || dataUrl.indexOf('data:') !== 0) { compressNext(); return; }
     try {
       var img = new Image();
       img.onload = function() {
@@ -2140,13 +2179,39 @@ function doSaveJob(formData) {
           var jpeg = c.toDataURL('image/jpeg', 0.7);
           if (jpeg && jpeg.length < dataUrl.length) sigs[id] = jpeg;
         } catch(e) {}
-        processNext();
+        compressNext();
       };
-      img.onerror = function() { processNext(); };
+      img.onerror = function() { compressNext(); };
       img.src = dataUrl;
-    } catch(e) { processNext(); }
+    } catch(e) { compressNext(); }
   }
-  processNext();
+  compressNext();
+}
+
+function uploadSigsToStorage(formData) {
+  // Step 2: upload new base64 signatures to Storage, replace with path refs
+  var sigs = formData.signatures || {};
+  var toUpload = Object.keys(sigs).filter(function(id) {
+    return sigs[id] && sigs[id].indexOf('data:') === 0 && sigs[id].length > 100;
+  });
+  var idx = 0;
+
+  function uploadNext() {
+    if (idx >= toUpload.length) { sendSave(formData); return; }
+    var id = toUpload[idx++];
+    var path = _storagePath(currentJobRef, id);
+    _uploadSig(path, sigs[id])
+      .then(function(r) {
+        if (r.ok || r.status === 200 || r.status === 201) {
+          sigs[id] = 'storage:' + path;
+          // Update pads cache so subsequent saves stay as storage refs
+          if (pads[id]) pads[id].dataUrl = 'storage:' + path;
+        }
+        uploadNext();
+      })
+      .catch(function() { uploadNext(); }); // keep base64 if upload fails
+  }
+  uploadNext();
 }
 
 function sendSave(formData) {
@@ -2295,8 +2360,9 @@ function collectFormData() {
     var padCanvas = pads[id].canvas || document.getElementById(id);
     if (!padCanvas) continue;
     pads[id].canvas = padCanvas;
-    if (pads[id].dataUrl && pads[id].dataUrl.length > 100) {
-      data.signatures[id] = pads[id].dataUrl;
+    var _dUrl = pads[id].dataUrl;
+    if (_dUrl && (_dUrl.length > 100 || _dUrl.indexOf('storage:') === 0)) {
+      data.signatures[id] = _dUrl;
     } else if (pads[id].sized) {
       try {
         var url = padCanvas.toDataURL('image/png');
@@ -2407,13 +2473,53 @@ var sigCache = {}; // persistent store: sigCache[id] = dataUrl
 
 function restoreSig(id, dataUrl) {
   if (!dataUrl || dataUrl === 'data:,') return;
-  // Store in sigCache so it survives across panel show/hide cycles
+
+  // Storage reference — fetch the image then treat like a normal base64 sig
+  if (dataUrl.indexOf('storage:') === 0) {
+    var path = dataUrl.substring(8);
+    var url = _storagePublicUrl(path);
+    // Keep the storage ref in pads so collectFormData can preserve it
+    // if the user saves without redrawing
+    if (!pads[id]) pads[id] = {canvas:null, ctx:null, sized:false, dataUrl:dataUrl};
+    else pads[id].dataUrl = dataUrl;
+    fetch(url, {credentials:'omit', mode:'cors'})
+      .then(function(r) { return r.blob(); })
+      .then(function(blob) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var b64 = e.target.result;
+          sigCache[id] = b64;
+          if (pads[id]) pads[id].dataUrl = dataUrl; // keep storage ref, not base64
+          drawSigFromCache_b64(id, b64);
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(function() {});
+    return;
+  }
+
+  // Plain base64 data URL (legacy jobs saved before Storage migration)
   sigCache[id] = dataUrl;
-  // Also store in pads immediately for collectFormData
   if (!pads[id]) pads[id] = {canvas:null, ctx:null, sized:false, dataUrl:dataUrl};
   else pads[id].dataUrl = dataUrl;
-  // Try to draw now if canvas is already in DOM
   drawSigFromCache(id);
+}
+
+// Draw a specific base64 url onto a canvas without touching pads[id].dataUrl
+function drawSigFromCache_b64(id, b64url) {
+  var canvas = document.getElementById(id);
+  if (!canvas) return;
+  initSig(id);
+  var p = pads[id];
+  if (!p || !p.ctx || !p.canvas) return;
+  var img = new Image();
+  img.onload = function() {
+    p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
+    p.ctx.drawImage(img, 0, 0,
+      p.canvas.width / (window.devicePixelRatio || 1),
+      p.canvas.height / (window.devicePixelRatio || 1));
+  };
+  img.src = b64url;
 }
 
 function drawSigFromCache(id) {
