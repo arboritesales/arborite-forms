@@ -59,11 +59,14 @@ function init() {
 // ── SHARED FIELD MAP ──
 var SHARED_MAP = {
   p_client:     ['so_client','ms_client','dr_site'],
-  p_address:    ['so_site','ms_site'],
-  p_quote:      ['so_quote','ms_jobno','dr_quote'],
-  so_site:      ['p_address','ms_site'],
-  so_quote:     ['p_quote','ms_jobno','dr_quote'],
-  so_works:     ['ms_scope']
+  p_address:    ['so_site','ms_site','wl_site'],
+  p_quote:      ['so_quote','ms_jobno','dr_quote','wl_quote'],
+  so_site:      ['p_address','ms_site','wl_site'],
+  so_quote:     ['p_quote','ms_jobno','dr_quote','wl_quote'],
+  so_works:     ['ms_scope','wl_scope'],
+  wl_quote:     ['p_quote','so_quote','ms_jobno','dr_quote'],
+  wl_site:      ['p_address','so_site','ms_site'],
+  wl_scope:     ['so_works','ms_scope']
   // p_w3w removed — w3w fields sync directly to avoid restore wipe
   // p_supervisor removed — each form's supervisor is independent
 };

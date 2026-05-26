@@ -326,11 +326,11 @@
 
   <div class="sec-head">Work Details</div>
   <div class="field-grid">
-    <div class="field-row lw"><div class="fc lbl">Job Reference</div><div class="fc"><input type="text" id="wl_job_ref" placeholder="Job / Quote Reference"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Quote Ref</div><div class="fc"><input type="text" id="wl_quote" class="shared-ro" oninput="onQuoteRefInput(this.value)" placeholder="e.g. QU-2714" style="text-transform:uppercase;"></div></div>
     <div class="field-row lw"><div class="fc lbl">Date of Inspection</div><div class="fc"><input type="date" id="wl_date"></div></div>
-    <div class="field-row lw"><div class="fc lbl">Site Address</div><div class="fc"><input type="text" id="wl_site_address" placeholder="Full site address"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Site Location</div><div class="fc"><input type="text" id="wl_site" class="shared-ro" oninput="syncShared()" placeholder="Site location"></div></div>
     <div class="field-row lw"><div class="fc lbl">Inspector Name</div><div class="fc"><input type="text" id="wl_inspector" placeholder="Name of person undertaking inspection"></div></div>
-    <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">General Description of Works</div><div class="fc"><textarea id="wl_works_desc" rows="3" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:8px 12px;font-size:12.5px;font-family:inherit;resize:vertical;outline:none;background:transparent;" placeholder="Describe the works to be carried out..."></textarea></div></div>
+    <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Project Scope</div><div class="fc"><textarea id="wl_scope" class="shared-ro" rows="3" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:8px 12px;font-size:12.5px;font-family:inherit;resize:vertical;outline:none;background:transparent;" oninput="syncShared()" placeholder="Describe the arboricultural works..."></textarea></div></div>
   </div>
 
   <div class="sec-head">Nesting Season Awareness</div>
