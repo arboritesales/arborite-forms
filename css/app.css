@@ -117,7 +117,7 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
 .ovr-btn.sel-excellent{background:#2d5a1b;color:white;border-color:#2d5a1b;}
 .ovr-btn.sel-satisfactory{background:#e65100;color:white;border-color:#e65100;}
 .ovr-btn.sel-unsatisfactory{background:#c62828;color:white;border-color:#c62828;}
-@media print{.lock-screen,.tab-bar,.job-bar,.print-bar,.modal-bg{display:none!important;}.panel{display:none!important;}.panel.printing-active{display:block!important;}.form-wrap{box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;}}
+@media print{.lock-screen,.tab-bar,.job-bar,.print-bar,.modal-bg{display:none!important;}.panel{display:none!important;}.panel.printing-active{display:block!important;}.form-wrap{box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;}#tbtView{display:none!important;}#tbtView.printing-tbt{display:block!important;position:static!important;overflow:visible!important;background:white!important;z-index:auto!important;padding:0!important;}#tbtView.printing-tbt .tbt-no-print{display:none!important;}#tbtView.printing-tbt #tbtListPanel{display:none!important;}#tbtView.printing-tbt #tbtFormPanel{display:block!important;}#tbtView.printing-tbt .form-wrap{box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;}}
 @media(max-width:600px){
   .field-row.c2{grid-template-columns:1fr!important;}
   .field-row.c4{grid-template-columns:1fr!important;}

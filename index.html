@@ -2459,6 +2459,106 @@
         <div style="font-size:12px;color:rgba(200,255,100,.7);letter-spacing:.3px;margin-top:2px;">Equipment &amp; PPE checks</div>
       </div>
 
+      <div style="background:#305818;border:1px solid rgba(126,200,32,.5);border-radius:10px;padding:26px 20px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px;-webkit-tap-highlight-color:transparent;"
+           onmouseover="this.style.background='#3d6a1b';this.style.transform='translateY(-2px)'"
+           onmouseout="this.style.background='#305818';this.style.transform=''"
+           onclick="openTBTView()">
+        <div style="font-size:40px;line-height:1;margin-bottom:4px;">&#128172;</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:white;line-height:1.2;">Toolbox Talks</div>
+        <div style="font-size:12px;color:rgba(200,255,100,.7);letter-spacing:.3px;margin-top:2px;">TBT report forms</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOOLBOX TALKS VIEW ═══ -->
+<div id="tbtView" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#2d5218;overflow-y:auto;z-index:950;padding:0 0 40px;">
+
+  <!-- Header -->
+  <div class="tbt-no-print" style="background:#1a3210;padding:14px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,.4);">
+    <button onclick="closeTBTView()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8592; Office</button>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;flex:1;">&#128172; Toolbox Talks</div>
+    <button onclick="newTBT()" style="background:var(--lime);border:none;color:#1a3210;padding:7px 16px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">+ New TBT</button>
+  </div>
+
+  <!-- LIST PANEL -->
+  <div id="tbtListPanel" style="padding:20px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;">Saved Toolbox Talks</div>
+    <div id="tbtList"><div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading...</div></div>
+  </div>
+
+  <!-- FORM PANEL -->
+  <div id="tbtFormPanel" style="display:none;">
+    <div class="tbt-no-print" style="padding:12px 20px;display:flex;align-items:center;gap:12px;background:#305818;border-bottom:1px solid rgba(126,200,32,.3);position:sticky;top:60px;z-index:9;">
+      <button onclick="showTBTList();fetchTBTList()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:6px 12px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8592; All TBTs</button>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--lime);letter-spacing:.5px;flex:1;" id="tbtRef">TBT-...</div>
+      <button id="tbtSaveBtn" onclick="saveTBT()" style="background:var(--lime);border:none;color:#1a3210;padding:7px 16px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Save</button>
+    </div>
+
+    <div class="form-wrap" style="margin:20px;">
+
+      <div class="notice-green" style="padding:14px 18px;font-size:12px;line-height:1.8;">
+        <strong style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);margin-bottom:6px;">About Toolbox Talks</strong>
+        <ol style="margin:0;padding-left:18px;color:var(--mid);">
+          <li>A Toolbox Talk is an informal group discussion that focuses on a health &amp; safety issue, carried out on an ad-hoc basis to promote a safety culture.</li>
+          <li>They encourage everyone to explore the risks of specific issues and think about ways to deal with them.</li>
+          <li>Anyone can present a TBT — you don't need to be an expert. Present clearly and take the process seriously.</li>
+          <li>TBTs should cover issues identified from site walks, operational activity or business processes such as risk assessments or LOLER.</li>
+          <li>This form does not need to record every detail — the key points are enough.</li>
+        </ol>
+      </div>
+
+      <div class="sec-head">TBT Details</div>
+      <div class="field-grid">
+        <div class="field-row lw"><div class="fc lbl">Date</div><div class="fc"><input type="date" id="tbt_date"></div></div>
+        <div class="field-row lw"><div class="fc lbl">Presented By</div><div class="fc"><input type="text" id="tbt_presenter" placeholder="Name of presenter"></div></div>
+        <div class="field-row lw"><div class="fc lbl">Topic / Title</div><div class="fc"><input type="text" id="tbt_topic" placeholder="Subject of this toolbox talk"></div></div>
+      </div>
+
+      <div class="sec-head">Main Points of Discussion</div>
+      <div class="field-grid">
+        <div class="field-row"><div class="fc" style="padding:0;"><textarea id="tbt_points" rows="7" style="width:100%;border:none;padding:10px 14px;font-size:12.5px;font-family:inherit;resize:vertical;outline:none;background:transparent;" placeholder="Record the main points discussed during this talk..."></textarea></div></div>
+      </div>
+
+      <div class="sec-head">Action Points</div>
+      <div class="field-grid">
+        <div class="field-row"><div class="fc" style="padding:0;"><textarea id="tbt_action_points" rows="5" style="width:100%;border:none;padding:10px 14px;font-size:12.5px;font-family:inherit;resize:vertical;outline:none;background:transparent;" placeholder="List any actions arising from this talk..."></textarea></div></div>
+      </div>
+
+      <div class="sec-head">Employee Acknowledgements</div>
+      <div style="border-bottom:1px solid var(--border);">
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid var(--green);background:var(--green-light);">
+          <div style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--green);border-right:1px solid var(--border);">Print Name</div>
+          <div style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--green);">Signature</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);align-items:center;">
+          <div style="padding:8px 14px;border-right:1px solid var(--border);"><input type="text" id="tbt_name1" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:4px 0;font-size:12.5px;background:transparent;outline:none;" placeholder="Name"></div>
+          <div style="padding:6px 14px;"><div class="sig-wrap"><canvas id="tbt_sig_1" height="60"></canvas><button class="sig-clr" data-sig="tbt_sig_1" onclick="clrSig(this.dataset.sig)">Clear</button></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);align-items:center;">
+          <div style="padding:8px 14px;border-right:1px solid var(--border);"><input type="text" id="tbt_name2" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:4px 0;font-size:12.5px;background:transparent;outline:none;" placeholder="Name"></div>
+          <div style="padding:6px 14px;"><div class="sig-wrap"><canvas id="tbt_sig_2" height="60"></canvas><button class="sig-clr" data-sig="tbt_sig_2" onclick="clrSig(this.dataset.sig)">Clear</button></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);align-items:center;">
+          <div style="padding:8px 14px;border-right:1px solid var(--border);"><input type="text" id="tbt_name3" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:4px 0;font-size:12.5px;background:transparent;outline:none;" placeholder="Name"></div>
+          <div style="padding:6px 14px;"><div class="sig-wrap"><canvas id="tbt_sig_3" height="60"></canvas><button class="sig-clr" data-sig="tbt_sig_3" onclick="clrSig(this.dataset.sig)">Clear</button></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);align-items:center;">
+          <div style="padding:8px 14px;border-right:1px solid var(--border);"><input type="text" id="tbt_name4" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:4px 0;font-size:12.5px;background:transparent;outline:none;" placeholder="Name"></div>
+          <div style="padding:6px 14px;"><div class="sig-wrap"><canvas id="tbt_sig_4" height="60"></canvas><button class="sig-clr" data-sig="tbt_sig_4" onclick="clrSig(this.dataset.sig)">Clear</button></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);align-items:center;">
+          <div style="padding:8px 14px;border-right:1px solid var(--border);"><input type="text" id="tbt_name5" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:4px 0;font-size:12.5px;background:transparent;outline:none;" placeholder="Name"></div>
+          <div style="padding:6px 14px;"><div class="sig-wrap"><canvas id="tbt_sig_5" height="60"></canvas><button class="sig-clr" data-sig="tbt_sig_5" onclick="clrSig(this.dataset.sig)">Clear</button></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;align-items:center;">
+          <div style="padding:8px 14px;border-right:1px solid var(--border);"><input type="text" id="tbt_name6" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:4px 0;font-size:12.5px;background:transparent;outline:none;" placeholder="Name"></div>
+          <div style="padding:6px 14px;"><div class="sig-wrap"><canvas id="tbt_sig_6" height="60"></canvas><button class="sig-clr" data-sig="tbt_sig_6" onclick="clrSig(this.dataset.sig)">Clear</button></div></div>
+        </div>
+      </div>
+
+      <div class="print-bar"><button class="btn btn-clear" onclick="clearTBTFormFields()">Clear</button><button class="btn btn-print" onclick="printTBT()">&#128424; Save as PDF</button></div>
     </div>
   </div>
 </div>
