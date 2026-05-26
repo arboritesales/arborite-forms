@@ -73,6 +73,11 @@
         <div class="dash-tile-name">POWA</div>
         <div class="dash-tile-sub">Point of work assessment</div>
       </div>
+      <div class="dash-tile" onclick="openForm('wildlife')">
+        <div class="dash-tile-icon">&#127807;</div>
+        <div class="dash-tile-name">Wildlife Protected Species</div>
+        <div class="dash-tile-sub">Protected species inspection</div>
+      </div>
       <div class="dash-tile" onclick="openForm('documents')">
         <div class="dash-tile-icon">&#128193;</div>
         <div class="dash-tile-name">Documents</div>
@@ -129,6 +134,7 @@
   <button class="tab" onclick="showTab('method',this)">Method Statement &amp; Sign Off</button>
   <button class="tab" onclick="showTab('daily',this)">Daily Register</button>
   <button class="tab" onclick="showTab('powa',this)">POWA</button>
+  <button class="tab" onclick="showTab('wildlife',this)">Wildlife Protected Species</button>
   <button class="tab" onclick="showTab('documents',this)">Documents</button>
   <button class="tab tab-emergency" onclick="showTab('emergency',this)">&#9888; Emergency Procedure</button>
   <button class="tab" onclick="showTab('cfra',this)">Common Factor Risk Assessment</button>
@@ -305,6 +311,109 @@
   <div class="notice">I understand the risk assessments and control measures. I have received information regarding Fire, Medical Emergency and Accident Reporting. I declare that I am fit to take part in work.</div>
   <div id="opSigsPowa"></div>
   <div class="print-bar"><button class="btn btn-clear" onclick="clearForm('powa')">Clear</button><button class="btn btn-print" onclick="printPanel('powa')">&#128424; Save as PDF</button></div>
+</div></div>
+
+<!-- ═══ WILDLIFE PROTECTED SPECIES ═══ -->
+<div id="wildlife" class="panel"><div class="form-wrap">
+  <div class="notice-green" style="padding:14px 18px;font-size:12.5px;line-height:1.6;">
+    <strong style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);margin-bottom:4px;">Scope and Limitations</strong>
+    This check sheet supports basic due diligence for trained arborists during <strong>daytime tree works only</strong>. It does not replace a professional ecological survey. If Schedule 1 species are suspected, or works are planned during darkness, a licensed ecologist must be consulted before works commence.
+  </div>
+  <div class="notice-green" style="padding:14px 18px;font-size:12.5px;line-height:1.6;border-top:1px solid #c8e0bf;">
+    <strong style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--green);margin-bottom:4px;">Legal Obligations</strong>
+    Under the Wildlife &amp; Countryside Act 1981, it is an offence to intentionally take, damage or destroy the nest of any wild bird while in use or being built. All operatives must comply prior to and throughout all works.
+  </div>
+
+  <div class="sec-head">Work Details</div>
+  <div class="field-grid">
+    <div class="field-row lw"><div class="fc lbl">Job Reference</div><div class="fc"><input type="text" id="wl_job_ref" placeholder="Job / Quote Reference"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Date of Inspection</div><div class="fc"><input type="date" id="wl_date"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Site Address</div><div class="fc"><input type="text" id="wl_site_address" placeholder="Full site address"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Inspector Name</div><div class="fc"><input type="text" id="wl_inspector" placeholder="Name of person undertaking inspection"></div></div>
+    <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">General Description of Works</div><div class="fc"><textarea id="wl_works_desc" rows="3" style="width:100%;border:none;border-bottom:1px solid var(--border);padding:8px 12px;font-size:12.5px;font-family:inherit;resize:vertical;outline:none;background:transparent;" placeholder="Describe the works to be carried out..."></textarea></div></div>
+  </div>
+
+  <div class="sec-head">Nesting Season Awareness</div>
+  <div style="border-bottom:1px solid var(--border);">
+    <div style="display:grid;grid-template-columns:220px 1fr;border-bottom:1px solid var(--border);background:#f0f8ee;">
+      <div style="padding:10px 14px;font-size:12px;font-weight:700;color:#1e4010;border-right:1px solid var(--border);">Jan &middot; Sep &middot; Oct &middot; Nov &middot; Dec</div>
+      <div style="padding:10px 14px;font-size:12px;color:var(--mid);"><span style="display:inline-block;background:#d4edda;color:#155724;font-weight:700;font-size:10px;padding:2px 7px;border-radius:3px;margin-right:8px;text-transform:uppercase;">Lower Risk</span>Some species remain active year-round. An inspection is still required before work commences.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:220px 1fr;border-bottom:1px solid var(--border);background:#fffbf0;">
+      <div style="padding:10px 14px;font-size:12px;font-weight:700;color:#7a4d00;border-right:1px solid var(--border);">Feb &middot; Aug</div>
+      <div style="padding:10px 14px;font-size:12px;color:var(--mid);"><span style="display:inline-block;background:#fff3cd;color:#856404;font-weight:700;font-size:10px;padding:2px 7px;border-radius:3px;margin-right:8px;text-transform:uppercase;">Elevated Risk</span>Early nesters or late broods may be active. A careful inspection is strongly advised.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:220px 1fr;background:#fff5f5;">
+      <div style="padding:10px 14px;font-size:12px;font-weight:700;color:#721c24;border-right:1px solid var(--border);">Mar &middot; Apr &middot; May &middot; Jun &middot; Jul</div>
+      <div style="padding:10px 14px;font-size:12px;color:var(--mid);"><span style="display:inline-block;background:#f8d7da;color:#721c24;font-weight:700;font-size:10px;padding:2px 7px;border-radius:3px;margin-right:8px;text-transform:uppercase;">Peak Nesting Season</span>These months fall within the primary nesting period. A thorough inspection is mandatory before any work begins.</div>
+    </div>
+  </div>
+
+  <div class="sec-head">Pre Work Site Assessment Checklist</div>
+  <div style="border-bottom:1px solid var(--border);">
+    <label style="display:grid;grid-template-columns:44px 1fr;border-bottom:1px solid var(--border);cursor:pointer;align-items:start;">
+      <div style="display:flex;align-items:center;justify-content:center;padding:12px 0;"><input type="checkbox" id="wl_chk1" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;"></div>
+      <div style="padding:10px 14px 10px 0;"><strong style="font-size:12.5px;display:block;margin-bottom:3px;">Visual inspection of all trees to be worked on</strong><span style="font-size:11.5px;color:#5a5a52;">Stand back and observe entire canopy, trunk cavities, ivy, dense foliage and deadwood for signs of nesting activity before approaching.</span></div>
+    </label>
+    <label style="display:grid;grid-template-columns:44px 1fr;border-bottom:1px solid var(--border);cursor:pointer;align-items:start;">
+      <div style="display:flex;align-items:center;justify-content:center;padding:12px 0;"><input type="checkbox" id="wl_chk2" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;"></div>
+      <div style="padding:10px 14px 10px 0;"><strong style="font-size:12.5px;display:block;margin-bottom:3px;">Checked for occupied or active nests</strong><span style="font-size:11.5px;color:#5a5a52;">Look for nest structures containing eggs, chicks or incubating adults. Also check for nest building behaviour (birds carrying material).</span></div>
+    </label>
+    <label style="display:grid;grid-template-columns:44px 1fr;border-bottom:1px solid var(--border);cursor:pointer;align-items:start;">
+      <div style="display:flex;align-items:center;justify-content:center;padding:12px 0;"><input type="checkbox" id="wl_chk3" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;"></div>
+      <div style="padding:10px 14px 10px 0;"><strong style="font-size:12.5px;display:block;margin-bottom:3px;">Checked for birds exhibiting alarm or distress calls</strong><span style="font-size:11.5px;color:#5a5a52;">Birds repeatedly returning to an area, alarm calling, or performing distraction displays may indicate a nearby nest.</span></div>
+    </label>
+    <label style="display:grid;grid-template-columns:44px 1fr;border-bottom:1px solid var(--border);cursor:pointer;align-items:start;">
+      <div style="display:flex;align-items:center;justify-content:center;padding:12px 0;"><input type="checkbox" id="wl_chk4" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;"></div>
+      <div style="padding:10px 14px 10px 0;"><strong style="font-size:12.5px;display:block;margin-bottom:3px;">Inspected tree cavities, holes and splits</strong><span style="font-size:11.5px;color:#5a5a52;">Cavities favoured by tits, owls, woodpeckers, stock dove and treecreeper. Listen for chick calls from within before any chainsaw work.</span></div>
+    </label>
+    <label style="display:grid;grid-template-columns:44px 1fr;border-bottom:1px solid var(--border);cursor:pointer;align-items:start;">
+      <div style="display:flex;align-items:center;justify-content:center;padding:12px 0;"><input type="checkbox" id="wl_chk5" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;"></div>
+      <div style="padding:10px 14px 10px 0;"><strong style="font-size:12.5px;display:block;margin-bottom:3px;">Inspected ivy, dense creeper and tangled vegetation</strong><span style="font-size:11.5px;color:#5a5a52;">Thick ivy and creepers commonly used by wrens, robins and blackbirds for concealed nesting.</span></div>
+    </label>
+    <label style="display:grid;grid-template-columns:44px 1fr;border-bottom:1px solid var(--border);cursor:pointer;align-items:start;">
+      <div style="display:flex;align-items:center;justify-content:center;padding:12px 0;"><input type="checkbox" id="wl_chk6" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;"></div>
+      <div style="padding:10px 14px 10px 0;"><strong style="font-size:12.5px;display:block;margin-bottom:3px;">Inspected hedgerows, scrub and adjacent vegetation</strong><span style="font-size:11.5px;color:#5a5a52;">If hedge trimming or scrub clearance is involved, inspect all areas carefully. Many ground and scrub-nesting species at high risk.</span></div>
+    </label>
+    <label style="display:grid;grid-template-columns:44px 1fr;border-bottom:1px solid var(--border);cursor:pointer;align-items:start;background:#fff8f8;">
+      <div style="display:flex;align-items:center;justify-content:center;padding:12px 0;"><input type="checkbox" id="wl_chk7" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;"></div>
+      <div style="padding:10px 14px 10px 0;"><strong style="font-size:12.5px;display:block;margin-bottom:3px;">No obvious signs of Schedule 1 species &#8212; if suspected, works halted</strong><span style="font-size:11.5px;color:#5a5a52;">Arborists are not expected to make definitive Schedule 1 identifications. If any signs are suspected (barn owl, peregrine, kingfisher etc.), works must stop and a licensed ecologist contacted before resuming.</span></div>
+    </label>
+    <label style="display:grid;grid-template-columns:44px 1fr;cursor:pointer;align-items:start;">
+      <div style="display:flex;align-items:center;justify-content:center;padding:12px 0;"><input type="checkbox" id="wl_chk8" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;"></div>
+      <div style="padding:10px 14px 10px 0;"><strong style="font-size:12.5px;display:block;margin-bottom:3px;">All operatives briefed on findings and obligations</strong><span style="font-size:11.5px;color:#5a5a52;">Entire team made aware of any findings, areas to avoid and their legal obligations before works commence.</span></div>
+    </label>
+  </div>
+
+  <div class="sec-head">Initial Nesting Risk Assessment</div>
+  <div class="field-grid">
+    <div class="field-row" style="padding:12px 16px;flex-direction:column;gap:8px;">
+      <label class="opt"><input type="radio" name="wl_risk" value="low"> <strong style="color:#155724;">&#9679; Low Risk</strong> &nbsp;<span style="font-size:11.5px;color:#5a5a52;">No nesting activity observed. Proceed with normal care.</span></label>
+      <label class="opt"><input type="radio" name="wl_risk" value="medium"> <strong style="color:#856404;">&#9679; Medium Risk</strong> &nbsp;<span style="font-size:11.5px;color:#5a5a52;">Some indicators noted. Proceed with heightened caution.</span></label>
+      <label class="opt"><input type="radio" name="wl_risk" value="high"> <strong style="color:#721c24;">&#9679; High Risk / Nest Found</strong> &nbsp;<span style="font-size:11.5px;color:#5a5a52;">Active nesting confirmed. Works must be suspended.</span></label>
+    </div>
+  </div>
+
+  <div class="sec-head">Notes on Initial Assessment</div>
+  <div class="field-grid">
+    <div class="field-row"><div class="fc" style="padding:0;"><textarea id="wl_assessment_notes" rows="4" style="width:100%;border:none;padding:10px 14px;font-size:12.5px;font-family:inherit;resize:vertical;outline:none;background:transparent;" placeholder="Record observations, species suspected, areas of concern or action taken..."></textarea></div></div>
+  </div>
+
+  <div class="sec-head">Overall Outcome and Decision</div>
+  <div class="field-grid">
+    <div class="field-row" style="padding:12px 16px;flex-direction:column;gap:8px;">
+      <label class="opt"><input type="radio" name="wl_outcome" value="proceed"> <strong style="color:#155724;">&#10003; Proceed</strong> &nbsp;<span style="font-size:11.5px;color:#5a5a52;">No nesting activity found. Works can go ahead.</span></label>
+      <label class="opt"><input type="radio" name="wl_outcome" value="caution"> <strong style="color:#856404;">&#9888; Proceed with Caution</strong> &nbsp;<span style="font-size:11.5px;color:#5a5a52;">Activity noted. Works modified / areas avoided.</span></label>
+      <label class="opt"><input type="radio" name="wl_outcome" value="suspended"> <strong style="color:#721c24;">&#9940; Works Suspended</strong> &nbsp;<span style="font-size:11.5px;color:#5a5a52;">Active nest confirmed. Works halted.</span></label>
+    </div>
+  </div>
+
+  <div class="sec-head">Actions Taken or Restrictions Applied</div>
+  <div class="field-grid">
+    <div class="field-row"><div class="fc" style="padding:0;"><textarea id="wl_actions" rows="4" style="width:100%;border:none;padding:10px 14px;font-size:12.5px;font-family:inherit;resize:vertical;outline:none;background:transparent;" placeholder="e.g. Section of hedge left untouched, ecologist contacted, section of canopy left..."></textarea></div></div>
+  </div>
+
+  <div class="print-bar"><button class="btn btn-clear" onclick="clearForm('wildlife')">Clear</button><button class="btn btn-print" onclick="printPanel('wildlife')">&#128424; Save as PDF</button></div>
 </div></div>
 
 <!-- ═══ SIGN OFF ═══ -->
