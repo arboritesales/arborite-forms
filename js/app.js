@@ -630,7 +630,7 @@ function _deleteStorageFolder(quoteRef) {
 }
 
 function fetchJobList() {
-  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&order=updated_at.desc&limit=200')
+  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=not.like.TBT-*&order=updated_at.desc&limit=200')
     .then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
