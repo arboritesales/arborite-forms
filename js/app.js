@@ -650,15 +650,18 @@ var _pendingDeleteRef = null;
 
 function deleteJob(ref) {
   _pendingDeleteRef = ref;
+  // Close the load modal first so the password modal isn't hidden behind it
+  document.getElementById('loadModal').className = 'modal-bg';
   document.getElementById('deletePassInput').value = '';
   document.getElementById('deletePassErr').textContent = '';
   document.getElementById('deletePassModal').className = 'modal-bg show';
-  setTimeout(function(){ document.getElementById('deletePassInput').focus(); }, 150);
 }
 
 function hideDeleteModal() {
   document.getElementById('deletePassModal').className = 'modal-bg';
   _pendingDeleteRef = null;
+  // Re-open the load modal so the user can continue browsing jobs
+  document.getElementById('loadModal').className = 'modal-bg show';
 }
 
 function confirmDeletePass() {
@@ -670,6 +673,7 @@ function confirmDeletePass() {
     return;
   }
   document.getElementById('deletePassModal').className = 'modal-bg';
+  document.getElementById('loadModal').className = 'modal-bg';
   var ref = _pendingDeleteRef;
   _pendingDeleteRef = null;
   supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))
