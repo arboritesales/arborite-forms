@@ -1693,7 +1693,7 @@ function showTBTForm() {
   document.getElementById('tbtListPanel').style.display = 'none';
   document.getElementById('tbtFormPanel').style.display = 'block';
   document.getElementById('tbtView').scrollTop = 0;
-  setTimeout(function() { for (var i = 1; i <= 6; i++) initSig('tbt_sig_' + i); }, 60);
+  setTimeout(function() { for (var i = 1; i <= 20; i++) initSig('tbt_sig_' + i); }, 60);
 }
 
 function clearTBTFormFields() {
@@ -1701,7 +1701,7 @@ function clearTBTFormFields() {
   if (!panel) return;
   var inputs = panel.querySelectorAll('input[type="text"], input[type="date"], textarea');
   for (var i = 0; i < inputs.length; i++) inputs[i].value = '';
-  for (var s = 1; s <= 6; s++) {
+  for (var s = 1; s <= 20; s++) {
     var id = 'tbt_sig_' + s;
     var p = pads[id];
     if (p && p.ctx && p.canvas) { p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height); p.dataUrl = null; }
@@ -1725,7 +1725,7 @@ function loadTBT(ref) {
       }
       if (data.signatures) {
         setTimeout(function() {
-          for (var s = 1; s <= 6; s++) {
+          for (var s = 1; s <= 20; s++) {
             var id = 'tbt_sig_' + s;
             if (data.signatures[id]) restoreSig(id, data.signatures[id]);
           }
@@ -1743,7 +1743,7 @@ function saveTBT() {
   var data = { signatures: {} };
   var inputs = panel.querySelectorAll('input[type="text"][id], input[type="date"][id], textarea[id]');
   for (var i = 0; i < inputs.length; i++) data[inputs[i].id] = inputs[i].value;
-  for (var s = 1; s <= 6; s++) {
+  for (var s = 1; s <= 20; s++) {
     var id = 'tbt_sig_' + s;
     var p = pads[id];
     if (!p || !p.sized) continue;
