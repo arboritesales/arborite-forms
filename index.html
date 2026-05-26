@@ -2401,6 +2401,22 @@
 </div></div>
 
 </div><!-- end appView -->
+<!-- DELETE PASSWORD MODAL -->
+<div class="modal-bg" id="deletePassModal">
+  <div class="modal">
+    <h2>Delete Job</h2>
+    <p>Enter the password to permanently delete this job.</p>
+    <input type="password" id="deletePassInput" placeholder="Password"
+      style="font-size:16px;"
+      onkeydown="if(event.key==='Enter')confirmDeletePass()">
+    <div style="color:#c0392b;font-size:12px;margin-top:6px;min-height:16px;" id="deletePassErr"></div>
+    <div class="modal-btns">
+      <button class="m-btn m-cancel" onclick="hideDeleteModal()">Cancel</button>
+      <button class="m-btn m-ok" style="background:#c0392b;" onclick="confirmDeletePass()">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- OFFICE PASSWORD MODAL -->
 <div class="modal-bg" id="officePassModal">
   <div class="modal">

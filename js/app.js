@@ -646,8 +646,32 @@ function fetchJobList() {
     });
 }
 
+var _pendingDeleteRef = null;
+
 function deleteJob(ref) {
-  if (!confirm('Delete job ' + ref + '? This cannot be undone.')) return;
+  _pendingDeleteRef = ref;
+  document.getElementById('deletePassInput').value = '';
+  document.getElementById('deletePassErr').textContent = '';
+  document.getElementById('deletePassModal').className = 'modal-bg show';
+  setTimeout(function(){ document.getElementById('deletePassInput').focus(); }, 150);
+}
+
+function hideDeleteModal() {
+  document.getElementById('deletePassModal').className = 'modal-bg';
+  _pendingDeleteRef = null;
+}
+
+function confirmDeletePass() {
+  var p = document.getElementById('deletePassInput').value;
+  if (p !== '2001') {
+    document.getElementById('deletePassErr').textContent = 'Incorrect password — please try again.';
+    document.getElementById('deletePassInput').value = '';
+    document.getElementById('deletePassInput').focus();
+    return;
+  }
+  document.getElementById('deletePassModal').className = 'modal-bg';
+  var ref = _pendingDeleteRef;
+  _pendingDeleteRef = null;
   supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))
     .then(function(r) {
       if (r.ok || r.status === 204) {
