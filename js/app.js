@@ -1809,15 +1809,26 @@ function printTBT() {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('./service-worker.js').then(function(reg) {
-      // Check for a new version every time the app loads
+      // Force check for a new version every time the app loads
       reg.update();
-      // When a new service worker takes over, reload automatically to get fresh files
+      // Watch for a new SW being installed
+      reg.addEventListener('updatefound', function() {
+        var newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', function() {
+          // Once the new SW is fully activated, reload to get fresh files
+          if (newWorker.state === 'activated') {
+            window.location.reload();
+          }
+        });
+      });
+      // Fallback: also reload on controllerchange (covers skipWaiting path)
       navigator.serviceWorker.addEventListener('controllerchange', function() {
         window.location.reload();
       });
     }).catch(function() {});
   });
-  // Also check for updates whenever the app comes back into focus (e.g. switching back on phone)
+  // Check for updates whenever the app comes back into focus on phone
   window.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') {
       navigator.serviceWorker.getRegistration().then(function(reg) {
