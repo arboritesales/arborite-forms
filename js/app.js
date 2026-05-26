@@ -1642,7 +1642,7 @@ function showTBTList() {
 function fetchTBTList() {
   var listEl = document.getElementById('tbtList');
   listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading...</div>';
-  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=like.TBT-*&order=updated_at.desc&limit=100')
+  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at,form_data&quote_ref=like.TBT-*&order=updated_at.desc&limit=100')
     .then(function(r) { return r.json(); })
     .then(function(rows) {
       if (!Array.isArray(rows) || rows.length === 0) {
@@ -1653,9 +1653,14 @@ function fetchTBTList() {
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
         var d = row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
-        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadTBT(\'' + row.quote_ref + '\')">'
-          + '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + row.quote_ref + '</div>'
-          + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">Last saved: ' + d + '</div></div>'
+        var topic = (row.form_data && row.form_data.tbt_topic) ? row.form_data.tbt_topic : '';
+        var ref = row.quote_ref;
+        // Build display: show topic as main heading if available, ref as secondary
+        var mainLine = topic ? topic : ref;
+        var subLine = topic ? ref + ' &nbsp;·&nbsp; ' + d : 'Last saved: ' + d;
+        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadTBT(\'' + ref + '\')">'
+          + '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+          + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div></div>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
           + '</div>';
       }
