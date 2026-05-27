@@ -647,10 +647,20 @@ function fetchJobList() {
 }
 
 var _pendingDeleteRef = null;
+var _pendingDeleteIsTBT = false;
 
 function deleteJob(ref) {
   _pendingDeleteRef = ref;
+  _pendingDeleteIsTBT = false;
   hideModals();
+  document.getElementById('deletePassInput').value = '';
+  document.getElementById('deletePassErr').textContent = '';
+  document.getElementById('deletePassModal').className = 'modal-bg show';
+}
+
+function deleteTBT(ref) {
+  _pendingDeleteRef = ref;
+  _pendingDeleteIsTBT = true;
   document.getElementById('deletePassInput').value = '';
   document.getElementById('deletePassErr').textContent = '';
   document.getElementById('deletePassModal').className = 'modal-bg show';
@@ -659,6 +669,7 @@ function deleteJob(ref) {
 function hideDeleteModal() {
   document.getElementById('deletePassModal').className = 'modal-bg';
   _pendingDeleteRef = null;
+  _pendingDeleteIsTBT = false;
 }
 
 function confirmDeletePass() {
@@ -672,18 +683,25 @@ function confirmDeletePass() {
   document.getElementById('deletePassModal').className = 'modal-bg';
   hideModals();
   var ref = _pendingDeleteRef;
+  var isTBT = _pendingDeleteIsTBT;
   _pendingDeleteRef = null;
+  _pendingDeleteIsTBT = false;
   supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))
     .then(function(r) {
       if (r.ok || r.status === 204) {
-        _deleteStorageFolder(ref); // clean up signature files from Storage
-        allJobs = allJobs.filter(function(j){ return j.quote_ref !== ref; });
-        renderJobList(allJobs);
-        if (currentJobRef === ref) {
-          setJobRef('');
-          setStatus('Job deleted', '');
+        if (isTBT) {
+          fetchTBTList();
+          setStatus('TBT deleted: ' + ref, '');
         } else {
-          setStatus('Deleted: ' + ref, '');
+          _deleteStorageFolder(ref);
+          allJobs = allJobs.filter(function(j){ return j.quote_ref !== ref; });
+          renderJobList(allJobs);
+          if (currentJobRef === ref) {
+            setJobRef('');
+            setStatus('Job deleted', '');
+          } else {
+            setStatus('Deleted: ' + ref, '');
+          }
         }
       }
     })
@@ -1691,9 +1709,12 @@ function fetchTBTList() {
         var mainLine = topic ? topic : ref;
         var subLine = topic ? ref + ' &nbsp;·&nbsp; ' + d : 'Last saved: ' + d;
         html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadTBT(\'' + ref + '\')">'
-          + '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div></div>'
+          + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
+          + '<button onclick="event.stopPropagation();deleteTBT(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
+          + '</div>'
           + '</div>';
       }
       html += '</div>';
