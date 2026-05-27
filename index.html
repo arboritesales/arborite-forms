@@ -426,12 +426,12 @@
     <div class="field-row c2"><div class="fc lbl">Quote Ref</div>
       <div class="fc"><input type="text" id="so_quote" class="shared-ro" oninput="onQuoteRefInput(this.value);scheduleAutoSave('signoff')"></div>
       <div class="fc lbl">Site Location</div>
-      <div class="fc"><input type="text" id="so_site" class="shared-ro" oninput="var ms=document.getElementById('ms_site');if(ms)ms.value=this.value;var pa=document.getElementById('p_address');if(pa)pa.value=this.value;scheduleAutoSave('signoff')"></div></div>
+      <div class="fc"><input type="text" id="so_site" class="shared-ro" oninput="var ms=document.getElementById('ms_site');if(ms)ms.value=this.value;var pa=document.getElementById('p_address');if(pa)pa.value=this.value;var wls=document.getElementById('wl_site');if(wls)wls.value=this.value;scheduleAutoSave('signoff')"></div></div>
     <div class="field-row lw">
       <div class="fc lbl">What3Words</div>
       <div class="fc" style="display:flex;align-items:center;gap:6px;"><input type="text" id="so_w3w" placeholder="///word.word.word" style="flex:1;min-width:0;" oninput="var mw=document.getElementById('ms_w3w');if(mw)mw.value=this.value;updateW3WLink('so_w3w_link',this.value);updateW3WLink('ms_w3w_link',this.value);scheduleAutoSave('signoff')"><a id="so_w3w_link" href="#" target="_blank" onclick="return openW3W('so_w3w')" style="display:none;background:#e11f26;color:white;border-radius:4px;padding:5px 9px;font-size:11px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-decoration:none;white-space:nowrap;">&#128205; w3w</a></div></div>
     <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Project Scope</div>
-      <div class="fc" style="padding:8px 12px;"><textarea id="so_works" style="min-height:120px;" placeholder="Describe the arboricultural works completed..." oninput="var s=document.getElementById('ms_scope');if(s)s.value=this.value;scheduleAutoSave('signoff')"></textarea></div></div>
+      <div class="fc" style="padding:8px 12px;"><textarea id="so_works" style="min-height:120px;" placeholder="Describe the arboricultural works completed..." oninput="var s=document.getElementById('ms_scope');if(s)s.value=this.value;var wsc=document.getElementById('wl_scope');if(wsc)wsc.value=this.value;scheduleAutoSave('signoff')"></textarea></div></div>
   </div>
   <div class="sec-head">Client Sign Off</div>
   <div class="notice">I certify that all the above works have been fully completed to my satisfaction.</div>
@@ -662,13 +662,7 @@
 
 <!-- ═══ EMERGENCY DETAILS ═══ -->
 <div id="emergency" class="panel"><div class="form-wrap">
-  <div class="form-header" style="background:#4a0000;"><div><h1 style="color:#ff6b6b;">&#9888; Emergency Procedure</h1><div class="sub">ATS Ltd Emergency Preparedness and Response Procedure V1 &middot; 25.09.2025</div></div><div class="hdr-logo" style="margin-left:auto;display:flex;align-items:center;gap:8px;background:rgba(126,200,32,.15);padding:8px 14px;border-radius:6px;border:2px solid #7ec820;">
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M16 2L4 14h5v2L6 22h8v8h4v-8h8l-3-6v-2h5L16 2z" fill="#7ec820"/>
-  <circle cx="16" cy="10" r="2" fill="#fff"/>
-</svg>
-<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;color:#7ec820;text-transform:uppercase;letter-spacing:1px;line-height:1.2;">Arborite<br><span style="color:white;font-size:10px;font-weight:400;letter-spacing:.5px;">Tree Services</span></div>
-</div></div>
+  <div class="form-header" style="background:#4a0000;"><div><h1 style="color:#ff6b6b;">&#9888; Emergency Procedure</h1><div class="sub">ATS Ltd Emergency Preparedness and Response Procedure V1 &middot; 25.09.2025</div></div></div>
 
 
   <div class="notice-green" style="font-size:12px;"><strong>Reference:</strong> ATS Ltd Emergency Preparedness and Response Procedure V1 &mdash; 25.09.2025</div>
@@ -2510,6 +2504,7 @@
       <button onclick="showTBTList();fetchTBTList()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:6px 12px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8592; All TBTs</button>
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:var(--lime);letter-spacing:.5px;flex:1;" id="tbtRef">TBT-...</div>
       <button id="tbtSaveBtn" onclick="saveTBT()" style="background:var(--lime);border:none;color:#1a3210;padding:7px 16px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">Save</button>
+      <button onclick="printTBT()" style="background:var(--green);border:none;color:white;padding:7px 16px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128424; PDF</button>
     </div>
 
     <div class="form-wrap" style="margin:20px;">

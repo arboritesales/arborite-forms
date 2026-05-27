@@ -650,6 +650,7 @@ var _pendingDeleteRef = null;
 
 function deleteJob(ref) {
   _pendingDeleteRef = ref;
+  hideModals();
   document.getElementById('deletePassInput').value = '';
   document.getElementById('deletePassErr').textContent = '';
   document.getElementById('deletePassModal').className = 'modal-bg show';
@@ -1389,6 +1390,13 @@ function openForm(panelId) {
 
 function printCurrentForm() {
   printPanel(currentPanelId);
+}
+
+function printTBT() {
+  var view = document.getElementById('tbtView');
+  if (view) view.classList.add('printing-tbt');
+  window.print();
+  if (view) view.classList.remove('printing-tbt');
 }
 
 // ── DOCUMENT STORE ──
