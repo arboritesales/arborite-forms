@@ -2646,6 +2646,11 @@
 <div class="modal-bg" id="newJobModal">
   <div class="modal">
     <h2>New Job</h2>
+    <div id="newJobWarning" style="display:none;background:#fff3cd;border-left:4px solid #e6a817;padding:10px 14px;border-radius:3px;margin-bottom:14px;font-size:12.5px;color:#7a4d00;line-height:1.5;">
+      <strong style="display:block;margin-bottom:3px;">&#9888; Job already loaded</strong>
+      <span id="newJobWarningText"></span><br>
+      Once a job reference is set it cannot be changed. Save your current job before creating a new one.
+    </div>
     <p>A job reference has been generated. You can edit it or leave as-is.</p>
     <input type="text" id="newJobRef" placeholder="e.g. QU-2714" oninput="this.value=this.value.toUpperCase()" style="font-size:16px;font-weight:700;letter-spacing:1px;">
     <div class="modal-btns">

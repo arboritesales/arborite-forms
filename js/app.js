@@ -467,6 +467,17 @@ function generateJobRef() {
 function showNewJobModal() {
   var ref = generateJobRef();
   document.getElementById('newJobRef').value = ref;
+  // Show warning if a job is already loaded
+  var warn = document.getElementById('newJobWarning');
+  var warnText = document.getElementById('newJobWarningText');
+  if (warn && warnText) {
+    if (currentJobRef) {
+      warnText.textContent = 'Job ' + currentJobRef + ' is currently loaded.';
+      warn.style.display = 'block';
+    } else {
+      warn.style.display = 'none';
+    }
+  }
   document.getElementById('newJobModal').className = 'modal-bg show';
   setTimeout(function(){
     var inp = document.getElementById('newJobRef');
