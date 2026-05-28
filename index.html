@@ -156,7 +156,7 @@
     <div class="field-row lw"><div class="fc lbl">Client Name</div>
       <div class="fc"><input type="text" id="p_client" oninput="syncShared()" placeholder="Auto-populates other forms"></div></div>
     <div class="field-row c2"><div class="fc lbl">Quote Ref</div>
-      <div class="fc"><input type="text" id="p_quote" oninput="onQuoteRefInput(this.value)" placeholder="e.g. QU-2714" style="text-transform:uppercase;"></div>
+      <div class="fc"><input type="text" id="p_quote" readonly placeholder="e.g. QU-2714" style="text-transform:uppercase;cursor:default;"></div>
       <div class="fc lbl">Site Location</div>
       <div class="fc"><input type="text" id="p_address" class="shared-ro" oninput="syncShared()"></div></div>
     <div class="field-row lw"><div class="fc lbl">Client Contact Details</div>
@@ -326,7 +326,7 @@
 
   <div class="sec-head">Work Details</div>
   <div class="field-grid">
-    <div class="field-row lw"><div class="fc lbl">Quote Ref</div><div class="fc"><input type="text" id="wl_quote" class="shared-ro" oninput="onQuoteRefInput(this.value)" placeholder="e.g. QU-2714" style="text-transform:uppercase;"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Quote Ref</div><div class="fc"><input type="text" id="wl_quote" class="shared-ro" readonly placeholder="e.g. QU-2714" style="text-transform:uppercase;cursor:default;"></div></div>
     <div class="field-row lw"><div class="fc lbl">Date of Inspection</div><div class="fc"><input type="date" id="wl_date"></div></div>
     <div class="field-row lw"><div class="fc lbl">Site Location</div><div class="fc"><input type="text" id="wl_site" class="shared-ro" oninput="syncShared()" placeholder="Site location"></div></div>
     <div class="field-row lw"><div class="fc lbl">Inspector Name</div><div class="fc"><input type="text" id="wl_inspector" placeholder="Name of person undertaking inspection"></div></div>
@@ -424,7 +424,7 @@
     <div class="field-row lw"><div class="fc lbl">Client Name</div>
       <div class="fc"><input type="text" id="so_client" class="shared-ro" oninput="var p=document.getElementById('p_client');if(p)p.value=this.value;syncShared()"></div></div>
     <div class="field-row c2"><div class="fc lbl">Quote Ref</div>
-      <div class="fc"><input type="text" id="so_quote" class="shared-ro" oninput="onQuoteRefInput(this.value);scheduleAutoSave('signoff')"></div>
+      <div class="fc"><input type="text" id="so_quote" class="shared-ro" readonly style="cursor:default;"></div>
       <div class="fc lbl">Site Location</div>
       <div class="fc"><input type="text" id="so_site" class="shared-ro" oninput="var ms=document.getElementById('ms_site');if(ms)ms.value=this.value;var pa=document.getElementById('p_address');if(pa)pa.value=this.value;var wls=document.getElementById('wl_site');if(wls)wls.value=this.value;scheduleAutoSave('signoff')"></div></div>
     <div class="field-row lw">
@@ -482,7 +482,7 @@
   <div class="sec-head">Document Details</div>
   <div class="field-grid">
     <div class="field-row lw"><div class="fc lbl">Quote Ref</div>
-      <div class="fc"><input type="text" id="ms_jobno" class="shared-ro" oninput="var p=document.getElementById('p_quote');if(p){p.value=this.value;onQuoteRefInput(this.value);}"></div></div>
+      <div class="fc"><input type="text" id="ms_jobno" class="shared-ro" readonly style="cursor:default;"></div></div>
     <div class="field-row lw"><div class="fc lbl" style="align-self:flex-start;padding-top:10px;">Project Scope</div>
       <div class="fc" style="padding:8px 12px;"><textarea id="ms_scope" style="min-height:160px;" placeholder="Describe the arboricultural works completed..."></textarea></div></div>
     <div class="field-row lw"><div class="fc lbl">Client Name</div>
