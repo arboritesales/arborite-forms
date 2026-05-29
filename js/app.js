@@ -1009,6 +1009,7 @@ function doSaveAndClose(formData, savedRef) {
           currentJobRef = '';
           setJobRef('');
           setStatus('No job loaded', '');
+          showJobSelectScreen();
         }, 800);
       } else {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
