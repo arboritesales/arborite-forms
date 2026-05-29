@@ -1,4 +1,12 @@
 
+// ── AUTO-UPDATE: when a new service worker takes over, reload to get latest files ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.ready.then(function(reg) { reg.update(); });
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    window.location.reload();
+  });
+}
+
 // ── iOS COMPATIBILITY ──
 if (typeof console === 'undefined') {
   window.console = {log:function(){},error:function(){},warn:function(){},assert:function(){}};
