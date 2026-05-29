@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arborite-field-forms-v20';
+const CACHE_NAME = 'arborite-field-forms-v21';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,7 +6,8 @@ const APP_SHELL = [
   './js/app.js',
   './manifest.json',
   './arborite-logo-192.png',
-  './arborite-logo-512.png'
+  './arborite-logo-512.png',
+  './arborite-leaf.svg'
 ];
 
 self.addEventListener('install', event => {
