@@ -19,7 +19,7 @@ function checkPass() {
     var ls = document.getElementById('lockScreen');
     if (ls) ls.style.display = 'none';
     try { sessionStorage.setItem('arb_auth','1'); } catch(e){}
-    showDashboard();
+    showJobSelectScreen();
   } else {
     if (err) err.textContent = 'Incorrect password \u2014 try again';
     inp.value = '';
@@ -34,7 +34,7 @@ function checkPass() {
   function hideLock() {
     var ls = document.getElementById('lockScreen');
     if (ls) ls.style.display = 'none';
-    showDashboard();
+    showJobSelectScreen();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', hideLock);
@@ -494,6 +494,12 @@ function confirmNewJob() {
   setJobRef(ref);
   syncShared();
   setStatus('New job: ' + ref, 'ok');
+  if (_fromJobSelect) {
+    _fromJobSelect = false;
+    var jss = document.getElementById('jobSelectScreen');
+    if (jss) jss.style.display = 'none';
+    openForm('signoff');
+  }
 }
 
 function clearAllForms() {
@@ -779,6 +785,11 @@ function loadJobByRef(ref) {
       setJobRef(rows[0].quote_ref);
       syncShared();
       setStatus('Loaded: ' + rows[0].quote_ref, 'ok');
+      if (_fromJobSelect) {
+        _fromJobSelect = false;
+        hideModals();
+        showDashboard();
+      }
     })
     .catch(function(){ setStatus('Load failed', 'err'); });
 }
@@ -1335,11 +1346,37 @@ function saveToGoogleDrive(panelId) {
   printPanel(panelId);
 }
 
-// ── DASHBOARD NAVIGATION ──
-function showDashboard() {
+// ── JOB SELECT SCREEN ──
+var _fromJobSelect = false;
+
+function showJobSelectScreen() {
+  var jss  = document.getElementById('jobSelectScreen');
   var dash = document.getElementById('dashboard');
   var app  = document.getElementById('appView');
   var off  = document.getElementById('officeView');
+  if (jss)  jss.style.display  = 'block';
+  if (dash) dash.style.display = 'none';
+  if (app)  app.style.display  = 'none';
+  if (off)  off.style.display  = 'none';
+}
+
+function showNewJobFromSelect() {
+  _fromJobSelect = true;
+  showNewJobModal();
+}
+
+function showLoadJobFromSelect() {
+  _fromJobSelect = true;
+  showLoadModal();
+}
+
+// ── DASHBOARD NAVIGATION ──
+function showDashboard() {
+  var jss  = document.getElementById('jobSelectScreen');
+  var dash = document.getElementById('dashboard');
+  var app  = document.getElementById('appView');
+  var off  = document.getElementById('officeView');
+  if (jss)  jss.style.display  = 'none';
   if (dash) dash.style.display = 'block';
   if (app)  app.style.display  = 'none';
   if (off)  off.style.display  = 'none';
