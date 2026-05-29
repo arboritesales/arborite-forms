@@ -108,7 +108,7 @@ function syncShared() {
           if (t.options[oi].value === val) { t.value = val; break; }
         }
       } else if (t) {
-        t.value = val;
+        if (val) t.value = val;  // only overwrite target if source has a value
       }
     }
   }
@@ -446,6 +446,11 @@ function setJobRef(ref) {
   if (appRef) appRef.textContent = ref || 'No job loaded';
   var offRef = document.getElementById('officeJobRef');
   if (offRef) offRef.textContent = ref || 'No job loaded';
+  // Show/hide New Job & Load Job buttons on dashboard based on whether a job is active
+  var btnNew  = document.querySelector('.btn-new');
+  var btnLoad = document.querySelector('.btn-load');
+  if (btnNew)  btnNew.style.display  = ref ? 'none' : '';
+  if (btnLoad) btnLoad.style.display = ref ? 'none' : '';
 }
 
 function onQuoteRefInput(val) {
