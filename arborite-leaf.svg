@@ -1,4 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <path d="M256 94l122 190h-78l74 104H138l74-104h-78z" fill="white"/>
-  <path d="M236 270h40v118h-40z" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 340">
+  <defs>
+    <clipPath id="leafShape">
+      <path d="M250 18 C310 14 400 55 430 130 C460 205 410 300 250 318 C90 300 40 205 70 130 C100 55 190 14 250 18Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Lime green face of leaf -->
+  <path d="M250 18 C190 14 100 55 70 130 C40 205 90 300 250 318 Z"
+        fill="#b0cc00" clip-path="url(#leafShape)"/>
+
+  <!-- Dark grey underside of leaf -->
+  <path d="M250 18 C310 14 400 55 430 130 C460 205 410 300 250 318 Z"
+        fill="#5a5e60" clip-path="url(#leafShape)"/>
+
+  <!-- Centre vein -->
+  <line x1="250" y1="18" x2="250" y2="318" stroke="#8a9e00" stroke-width="3" opacity="0.4"/>
+
+  <!-- Side veins - left (green) side -->
+  <path d="M250 80  Q170 100 130 120" stroke="#8a9e00" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 110 Q175 128 140 148" stroke="#8a9e00" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 145 Q178 160 148 178" stroke="#8a9e00" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 180 Q178 192 152 208" stroke="#8a9e00" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 215 Q185 224 165 238" stroke="#8a9e00" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 248 Q200 254 188 264" stroke="#8a9e00" stroke-width="2" fill="none" opacity="0.35"/>
+
+  <!-- Side veins - right (grey) side -->
+  <path d="M250 80  Q330 100 370 120" stroke="#3a3e40" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 110 Q325 128 360 148" stroke="#3a3e40" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 145 Q322 160 352 178" stroke="#3a3e40" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 180 Q322 192 348 208" stroke="#3a3e40" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 215 Q315 224 335 238" stroke="#3a3e40" stroke-width="2" fill="none" opacity="0.35"/>
+  <path d="M250 248 Q300 254 312 264" stroke="#3a3e40" stroke-width="2" fill="none" opacity="0.35"/>
 </svg>
