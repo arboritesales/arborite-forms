@@ -224,6 +224,7 @@ function buildAll() {
   // opSigsMethod replaced by 15 individual sig boxes
   buildDailyRows(12);
   initAllStaffSelects();
+  initDocDropZones();
 }
 
 function initAllStaffSelects() {
@@ -1515,9 +1516,8 @@ function handleDocUpload(input, categoryId) {
   input.value = '';
 }
 
-function handleDocDrop(event, categoryId) {
-  event.preventDefault();
-  var files = Array.from(event.dataTransfer.files).filter(function(f) {
+function _processDroppedFiles(files, categoryId) {
+  files = Array.from(files).filter(function(f) {
     return /\.(pdf|docx?|png|jpe?g)$/i.test(f.name);
   });
   if (!files.length) return;
@@ -1539,6 +1539,34 @@ function handleDocDrop(event, categoryId) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+function initDocDropZones() {
+  var zones = document.querySelectorAll('.doc-section-drop');
+  for (var i = 0; i < zones.length; i++) {
+    (function(zone) {
+      var cat = zone.getAttribute('data-cat');
+      var counter = 0;
+      zone.addEventListener('dragenter', function(e) {
+        e.preventDefault();
+        counter++;
+        zone.classList.add('doc-drop-over');
+      });
+      zone.addEventListener('dragleave', function() {
+        counter--;
+        if (counter <= 0) { counter = 0; zone.classList.remove('doc-drop-over'); }
+      });
+      zone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+      });
+      zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        counter = 0;
+        zone.classList.remove('doc-drop-over');
+        _processDroppedFiles(e.dataTransfer.files, cat);
+      });
+    })(zones[i]);
+  }
 }
 
 function renderDocList(categoryId) {
