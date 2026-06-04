@@ -230,13 +230,13 @@
   <div class="sec-head">Key Personnel</div>
   <div class="field-grid">
     <div class="field-row lm"><div class="fc lbl">Lead Climber</div>
-      <div class="fc"><select id="p_lead" class="staff-sel" onchange="handleStaffSel(this)"><option value="">-- Select lead climber --</option><option value="Joe Grace">Joe Grace</option><option value="Liam Cooper">Liam Cooper</option><option value="Jason Hiscock">Jason Hiscock</option><option value="Jack Fisher">Jack Fisher</option><option value="Luke Richardson">Luke Richardson</option><option value="James Hilborn">James Hilborn</option><option value="Dave Norris">Dave Norris</option><option value="Haiden Rodbard-Brown">Haiden Rodbard-Brown</option><option value="Jon Challinor">Jon Challinor</option><option value="Joel Cripps">Joel Cripps</option><option value="Brook Taylor-Ware">Brook Taylor-Ware</option><option value="__new__">+ Add new name...</option></select></div></div>
+      <div class="fc"><select id="p_lead" class="staff-sel" onchange="handleStaffSel(this)"><option value="">-- Select lead climber --</option><option value="Joe Grace">Joe Grace</option><option value="Liam Cooper">Liam Cooper</option><option value="Jason Hiscock">Jason Hiscock</option><option value="Jack Fisher">Jack Fisher</option><option value="Luke Richardson">Luke Richardson</option><option value="James Hilborn">James Hilborn</option><option value="Dave Norris">Dave Norris</option><option value="Jon Challinor">Jon Challinor</option><option value="Joel Cripps">Joel Cripps</option><option value="Brook Taylor-Ware">Brook Taylor-Ware</option><option value="__new__">+ Add new name...</option></select></div></div>
     <div class="field-row lm"><div class="fc lbl">First Aider(s)</div>
       <div class="fc" style="flex-direction:column;align-items:flex-start;gap:4px;padding:6px 12px;" id="aider_wrap">
         <div id="aider_checks" class="multi-check" style="flex-wrap:wrap;gap:4px 14px;"></div>
       </div></div>
     <div class="field-row lm"><div class="fc lbl">Designated Aerial Rescuer</div>
-      <div class="fc"><select id="p_rescuer" class="staff-sel" onchange="handleStaffSel(this)"><option value="">-- Select aerial rescuer --</option><option value="Joe Grace">Joe Grace</option><option value="Liam Cooper">Liam Cooper</option><option value="Jason Hiscock">Jason Hiscock</option><option value="Jack Fisher">Jack Fisher</option><option value="Luke Richardson">Luke Richardson</option><option value="James Hilborn">James Hilborn</option><option value="Dave Norris">Dave Norris</option><option value="Haiden Rodbard-Brown">Haiden Rodbard-Brown</option><option value="Jon Challinor">Jon Challinor</option><option value="Joel Cripps">Joel Cripps</option><option value="Brook Taylor-Ware">Brook Taylor-Ware</option><option value="__new__">+ Add new name...</option></select></div></div>
+      <div class="fc"><select id="p_rescuer" class="staff-sel" onchange="handleStaffSel(this)"><option value="">-- Select aerial rescuer --</option><option value="Joe Grace">Joe Grace</option><option value="Liam Cooper">Liam Cooper</option><option value="Jason Hiscock">Jason Hiscock</option><option value="Jack Fisher">Jack Fisher</option><option value="Luke Richardson">Luke Richardson</option><option value="James Hilborn">James Hilborn</option><option value="Dave Norris">Dave Norris</option><option value="Jon Challinor">Jon Challinor</option><option value="Joel Cripps">Joel Cripps</option><option value="Brook Taylor-Ware">Brook Taylor-Ware</option><option value="__new__">+ Add new name...</option></select></div></div>
     <div class="field-row lm"><div class="fc lbl">Site Supervisor</div>
       <div class="fc"><select id="p_supervisor" class="staff-sel" onchange="handleStaffSel(this)" onfocus="if(!this.options.length||this.options.length<2)this.innerHTML=makeStaffOpts('Select site supervisor')" style="width:100%;"></select></div></div>
   </div>
@@ -1331,73 +1331,45 @@
   <div class="form-header"><div><h1>Documents</h1><div class="sub">Arborite Tree Services Ltd</div></div></div>
 
   <div class="sec-head">Common Factor Risk Assessment</div>
-  <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'risk_assessment');this.classList.remove('doc-drop-over')">
-      <button onclick="document.getElementById('doc_input_risk_assessment').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
-      <span class="doc-drop-hint">or drag files here</span>
-      <input type="file" id="doc_input_risk_assessment" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'risk_assessment')">
-    </div>
-    <div id="doc_list_risk_assessment" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
+  <div class="doc-section-drop" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'risk_assessment');this.classList.remove('doc-drop-over')">
+    <div style="margin-bottom:10px;"><button onclick="document.getElementById('doc_input_risk_assessment').click()" class="doc-add-btn">&#128194; Add Document</button><span class="doc-drop-hint">or drag &amp; drop files anywhere in this box</span><input type="file" id="doc_input_risk_assessment" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'risk_assessment')"></div>
+    <div id="doc_list_risk_assessment" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:30px;"></div>
   </div>
 
   <div class="sec-head">Method Statement</div>
-  <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'method_statement');this.classList.remove('doc-drop-over')">
-      <button onclick="document.getElementById('doc_input_method_statement').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
-      <span class="doc-drop-hint">or drag files here</span>
-      <input type="file" id="doc_input_method_statement" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'method_statement')">
-    </div>
-    <div id="doc_list_method_statement" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
+  <div class="doc-section-drop" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'method_statement');this.classList.remove('doc-drop-over')">
+    <div style="margin-bottom:10px;"><button onclick="document.getElementById('doc_input_method_statement').click()" class="doc-add-btn">&#128194; Add Document</button><span class="doc-drop-hint">or drag &amp; drop files anywhere in this box</span><input type="file" id="doc_input_method_statement" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'method_statement')"></div>
+    <div id="doc_list_method_statement" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:30px;"></div>
   </div>
 
   <div class="sec-head">Site Plan</div>
-  <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'plans');this.classList.remove('doc-drop-over')">
-      <button onclick="document.getElementById('doc_input_plans').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
-      <span class="doc-drop-hint">or drag files here</span>
-      <input type="file" id="doc_input_plans" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'plans')">
-    </div>
-    <div id="doc_list_plans" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
+  <div class="doc-section-drop" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'plans');this.classList.remove('doc-drop-over')">
+    <div style="margin-bottom:10px;"><button onclick="document.getElementById('doc_input_plans').click()" class="doc-add-btn">&#128194; Add Document</button><span class="doc-drop-hint">or drag &amp; drop files anywhere in this box</span><input type="file" id="doc_input_plans" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'plans')"></div>
+    <div id="doc_list_plans" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:30px;"></div>
   </div>
 
   <div class="sec-head">Tree Survey Reports</div>
-  <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'reports');this.classList.remove('doc-drop-over')">
-      <button onclick="document.getElementById('doc_input_reports').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
-      <span class="doc-drop-hint">or drag files here</span>
-      <input type="file" id="doc_input_reports" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'reports')">
-    </div>
-    <div id="doc_list_reports" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
+  <div class="doc-section-drop" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'reports');this.classList.remove('doc-drop-over')">
+    <div style="margin-bottom:10px;"><button onclick="document.getElementById('doc_input_reports').click()" class="doc-add-btn">&#128194; Add Document</button><span class="doc-drop-hint">or drag &amp; drop files anywhere in this box</span><input type="file" id="doc_input_reports" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'reports')"></div>
+    <div id="doc_list_reports" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:30px;"></div>
   </div>
 
   <div class="sec-head">Ecology Reports</div>
-  <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'tree_survey');this.classList.remove('doc-drop-over')">
-      <button onclick="document.getElementById('doc_input_tree_survey').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
-      <span class="doc-drop-hint">or drag files here</span>
-      <input type="file" id="doc_input_tree_survey" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tree_survey')">
-    </div>
-    <div id="doc_list_tree_survey" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
+  <div class="doc-section-drop" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'tree_survey');this.classList.remove('doc-drop-over')">
+    <div style="margin-bottom:10px;"><button onclick="document.getElementById('doc_input_tree_survey').click()" class="doc-add-btn">&#128194; Add Document</button><span class="doc-drop-hint">or drag &amp; drop files anywhere in this box</span><input type="file" id="doc_input_tree_survey" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tree_survey')"></div>
+    <div id="doc_list_tree_survey" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:30px;"></div>
   </div>
 
   <div class="sec-head">TPO Approval</div>
-  <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'tpo_approval');this.classList.remove('doc-drop-over')">
-      <button onclick="document.getElementById('doc_input_tpo_approval').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
-      <span class="doc-drop-hint">or drag files here</span>
-      <input type="file" id="doc_input_tpo_approval" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tpo_approval')">
-    </div>
-    <div id="doc_list_tpo_approval" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
+  <div class="doc-section-drop" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'tpo_approval');this.classList.remove('doc-drop-over')">
+    <div style="margin-bottom:10px;"><button onclick="document.getElementById('doc_input_tpo_approval').click()" class="doc-add-btn">&#128194; Add Document</button><span class="doc-drop-hint">or drag &amp; drop files anywhere in this box</span><input type="file" id="doc_input_tpo_approval" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tpo_approval')"></div>
+    <div id="doc_list_tpo_approval" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:30px;"></div>
   </div>
 
   <div class="sec-head">Other</div>
-  <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'additional');this.classList.remove('doc-drop-over')">
-      <button onclick="document.getElementById('doc_input_additional').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
-      <span class="doc-drop-hint">or drag files here</span>
-      <input type="file" id="doc_input_additional" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'additional')">
-    </div>
-    <div id="doc_list_additional" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
+  <div class="doc-section-drop" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'additional');this.classList.remove('doc-drop-over')">
+    <div style="margin-bottom:10px;"><button onclick="document.getElementById('doc_input_additional').click()" class="doc-add-btn">&#128194; Add Document</button><span class="doc-drop-hint">or drag &amp; drop files anywhere in this box</span><input type="file" id="doc_input_additional" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'additional')"></div>
+    <div id="doc_list_additional" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:30px;"></div>
   </div>
   <div class="print-bar"><button class="btn btn-print" onclick="printPanel('documents')">&#128424; Save as PDF</button></div>
 </div></div>
