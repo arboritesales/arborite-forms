@@ -457,7 +457,7 @@
     <div class="field-row c2"><div class="fc lbl">Quote Ref</div>
       <div class="fc"><input type="text" id="so_quote" class="shared-ro" readonly style="cursor:default;"></div>
       <div class="fc lbl">Site Location</div>
-      <div class="fc"><input type="text" id="so_site" class="shared-ro" oninput="var ms=document.getElementById('ms_site');if(ms)ms.value=this.value;var pa=document.getElementById('p_address');if(pa)pa.value=this.value;var wls=document.getElementById('wl_site');if(wls)wls.value=this.value;scheduleAutoSave('signoff')"></div></div>
+      <div class="fc"><input type="text" id="so_site" class="shared-ro" oninput="var ms=document.getElementById('ms_site');if(ms)ms.value=this.value;var pa=document.getElementById('p_address');if(pa)pa.value=this.value;var wls=document.getElementById('wl_site');if(wls)wls.value=this.value;var aus=document.getElementById('aud_site');if(aus)aus.value=this.value;scheduleAutoSave('signoff')"></div></div>
     <div class="field-row lw">
       <div class="fc lbl">What3Words</div>
       <div class="fc" style="display:flex;align-items:center;gap:6px;"><input type="text" id="so_w3w" placeholder="///word.word.word" style="flex:1;min-width:0;" oninput="var mw=document.getElementById('ms_w3w');if(mw)mw.value=this.value;updateW3WLink('so_w3w_link',this.value);updateW3WLink('ms_w3w_link',this.value);scheduleAutoSave('signoff')"><a id="so_w3w_link" href="#" target="_blank" onclick="return openW3W('so_w3w')" style="display:none;background:#e11f26;color:white;border-radius:4px;padding:5px 9px;font-size:11px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-decoration:none;white-space:nowrap;">&#128205; w3w</a></div></div>
@@ -1031,7 +1031,7 @@
         <label class="opt" style="margin-left:12px;"><input type="radio" name="aud_announced" value="No"> No</label>
       </div>
     </div>
-    <div class="field-row lw"><div class="fc lbl">Job Ref / Site Address</div><div class="fc"><input type="text" id="aud_site"></div></div>
+    <div class="field-row lw"><div class="fc lbl">Job Ref / Site Address</div><div class="fc"><input type="text" id="aud_site" class="shared-ro" oninput="syncShared()"></div></div>
     <div class="field-row lw"><div class="fc lbl">Operators on Site</div>
       <div class="fc" style="flex-direction:column;align-items:flex-start;gap:4px;padding:6px 12px;">
         <div id="aud_ops_checks" class="multi-check" style="flex-wrap:wrap;gap:4px 14px;"></div>
@@ -1332,58 +1332,72 @@
 
   <div class="sec-head">Common Factor Risk Assessment</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_risk_assessment').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_risk_assessment" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'risk_assessment')">
+    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'risk_assessment');this.classList.remove('doc-drop-over')">
+      <button onclick="document.getElementById('doc_input_risk_assessment').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
+      <span class="doc-drop-hint">or drag files here</span>
+      <input type="file" id="doc_input_risk_assessment" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'risk_assessment')">
     </div>
-    <div id="doc_list_risk_assessment" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
+    <div id="doc_list_risk_assessment" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
   </div>
 
   <div class="sec-head">Method Statement</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_method_statement').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_method_statement" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'method_statement')">
+    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'method_statement');this.classList.remove('doc-drop-over')">
+      <button onclick="document.getElementById('doc_input_method_statement').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
+      <span class="doc-drop-hint">or drag files here</span>
+      <input type="file" id="doc_input_method_statement" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'method_statement')">
     </div>
-    <div id="doc_list_method_statement" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
+    <div id="doc_list_method_statement" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
   </div>
 
   <div class="sec-head">Site Plan</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_plans').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_plans" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'plans')">
+    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'plans');this.classList.remove('doc-drop-over')">
+      <button onclick="document.getElementById('doc_input_plans').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
+      <span class="doc-drop-hint">or drag files here</span>
+      <input type="file" id="doc_input_plans" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'plans')">
     </div>
-    <div id="doc_list_plans" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
+    <div id="doc_list_plans" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
   </div>
 
   <div class="sec-head">Tree Survey Reports</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_reports').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_reports" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'reports')">
+    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'reports');this.classList.remove('doc-drop-over')">
+      <button onclick="document.getElementById('doc_input_reports').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
+      <span class="doc-drop-hint">or drag files here</span>
+      <input type="file" id="doc_input_reports" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'reports')">
     </div>
-    <div id="doc_list_reports" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
+    <div id="doc_list_reports" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
   </div>
 
   <div class="sec-head">Ecology Reports</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_tree_survey').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_tree_survey" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tree_survey')">
+    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'tree_survey');this.classList.remove('doc-drop-over')">
+      <button onclick="document.getElementById('doc_input_tree_survey').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
+      <span class="doc-drop-hint">or drag files here</span>
+      <input type="file" id="doc_input_tree_survey" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tree_survey')">
     </div>
-    <div id="doc_list_tree_survey" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
+    <div id="doc_list_tree_survey" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
   </div>
 
   <div class="sec-head">TPO Approval</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_tpo_approval').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_tpo_approval" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tpo_approval')">
+    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'tpo_approval');this.classList.remove('doc-drop-over')">
+      <button onclick="document.getElementById('doc_input_tpo_approval').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
+      <span class="doc-drop-hint">or drag files here</span>
+      <input type="file" id="doc_input_tpo_approval" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'tpo_approval')">
     </div>
-    <div id="doc_list_tpo_approval" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
+    <div id="doc_list_tpo_approval" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
   </div>
 
   <div class="sec-head">Other</div>
   <div style="padding:12px 16px;border-bottom:1px solid var(--border);">
-    <div style="margin-bottom:10px;">
-      <button onclick="document.getElementById('doc_input_additional').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button><input type="file" id="doc_input_additional" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'additional')">
+    <div class="doc-drop-zone" ondragover="event.preventDefault();this.classList.add('doc-drop-over')" ondragleave="this.classList.remove('doc-drop-over')" ondrop="handleDocDrop(event,'additional');this.classList.remove('doc-drop-over')">
+      <button onclick="document.getElementById('doc_input_additional').click()" style="background:var(--green);color:white;padding:8px 16px;border-radius:3px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:none;">&#128194; Add Document</button>
+      <span class="doc-drop-hint">or drag files here</span>
+      <input type="file" id="doc_input_additional" multiple accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display:none;" onchange="handleDocUpload(this,'additional')">
     </div>
-    <div id="doc_list_additional" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;"></div>
+    <div id="doc_list_additional" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;min-height:40px;margin-top:8px;"></div>
   </div>
   <div class="print-bar"><button class="btn btn-print" onclick="printPanel('documents')">&#128424; Save as PDF</button></div>
 </div></div>

@@ -60,21 +60,22 @@ var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads
 
 function init() {
   CUSTOM_STAFF = []; CUSTOM_MACHINES = []; allJobs = []; currentJobRef = ''; pads = {}; drCount = 0; docStore = {};
-  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Haiden Rodbard-Brown", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware"];
+  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware"];
   MACHINES = ["ARB Team", "Kubota 2.7", "CC145", "Cutter", "LV800", "Climber", "MEWP", "Hinowa 2010", "TPF", "FSID74", "Sub Contractor"];
 }
 
 // ── SHARED FIELD MAP ──
 var SHARED_MAP = {
   p_client:     ['so_client','ms_client','dr_site'],
-  p_address:    ['so_site','ms_site','wl_site'],
+  p_address:    ['so_site','ms_site','wl_site','aud_site'],
   p_quote:      ['so_quote','ms_jobno','dr_quote','wl_quote'],
-  so_site:      ['p_address','ms_site','wl_site'],
+  so_site:      ['p_address','ms_site','wl_site','aud_site'],
   so_quote:     ['p_quote','ms_jobno','dr_quote','wl_quote'],
   so_works:     ['ms_scope','wl_scope'],
   wl_quote:     ['p_quote','so_quote','ms_jobno','dr_quote'],
-  wl_site:      ['p_address','so_site','ms_site'],
-  wl_scope:     ['so_works','ms_scope']
+  wl_site:      ['p_address','so_site','ms_site','aud_site'],
+  wl_scope:     ['so_works','ms_scope'],
+  aud_site:     ['p_address','so_site','ms_site','wl_site']
   // p_w3w removed — w3w fields sync directly to avoid restore wipe
   // p_supervisor removed — each form's supervisor is independent
 };
@@ -1512,6 +1513,32 @@ function handleDocUpload(input, categoryId) {
     reader.readAsDataURL(file);
   });
   input.value = '';
+}
+
+function handleDocDrop(event, categoryId) {
+  event.preventDefault();
+  var files = Array.from(event.dataTransfer.files).filter(function(f) {
+    return /\.(pdf|docx?|png|jpe?g)$/i.test(f.name);
+  });
+  if (!files.length) return;
+  if (!docStore[categoryId]) docStore[categoryId] = [];
+  var existing = docStore[categoryId].length;
+  if (existing >= MAX_DOCS_PER_CAT) {
+    alert('Maximum ' + MAX_DOCS_PER_CAT + ' documents per category. Please remove one first.');
+    return;
+  }
+  var canAdd = MAX_DOCS_PER_CAT - existing;
+  files = files.slice(0, canAdd);
+  var remaining = files.length;
+  files.forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      docStore[categoryId].push({name: file.name, type: file.type, data: e.target.result});
+      remaining--;
+      if (remaining === 0) renderDocList(categoryId);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function renderDocList(categoryId) {
