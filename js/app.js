@@ -991,7 +991,7 @@ function saveAndClose() {
     if (idx2 >= sigIds.length) { doSaveAndClose(formData, savedRef); return; }
     var id2 = sigIds[idx2++];
     var dataUrl2 = sigs[id2];
-    if (!dataUrl2 || dataUrl2.length < 100) { processNextSAC(); return; }
+    if (!dataUrl2 || dataUrl2.length < 100 || dataUrl2.indexOf('storage:') === 0 || dataUrl2.indexOf('data:image/jpeg') === 0) { processNextSAC(); return; }
     try {
       var img2 = new Image();
       img2.onload = function() {
@@ -1026,7 +1026,7 @@ function doSaveAndClose(formData, savedRef) {
           setJobRef('');
           setStatus('No job loaded', '');
           showJobSelectScreen();
-        }, 800);
+        }, 200);
       } else {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
       }
