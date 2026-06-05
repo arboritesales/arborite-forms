@@ -976,6 +976,7 @@ function saveForm() { saveJob(); }  // saveJob handles compression + iOS safety
 function saveAndClose() {
   if (!currentJobRef) return;
   if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Supabase not configured', 'err'); return; }
+  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
   setStatus('Saving…', '');
   var saveBtns = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
   for (var i=0;i<saveBtns.length;i++) saveBtns[i].disabled = true;
@@ -1030,10 +1031,10 @@ function doSaveAndClose(formData, savedRef) {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
       }
     })
-    .catch(function(e){ setStatus('Save failed: ' + e.message, 'err'); })
-    .finally(function(){
+    .catch(function(e){
+      setStatus('Save failed: ' + e.message, 'err');
       var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
-      for (var j=0;j<btns2.length;j++) btns2[j].disabled = true;
+      for (var j=0;j<btns2.length;j++) btns2[j].disabled = false;
     });
 }
 
