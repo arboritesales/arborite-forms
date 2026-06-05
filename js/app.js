@@ -1509,7 +1509,7 @@ function handleDocUpload(input, categoryId) {
     reader.onload = function(e) {
       docStore[categoryId].push({name: file.name, type: file.type, data: e.target.result});
       remaining--;
-      if (remaining === 0) renderDocList(categoryId);
+      if (remaining === 0) { renderDocList(categoryId); if (currentJobRef) saveJob(); }
     };
     reader.readAsDataURL(file);
   });
@@ -1535,7 +1535,7 @@ function _processDroppedFiles(files, categoryId) {
     reader.onload = function(e) {
       docStore[categoryId].push({name: file.name, type: file.type, data: e.target.result});
       remaining--;
-      if (remaining === 0) renderDocList(categoryId);
+      if (remaining === 0) { renderDocList(categoryId); if (currentJobRef) saveJob(); }
     };
     reader.readAsDataURL(file);
   });
@@ -1626,6 +1626,7 @@ function removeDoc(categoryId, idx) {
   if (!docStore[categoryId]) return;
   docStore[categoryId].splice(idx, 1);
   renderDocList(categoryId);
+  if (currentJobRef) saveJob();
 }
 
 function renderAllDocLists() {
