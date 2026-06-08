@@ -1617,68 +1617,73 @@ function printTBT() {
 // ── DOCUMENT STORE ──
 var docStore = {};
 var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
-
 var MAX_DOCS_PER_CAT = 10;
 
 function _addDocFiles(files, categoryId) {
+  files = Array.from(files);
   if (!files.length) return;
   if (!docStore[categoryId]) docStore[categoryId] = [];
   var existing = docStore[categoryId].length;
   if (existing >= MAX_DOCS_PER_CAT) {
-    alert('Maximum ' + MAX_DOCS_PER_CAT + ' documents per category. Please remove one first.');
-    return;
+    alert('Maximum ' + MAX_DOCS_PER_CAT + ' documents per category. Please remove one first.'); return;
   }
-  var canAdd = MAX_DOCS_PER_CAT - existing;
-  files = files.slice(0, canAdd);
-  setStatus('Uploading document' + (files.length > 1 ? 's' : '') + '…', '');
-  var remaining = files.length;
+  files = files.slice(0, MAX_DOCS_PER_CAT - existing);
   files.forEach(function(file) {
+    // Add placeholder entry immediately so user sees it
+    var entry = {name: file.name, type: file.type, data: '', status: 'uploading'};
+    docStore[categoryId].push(entry);
+    var idx = docStore[categoryId].length - 1;
+    renderDocList(categoryId);
     var reader = new FileReader();
     reader.onload = function(e) {
       var dataUrl = e.target.result;
-      var docEntry = {name: file.name, type: file.type, data: dataUrl};
-      docStore[categoryId].push(docEntry);
-      var docIdx = docStore[categoryId].length - 1;
-      renderDocList(categoryId);
-      // Upload to Storage immediately if job is open
+      entry.data = dataUrl;
       if (currentJobRef) {
+        entry.status = 'uploading';
+        renderDocList(categoryId);
         var path = _docPath(currentJobRef, categoryId, file.name);
         _uploadDocFile(path, dataUrl, file.type)
           .then(function(r) {
             if (r.ok || r.status === 200 || r.status === 201) {
-              docStore[categoryId][docIdx].data = 'storage:' + path;
+              entry.data = 'storage:' + path;
+              entry.status = 'saved';
               setStatus('Document saved ✓', 'ok');
             } else {
-              return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
+              entry.status = 'local';
+              setStatus('Upload failed — doc kept locally', 'err');
             }
           })
-          .catch(function(err) {
-            setStatus('Doc upload failed — will retry on save', 'err');
+          .catch(function() {
+            entry.status = 'local';
+            setStatus('Upload failed — doc kept locally', 'err');
           })
           .finally(function() {
-            remaining--;
-            if (remaining === 0) { renderDocList(categoryId); saveJob(); }
+            renderDocList(categoryId);
+            saveJob();
           });
       } else {
-        remaining--;
-        if (remaining === 0) renderDocList(categoryId);
+        entry.status = 'local';
+        renderDocList(categoryId);
       }
+    };
+    reader.onerror = function() {
+      docStore[categoryId].splice(idx, 1);
+      renderDocList(categoryId);
+      setStatus('Could not read file', 'err');
     };
     reader.readAsDataURL(file);
   });
 }
 
 function handleDocUpload(input, categoryId) {
-  var files = Array.from(input.files);
+  _addDocFiles(Array.from(input.files), categoryId);
   input.value = '';
-  _addDocFiles(files, categoryId);
 }
 
 function _processDroppedFiles(files, categoryId) {
-  files = Array.from(files).filter(function(f) {
+  _addDocFiles(Array.from(files).filter(function(f){
     return /\.(pdf|docx?|png|jpe?g)$/i.test(f.name);
-  });
-  _addDocFiles(files, categoryId);
+  }), categoryId);
 }
 
 function initDocDropZones() {
@@ -1714,56 +1719,79 @@ function renderDocList(categoryId) {
   if (!el) return;
   var docs = docStore[categoryId] || [];
   if (!docs.length) { el.innerHTML = '<div style="color:#999;font-size:12px;padding:8px 0;">No documents uploaded</div>'; return; }
-  var btnStyle = 'border:none;padding:4px 10px;border-radius:3px;font-size:11px;font-weight:700;cursor:pointer;font-family:Barlow Condensed,sans-serif;text-transform:uppercase;letter-spacing:.5px;';
+  var btnStyle = 'border:none;padding:6px 12px;border-radius:3px;font-size:11px;font-weight:700;cursor:pointer;font-family:Barlow Condensed,sans-serif;text-transform:uppercase;letter-spacing:.5px;';
   el.innerHTML = docs.map(function(doc, idx) {
     var isImg = doc.type && doc.type.startsWith('image/');
     var isPdf = doc.type === 'application/pdf';
-    var icon = isImg ? '&#128444;' : isPdf ? '&#128196;' : '&#128462;';
+    var icon = isImg ? '🖼' : isPdf ? '📄' : '📎';
+    var statusBadge = '';
+    if (doc.status === 'uploading') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⏳ Uploading...</span>';
+    else if (doc.status === 'saved') statusBadge = '<span style="color:#27ae60;font-size:10px;"> ✓ Saved</span>';
+    else if (doc.status === 'local') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⚠ Not yet saved to cloud</span>';
+    var canView = doc.data && (doc.data.indexOf('storage:') === 0 || doc.data.indexOf('data:') === 0);
     return '<div style="background:#f5f5f2;border:1px solid #ddd;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">'
-      + '<div style="font-size:11px;font-weight:700;color:#333;word-break:break-all;line-height:1.3;">' + icon + ' ' + doc.name + '</div>'
-      + '<div style="display:flex;gap:6px;">'
-      + '<button onclick="viewDoc(\'' + categoryId + '\',' + idx + ')" style="background:#2a4a1a;color:white;' + btnStyle + '" ontouchend="viewDoc(\'' + categoryId + '\',' + idx + ')">&#128065; View</button>'
-      + '<button onclick="removeDoc(\'' + categoryId + '\',' + idx + ')" style="background:#c0392b;color:white;' + btnStyle + '">&#10005; Remove</button>'
+      + '<div style="font-size:11px;font-weight:700;color:#333;word-break:break-all;line-height:1.4;">' + icon + ' ' + doc.name + statusBadge + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+      + (canView ? '<button onclick="viewDoc(\'' + categoryId + '\',' + idx + ')" style="background:#2a4a1a;color:white;' + btnStyle + '">👁 View</button>' : '')
+      + '<button onclick="removeDoc(\'' + categoryId + '\',' + idx + ')" style="background:#c0392b;color:white;' + btnStyle + '">✕ Remove</button>'
       + '</div></div>';
   }).join('');
 }
 
-function _openUrl(url, filename) {
-  // iOS Safari compatible URL opener — window.open must be called directly in user gesture
-  var a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  if (filename) a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(function(){ document.body.removeChild(a); }, 200);
-}
-
 function viewDoc(categoryId, idx) {
   var doc = (docStore[categoryId] || [])[idx];
-  if (!doc) return;
+  if (!doc || !doc.data) return;
+  var url = doc.data.indexOf('storage:') === 0 ? _docPublicUrl(doc.data.substring(8)) : doc.data;
   var isImg = doc.type && doc.type.startsWith('image/');
   var isPdf = doc.type === 'application/pdf';
-  // If stored in Supabase Storage, open public URL directly
-  if (doc.data && doc.data.indexOf('storage:') === 0) {
-    var pubUrl = _docPublicUrl(doc.data.substring(8));
-    _openUrl(pubUrl);
-    return;
+  // Build in-app viewer modal — works on iOS, Android, desktop
+  var existing = document.getElementById('docViewerModal');
+  if (existing) document.body.removeChild(existing);
+  var modal = document.createElement('div');
+  modal.id = 'docViewerModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:99999;display:flex;flex-direction:column;';
+  var header = document.createElement('div');
+  header.style.cssText = 'background:#1a2e10;color:white;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;';
+  header.innerHTML = '<span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">' + doc.name + '</span>';
+  var btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
+  // Open in browser button
+  var openBtn = document.createElement('a');
+  openBtn.href = url; openBtn.target = '_blank'; openBtn.rel = 'noopener';
+  openBtn.style.cssText = 'background:#4a7a2a;color:white;padding:6px 12px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;text-decoration:none;text-transform:uppercase;';
+  openBtn.textContent = '↗ Open';
+  // Close button
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:#c0392b;color:white;border:none;padding:6px 12px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;';
+  closeBtn.textContent = '✕ Close';
+  closeBtn.onclick = function(){ document.body.removeChild(modal); };
+  btns.appendChild(openBtn); btns.appendChild(closeBtn);
+  header.appendChild(btns);
+  modal.appendChild(header);
+  var content = document.createElement('div');
+  content.style.cssText = 'flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;';
+  if (isImg) {
+    var img = document.createElement('img');
+    img.src = url; img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
+    content.appendChild(img);
+  } else if (isPdf) {
+    var iframe = document.createElement('iframe');
+    iframe.src = url; iframe.style.cssText = 'width:100%;height:100%;border:none;';
+    content.appendChild(iframe);
+  } else {
+    // Non-previewable file — show download prompt
+    content.innerHTML = '<div style="color:white;text-align:center;padding:40px;font-family:Barlow Condensed,sans-serif;">'
+      + '<div style="font-size:48px;margin-bottom:16px;">📎</div>'
+      + '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">' + doc.name + '</div>'
+      + '<div style="font-size:13px;opacity:.7;margin-bottom:24px;">Tap Open to view this file</div>'
+      + '<a href="' + url + '" target="_blank" rel="noopener" style="background:#4a7a2a;color:white;padding:12px 24px;border-radius:4px;font-weight:700;font-size:14px;text-decoration:none;text-transform:uppercase;">↗ Open File</a>'
+      + '</div>';
   }
-  try {
-    var byteString = atob(doc.data.split(',')[1]);
-    var ab = new ArrayBuffer(byteString.length);
-    var ia = new Uint8Array(ab);
-    for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-    var blob = new Blob([ab], {type: doc.type || 'application/octet-stream'});
-    var url = URL.createObjectURL(blob);
-    _openUrl(url, (!isImg && !isPdf) ? doc.name : null);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
-  } catch(e) {
-    // Fallback — open data URL directly
-    _openUrl(doc.data);
-  }
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  // Close on background tap
+  modal.addEventListener('click', function(e){ if (e.target === modal) document.body.removeChild(modal); });
+}
 }
 
 function removeDoc(categoryId, idx) {
