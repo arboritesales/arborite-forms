@@ -196,11 +196,11 @@ function showTab(id, btn) {
   }
   window.scrollTo(0, 0);
   setTimeout(function() {
-    // Only init canvases in the visible panel, then restore any cached signatures
+    // Only init canvases in the visible panel, then restore cached signatures
     var cs = document.querySelectorAll('#' + id + ' .sig-wrap canvas');
     for (var i = 0; i < cs.length; i++) {
       initSig(cs[i].id);
-      if (sigCache[cs[i].id]) drawSigFromCache(cs[i].id);
+      if (sigCache[cs[i].id]) _paintSigOnCanvas(cs[i].id, sigCache[cs[i].id]);
     }
   }, 80);
 }
@@ -1371,16 +1371,24 @@ function drawSigFromCache_b64(id, b64url) {
   var canvas = document.getElementById(id);
   if (!canvas) return;
   initSig(id);
+  sigCache[id] = b64url; // keep in cache for tab-switching
+  _paintSigOnCanvas(id, b64url);
+}
+
+// Draw onto a canvas that has ALREADY been initialised by initSig — no double-init
+function _paintSigOnCanvas(id, dataUrl) {
   var p = pads[id];
   if (!p || !p.ctx || !p.canvas) return;
   var img = new Image();
   img.onload = function() {
-    p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
-    p.ctx.drawImage(img, 0, 0,
-      p.canvas.width / (window.devicePixelRatio || 1),
-      p.canvas.height / (window.devicePixelRatio || 1));
+    if (p.ctx && p.canvas) {
+      p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
+      p.ctx.drawImage(img, 0, 0,
+        p.canvas.width / (window.devicePixelRatio || 1),
+        p.canvas.height / (window.devicePixelRatio || 1));
+    }
   };
-  img.src = b64url;
+  img.src = dataUrl;
 }
 
 function drawSigFromCache(id) {
@@ -1392,16 +1400,7 @@ function drawSigFromCache(id) {
   var p = pads[id];
   if (!p) return;
   p.dataUrl = dataUrl;
-  var img = new Image();
-  img.onload = function() {
-    if (p.ctx && p.canvas) {
-      p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
-      p.ctx.drawImage(img, 0, 0,
-        p.canvas.width / (window.devicePixelRatio || 1),
-        p.canvas.height / (window.devicePixelRatio || 1));
-    }
-  };
-  img.src = dataUrl;
+  _paintSigOnCanvas(id, dataUrl);
 }
 
 // ── AUDIT OVERALL ──
@@ -1613,7 +1612,7 @@ function openForm(panelId) {
     var cs = document.querySelectorAll('#' + panelId + ' .sig-wrap canvas');
     for (var ci = 0; ci < cs.length; ci++) {
       initSig(cs[ci].id);
-      if (sigCache[cs[ci].id]) drawSigFromCache(cs[ci].id);
+      if (sigCache[cs[ci].id]) _paintSigOnCanvas(cs[ci].id, sigCache[cs[ci].id]);
     }
     attachAutoSave(panelId);
   }, 80);
