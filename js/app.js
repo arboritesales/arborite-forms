@@ -1620,58 +1620,65 @@ var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_sur
 
 var MAX_DOCS_PER_CAT = 10;
 
-function handleDocUpload(input, categoryId) {
-  var files = Array.from(input.files);
+function _addDocFiles(files, categoryId) {
   if (!files.length) return;
   if (!docStore[categoryId]) docStore[categoryId] = [];
   var existing = docStore[categoryId].length;
   if (existing >= MAX_DOCS_PER_CAT) {
     alert('Maximum ' + MAX_DOCS_PER_CAT + ' documents per category. Please remove one first.');
-    input.value = '';
     return;
   }
-  // Only take as many as allowed
   var canAdd = MAX_DOCS_PER_CAT - existing;
   files = files.slice(0, canAdd);
-  if (files.length < Array.from(input.files).length) {
-    alert('Only ' + canAdd + ' more document(s) can be added to this category (max ' + MAX_DOCS_PER_CAT + ').');
-  }
+  setStatus('Uploading document' + (files.length > 1 ? 's' : '') + '…', '');
   var remaining = files.length;
   files.forEach(function(file) {
     var reader = new FileReader();
     reader.onload = function(e) {
-      docStore[categoryId].push({name: file.name, type: file.type, data: e.target.result});
-      remaining--;
-      if (remaining === 0) { renderDocList(categoryId); if (currentJobRef) saveJob(); }
+      var dataUrl = e.target.result;
+      var docEntry = {name: file.name, type: file.type, data: dataUrl};
+      docStore[categoryId].push(docEntry);
+      var docIdx = docStore[categoryId].length - 1;
+      renderDocList(categoryId);
+      // Upload to Storage immediately if job is open
+      if (currentJobRef) {
+        var path = _docPath(currentJobRef, categoryId, file.name);
+        _uploadDocFile(path, dataUrl, file.type)
+          .then(function(r) {
+            if (r.ok || r.status === 200 || r.status === 201) {
+              docStore[categoryId][docIdx].data = 'storage:' + path;
+              setStatus('Document saved ✓', 'ok');
+            } else {
+              return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
+            }
+          })
+          .catch(function(err) {
+            setStatus('Doc upload failed — will retry on save', 'err');
+          })
+          .finally(function() {
+            remaining--;
+            if (remaining === 0) { renderDocList(categoryId); saveJob(); }
+          });
+      } else {
+        remaining--;
+        if (remaining === 0) renderDocList(categoryId);
+      }
     };
     reader.readAsDataURL(file);
   });
+}
+
+function handleDocUpload(input, categoryId) {
+  var files = Array.from(input.files);
   input.value = '';
+  _addDocFiles(files, categoryId);
 }
 
 function _processDroppedFiles(files, categoryId) {
   files = Array.from(files).filter(function(f) {
     return /\.(pdf|docx?|png|jpe?g)$/i.test(f.name);
   });
-  if (!files.length) return;
-  if (!docStore[categoryId]) docStore[categoryId] = [];
-  var existing = docStore[categoryId].length;
-  if (existing >= MAX_DOCS_PER_CAT) {
-    alert('Maximum ' + MAX_DOCS_PER_CAT + ' documents per category. Please remove one first.');
-    return;
-  }
-  var canAdd = MAX_DOCS_PER_CAT - existing;
-  files = files.slice(0, canAdd);
-  var remaining = files.length;
-  files.forEach(function(file) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      docStore[categoryId].push({name: file.name, type: file.type, data: e.target.result});
-      remaining--;
-      if (remaining === 0) { renderDocList(categoryId); if (currentJobRef) saveJob(); }
-    };
-    reader.readAsDataURL(file);
-  });
+  _addDocFiles(files, categoryId);
 }
 
 function initDocDropZones() {
