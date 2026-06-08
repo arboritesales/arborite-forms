@@ -196,8 +196,12 @@ function showTab(id, btn) {
   }
   window.scrollTo(0, 0);
   setTimeout(function() {
-    var cs = document.querySelectorAll('.sig-wrap canvas');
-    for (var i = 0; i < cs.length; i++) initSig(cs[i].id);
+    // Only init canvases in the visible panel, then restore any cached signatures
+    var cs = document.querySelectorAll('#' + id + ' .sig-wrap canvas');
+    for (var i = 0; i < cs.length; i++) {
+      initSig(cs[i].id);
+      if (sigCache[cs[i].id]) drawSigFromCache(cs[i].id);
+    }
   }, 80);
 }
 
@@ -1609,7 +1613,6 @@ function openForm(panelId) {
     var cs = document.querySelectorAll('#' + panelId + ' .sig-wrap canvas');
     for (var ci = 0; ci < cs.length; ci++) {
       initSig(cs[ci].id);
-      // Restore from cache if this canvas was restored before the panel was opened
       if (sigCache[cs[ci].id]) drawSigFromCache(cs[ci].id);
     }
     attachAutoSave(panelId);

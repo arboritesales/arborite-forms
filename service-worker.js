@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arborite-field-forms-v45';
+const CACHE_NAME = 'arborite-field-forms-v46';
 const APP_SHELL = [
   './',
   './index.html',
