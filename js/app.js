@@ -789,7 +789,7 @@ function confirmDeletePass() {
 function loadJobByRef(ref) {
   if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Configure Supabase first', 'err'); return; }
   setStatus('Loading...', '');
-  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&limit=1')
+  supaFetch('GET', TABLE + '?select=quote_ref,form_data&quote_ref=eq.' + encodeURIComponent(ref) + '&limit=1')
     .then(function(r){ return r.json(); })
     .then(function(rows){
       if (!rows || rows.length === 0) { setStatus('Not found: ' + ref, 'err'); return; }
@@ -801,7 +801,7 @@ function loadJobByRef(ref) {
       var fd_parsed = (typeof fd_raw === 'string') ? JSON.parse(fd_raw) : fd_raw;
       restoreFormData(fd_parsed);
       // Re-sync shared fields and re-apply supervisor value after select is populated
-      setTimeout(function() {
+      setTimeout(function() { /* 50ms: enough for selects to populate */
         syncShared();
         var fd = fd_parsed;
         if (fd) {
@@ -842,7 +842,7 @@ function loadJobByRef(ref) {
           if (fd.so_w3w) updateW3WLink('so_w3w_link', fd.so_w3w);
           if (fd.ms_w3w) updateW3WLink('ms_w3w_link', fd.ms_w3w);
         }
-      }, 100);
+      }, 50);
       setJobRef(rows[0].quote_ref);
       syncShared();
       setStatus('Loaded: ' + rows[0].quote_ref, 'ok');
@@ -1225,7 +1225,7 @@ function restoreFormData(data) {
         hiddenPanels2[hi].style.visibility = '';
         hiddenPanels2[hi].style.position = '';
       }
-    }, 800);
+    }, 300);
   }
   // Restore w3w link buttons
   if (data.so_w3w) updateW3WLink('so_w3w_link', data.so_w3w);
@@ -1234,7 +1234,7 @@ function restoreFormData(data) {
   if (data._documents && typeof docStore !== 'undefined') {
     docStore = {};
     for (var cat in data._documents) docStore[cat] = data._documents[cat];
-    setTimeout(renderAllDocLists, 200);
+    setTimeout(renderAllDocLists, 50);
   }
 }
 
