@@ -737,20 +737,46 @@ function _deleteStorageFolder(quoteRef) {
   .catch(function(){});
 }
 
+function _saveJobListCache(rows) {
+  try { localStorage.setItem('arb_job_list', JSON.stringify(rows)); } catch(e) {}
+}
+function _loadJobListCache() {
+  try { var s = localStorage.getItem('arb_job_list'); return s ? JSON.parse(s) : null; } catch(e) { return null; }
+}
+
 function fetchJobList() {
+  // Load from cache immediately so list is never blank
+  var cached = _loadJobListCache();
+  if (cached && cached.length && (!allJobs || !allJobs.length)) {
+    allJobs = cached;
+    renderJobList(allJobs);
+  }
   supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=not.like.TBT-*&order=updated_at.desc&limit=200')
     .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) return r.text().then(function(t){ throw new Error('HTTP ' + r.status + ' ' + t.substring(0,80)); });
       return r.json();
     })
     .then(function(rows) {
-      if (!Array.isArray(rows)) throw new Error('Unexpected response format');
+      if (!Array.isArray(rows)) throw new Error('Bad response');
       allJobs = rows;
+      _saveJobListCache(rows);
       renderJobList(allJobs);
     })
-    .catch(function() {
+    .catch(function(e) {
+      var msg = e && e.message ? e.message : 'Unknown error';
       var list = document.getElementById('jobList');
-      if (list && (!allJobs || !allJobs.length)) list.innerHTML = '<div class="job-empty" style="color:#c0392b;">Could not load jobs — check your connection. <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
+      if (allJobs && allJobs.length) {
+        // Show cached jobs with a warning
+        renderJobList(allJobs);
+        if (list) {
+          var warn = document.createElement('div');
+          warn.style.cssText = 'color:#e67e22;font-size:11px;padding:6px 12px;';
+          warn.innerHTML = '⚠ Showing cached jobs (' + msg + ') — <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span>';
+          list.insertBefore(warn, list.firstChild);
+        }
+      } else {
+        if (list) list.innerHTML = '<div class="job-empty" style="color:#c0392b;">Error: ' + msg + '<br><br><span style="text-decoration:underline;cursor:pointer;font-weight:700;" onclick="fetchJobList()">Tap to retry</span></div>';
+      }
     });
 }
 
