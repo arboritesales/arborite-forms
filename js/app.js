@@ -1116,15 +1116,33 @@ function saveAndClose() {
 }
 
 function doSaveAndClose(formData, savedRef) {
-  // Strip any base64 document data — docs are already in Storage from the upload step.
-  // Only keep storage: refs to keep the payload small.
+  // Try to upload any docs still in base64 to Storage (with 10s timeout),
+  // then save — keeping storage refs or falling back to base64 for small files.
+  var uploadDone = false;
+  var uploadTimer = setTimeout(function() {
+    if (!uploadDone) { uploadDone = true; _finishSaveAndClose(formData, savedRef); }
+  }, 10000);
+  uploadDocsToStorage(formData, function() {
+    if (!uploadDone) {
+      uploadDone = true;
+      clearTimeout(uploadTimer);
+      _finishSaveAndClose(formData, savedRef);
+    }
+  });
+}
+
+function _finishSaveAndClose(formData, savedRef) {
+  // Strip only large base64 docs (>500KB) to keep payload manageable.
+  // Small ones are kept as fallback if Storage upload failed.
   if (formData._documents) {
     var DC2 = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
     DC2.forEach(function(cat) {
       if (!formData._documents[cat]) return;
-      formData._documents[cat] = formData._documents[cat].map(function(doc) {
-        return {name:doc.name, type:doc.type, data: (doc.data && doc.data.indexOf('storage:') === 0) ? doc.data : ''};
-      }).filter(function(doc){ return doc.data; });
+      formData._documents[cat] = formData._documents[cat].filter(function(doc) {
+        if (!doc.data) return false;
+        if (doc.data.indexOf('storage:') === 0) return true; // keep storage refs
+        return doc.data.length < 500000; // keep small base64 (<375KB file)
+      });
       if (!formData._documents[cat].length) delete formData._documents[cat];
     });
   }
