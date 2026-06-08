@@ -1239,13 +1239,17 @@ function collectFormData() {
   }
   data._custom_staff    = CUSTOM_STAFF;
   data._custom_machines = CUSTOM_MACHINES;
-  // Save documents (base64)
+  // Save documents — only keep storage refs, strip base64 to keep payload small
   data._documents = {};
   if (typeof docStore !== 'undefined') {
-    var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
-    for (var dc = 0; dc < DOC_CATS.length; dc++) {
-      if (docStore[DOC_CATS[dc]] && docStore[DOC_CATS[dc]].length) {
-        data._documents[DOC_CATS[dc]] = docStore[DOC_CATS[dc]];
+    var DOC_CATS_SAVE = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
+    for (var dc = 0; dc < DOC_CATS_SAVE.length; dc++) {
+      var cat = DOC_CATS_SAVE[dc];
+      if (docStore[cat] && docStore[cat].length) {
+        var catDocs = docStore[cat].map(function(d) {
+          return {name: d.name, type: d.type, data: (d.data && d.data.indexOf('storage:') === 0) ? d.data : '', status: d.status || ''};
+        }).filter(function(d){ return d.data; }); // only save docs that made it to Storage
+        if (catDocs.length) data._documents[cat] = catDocs;
       }
     }
   }
@@ -1727,12 +1731,14 @@ function renderDocList(categoryId) {
     var statusBadge = '';
     if (doc.status === 'uploading') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⏳ Uploading...</span>';
     else if (doc.status === 'saved') statusBadge = '<span style="color:#27ae60;font-size:10px;"> ✓ Saved</span>';
-    else if (doc.status === 'local') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⚠ Not yet saved to cloud</span>';
-    var canView = doc.data && (doc.data.indexOf('storage:') === 0 || doc.data.indexOf('data:') === 0);
+    else if (doc.status === 'local') statusBadge = '<span style="color:#c0392b;font-size:10px;"> ⚠ Upload failed</span>';
+    var canView = doc.data && doc.data.indexOf('storage:') === 0;
+    var canRetry = doc.status === 'local' && doc.data && doc.data.indexOf('data:') === 0;
     return '<div style="background:#f5f5f2;border:1px solid #ddd;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">'
       + '<div style="font-size:11px;font-weight:700;color:#333;word-break:break-all;line-height:1.4;">' + icon + ' ' + doc.name + statusBadge + '</div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
       + (canView ? '<button onclick="viewDoc(\'' + categoryId + '\',' + idx + ')" style="background:#2a4a1a;color:white;' + btnStyle + '">👁 View</button>' : '')
+      + (canRetry ? '<button onclick="retryDocUpload(\'' + categoryId + '\',' + idx + ')" style="background:#e67e22;color:white;' + btnStyle + '">↺ Retry Upload</button>' : '')
       + '<button onclick="removeDoc(\'' + categoryId + '\',' + idx + ')" style="background:#c0392b;color:white;' + btnStyle + '">✕ Remove</button>'
       + '</div></div>';
   }).join('');
@@ -1799,6 +1805,33 @@ function removeDoc(categoryId, idx) {
   docStore[categoryId].splice(idx, 1);
   renderDocList(categoryId);
   if (currentJobRef) saveJob();
+}
+
+function retryDocUpload(categoryId, idx) {
+  var doc = (docStore[categoryId] || [])[idx];
+  if (!doc || !doc.data || doc.data.indexOf('data:') !== 0) return;
+  if (!currentJobRef) { setStatus('Open a job first', 'err'); return; }
+  doc.status = 'uploading';
+  renderDocList(categoryId);
+  setStatus('Retrying upload…', '');
+  var path = _docPath(currentJobRef, categoryId, doc.name);
+  _uploadDocFile(path, doc.data, doc.type)
+    .then(function(r) {
+      if (r.ok || r.status === 200 || r.status === 201) {
+        doc.data = 'storage:' + path;
+        doc.status = 'saved';
+        setStatus('Document saved ✓', 'ok');
+        renderDocList(categoryId);
+        saveJob();
+      } else {
+        return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
+      }
+    })
+    .catch(function(e) {
+      doc.status = 'local';
+      setStatus('Retry failed: ' + (e && e.message ? e.message : 'check connection'), 'err');
+      renderDocList(categoryId);
+    });
 }
 
 function renderAllDocLists() {
