@@ -408,6 +408,7 @@ function attachSigListeners(canvas, id) {
       var url = canvas.toDataURL('image/png');
       if (url && url.length > 100 && url !== 'data:,') {
         pads[id].dataUrl = url;
+        sigCache[id] = url; // keep in cache so it redraws when switching tabs
         // Trigger auto-save for whichever panel this canvas lives in
         var el = canvas.parentNode;
         while (el && el !== document.body) {
