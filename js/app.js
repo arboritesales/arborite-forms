@@ -1798,7 +1798,6 @@ function viewDoc(categoryId, idx) {
   // Close on background tap
   modal.addEventListener('click', function(e){ if (e.target === modal) document.body.removeChild(modal); });
 }
-}
 
 function removeDoc(categoryId, idx) {
   if (!docStore[categoryId]) return;
