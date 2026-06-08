@@ -544,11 +544,39 @@ function clearAllForms() {
 function showLoadModal() {
   document.getElementById('loadSearch').value = '';
   document.getElementById('loadModal').className = 'modal-bg show';
-  // Show existing jobs immediately, then refresh from Supabase
-  renderJobList(allJobs);
-  if (SUPA_URL !== 'YOUR_SUPABASE_URL') {
+  // Show any already-cached jobs immediately so the list isn't blank
+  if (allJobs && allJobs.length > 0) {
+    renderJobList(allJobs);
+  } else {
     document.getElementById('jobList').innerHTML = '<div class="job-empty">Loading saved jobs...</div>';
-    fetchJobList();
+  }
+  if (SUPA_URL !== 'YOUR_SUPABASE_URL') {
+    // Refresh from Supabase in the background — don't blank the list while waiting
+    var refreshTimeout = setTimeout(function() {
+      var list = document.getElementById('jobList');
+      if (list && list.innerHTML.indexOf('Loading saved jobs') > -1) {
+        list.innerHTML = '<div class="job-empty" style="color:#c0392b;">Taking a while — check your signal. <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
+      }
+    }, 8000);
+    supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=not.like.TBT-*&order=updated_at.desc&limit=200')
+      .then(function(r) {
+        clearTimeout(refreshTimeout);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(rows) {
+        if (!Array.isArray(rows)) throw new Error('Bad response');
+        allJobs = rows;
+        renderJobList(allJobs);
+      })
+      .catch(function() {
+        clearTimeout(refreshTimeout);
+        if (allJobs && allJobs.length > 0) {
+          renderJobList(allJobs); // fall back to cached list
+        } else {
+          document.getElementById('jobList').innerHTML = '<div class="job-empty" style="color:#c0392b;">Could not load jobs — check your connection. <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
+        }
+      });
   }
 }
 
@@ -720,7 +748,7 @@ function fetchJobList() {
     })
     .catch(function() {
       var list = document.getElementById('jobList');
-      if (list) list.innerHTML = '<div class="job-empty">Could not load jobs — check your connection and try again.</div>';
+      if (list && (!allJobs || !allJobs.length)) list.innerHTML = '<div class="job-empty" style="color:#c0392b;">Could not load jobs — check your connection. <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
     });
 }
 
