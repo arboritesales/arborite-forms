@@ -1697,10 +1697,22 @@ function renderDocList(categoryId) {
     return '<div style="background:#f5f5f2;border:1px solid #ddd;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">'
       + '<div style="font-size:11px;font-weight:700;color:#333;word-break:break-all;line-height:1.3;">' + icon + ' ' + doc.name + '</div>'
       + '<div style="display:flex;gap:6px;">'
-      + '<button onclick="viewDoc(\'' + categoryId + '\',' + idx + ')" style="background:#2a4a1a;color:white;' + btnStyle + '">&#128065; View</button>'
+      + '<button onclick="viewDoc(\'' + categoryId + '\',' + idx + ')" style="background:#2a4a1a;color:white;' + btnStyle + '" ontouchend="viewDoc(\'' + categoryId + '\',' + idx + ')">&#128065; View</button>'
       + '<button onclick="removeDoc(\'' + categoryId + '\',' + idx + ')" style="background:#c0392b;color:white;' + btnStyle + '">&#10005; Remove</button>'
       + '</div></div>';
   }).join('');
+}
+
+function _openUrl(url, filename) {
+  // iOS Safari compatible URL opener — window.open must be called directly in user gesture
+  var a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  if (filename) a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ document.body.removeChild(a); }, 200);
 }
 
 function viewDoc(categoryId, idx) {
@@ -1711,11 +1723,7 @@ function viewDoc(categoryId, idx) {
   // If stored in Supabase Storage, open public URL directly
   if (doc.data && doc.data.indexOf('storage:') === 0) {
     var pubUrl = _docPublicUrl(doc.data.substring(8));
-    if (isImg || isPdf) {
-      window.open(pubUrl, '_blank');
-    } else {
-      var a2 = document.createElement('a'); a2.href = pubUrl; a2.download = doc.name; a2.click();
-    }
+    _openUrl(pubUrl);
     return;
   }
   try {
@@ -1725,20 +1733,11 @@ function viewDoc(categoryId, idx) {
     for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
     var blob = new Blob([ab], {type: doc.type || 'application/octet-stream'});
     var url = URL.createObjectURL(blob);
-    if (isImg || isPdf) {
-      window.open(url, '_blank');
-    } else {
-      var a = document.createElement('a');
-      a.href = url; a.download = doc.name; a.click();
-    }
+    _openUrl(url, (!isImg && !isPdf) ? doc.name : null);
     setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
   } catch(e) {
-    var w = window.open('', '_blank');
-    if (isImg) {
-      w.document.write('<html><body style="margin:0;background:#111;display:flex;justify-content:center;"><img src="' + doc.data + '" style="max-width:100%;"></body></html>');
-    } else {
-      w.document.write('<iframe src="' + doc.data + '" style="width:100%;height:100vh;border:none;"></iframe>');
-    }
+    // Fallback — open data URL directly
+    _openUrl(doc.data);
   }
 }
 
