@@ -621,8 +621,54 @@ function setStatus(msg, type) {
   el.className = 'job-status' + (type ? ' ' + type : '');
 }
 
-// ── SUPABASE STORAGE (signatures) ──
+// ── SUPABASE STORAGE (signatures & documents) ──
 var SIG_BUCKET = 'signatures';
+var DOC_BUCKET = 'documents';
+
+function _docPath(quoteRef, categoryId, filename) {
+  return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + categoryId + '/' + filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+function _docPublicUrl(path) {
+  return SUPA_URL + '/storage/v1/object/public/' + DOC_BUCKET + '/' + path;
+}
+function _uploadDocFile(path, dataUrl, mimeType) {
+  var base64 = dataUrl.split(',')[1];
+  if (!base64) return Promise.reject(new Error('bad dataUrl'));
+  var chars = atob(base64), bytes = new Uint8Array(chars.length);
+  for (var i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
+  return fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + path, {
+    method: 'POST',
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':mimeType||'application/octet-stream','x-upsert':'true'},
+    body: bytes, credentials: 'omit', mode: 'cors'
+  });
+}
+function uploadDocsToStorage(formData, done) {
+  var docs = formData._documents || {};
+  var toUpload = [];
+  var DC = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
+  DC.forEach(function(cat) {
+    if (!docs[cat]) return;
+    docs[cat].forEach(function(doc, idx) {
+      if (doc.data && doc.data.indexOf('data:') === 0) toUpload.push({cat:cat, idx:idx, doc:doc});
+    });
+  });
+  var i = 0;
+  function uploadNext() {
+    if (i >= toUpload.length) { done(); return; }
+    var item = toUpload[i++];
+    var path = _docPath(currentJobRef, item.cat, item.doc.name);
+    _uploadDocFile(path, item.doc.data, item.doc.type)
+      .then(function(r) {
+        if (r.ok || r.status === 200 || r.status === 201) {
+          docs[item.cat][item.idx].data = 'storage:' + path;
+          if (docStore[item.cat] && docStore[item.cat][item.idx]) docStore[item.cat][item.idx].data = 'storage:' + path;
+        }
+        uploadNext();
+      })
+      .catch(function() { uploadNext(); });
+  }
+  uploadNext();
+}
 
 function _storagePath(quoteRef, sigId) {
   return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + sigId + '.jpg';
@@ -906,7 +952,7 @@ function uploadSigsToStorage(formData) {
   var idx = 0;
 
   function uploadNext() {
-    if (idx >= toUpload.length) { sendSave(formData); return; }
+    if (idx >= toUpload.length) { uploadDocsToStorage(formData, function(){ sendSave(formData); }); return; }
     var id = toUpload[idx++];
     var path = _storagePath(currentJobRef, id);
     _uploadSig(path, sigs[id])
@@ -1014,8 +1060,9 @@ function saveAndClose() {
 }
 
 function doSaveAndClose(formData, savedRef) {
-  var payload = {quote_ref:savedRef, form_data:formData, updated_at:new Date().toISOString()};
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
+  uploadDocsToStorage(formData, function() {
+    var payload = {quote_ref:savedRef, form_data:formData, updated_at:new Date().toISOString()};
+    supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
         setStatus('Saved & closed', 'ok');
@@ -1036,6 +1083,7 @@ function doSaveAndClose(formData, savedRef) {
       var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
       for (var j=0;j<btns2.length;j++) btns2[j].disabled = false;
     });
+  }); // end uploadDocsToStorage
 }
 
 // ── COLLECT / RESTORE ──
@@ -1486,7 +1534,7 @@ function printTBT() {
 var docStore = {};
 var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
 
-var MAX_DOCS_PER_CAT = 3;
+var MAX_DOCS_PER_CAT = 10;
 
 function handleDocUpload(input, categoryId) {
   var files = Array.from(input.files);
@@ -1594,6 +1642,16 @@ function viewDoc(categoryId, idx) {
   if (!doc) return;
   var isImg = doc.type && doc.type.startsWith('image/');
   var isPdf = doc.type === 'application/pdf';
+  // If stored in Supabase Storage, open public URL directly
+  if (doc.data && doc.data.indexOf('storage:') === 0) {
+    var pubUrl = _docPublicUrl(doc.data.substring(8));
+    if (isImg || isPdf) {
+      window.open(pubUrl, '_blank');
+    } else {
+      var a2 = document.createElement('a'); a2.href = pubUrl; a2.download = doc.name; a2.click();
+    }
+    return;
+  }
   try {
     var byteString = atob(doc.data.split(',')[1]);
     var ab = new ArrayBuffer(byteString.length);
@@ -1602,18 +1660,13 @@ function viewDoc(categoryId, idx) {
     var blob = new Blob([ab], {type: doc.type || 'application/octet-stream'});
     var url = URL.createObjectURL(blob);
     if (isImg || isPdf) {
-      // Open inline in new tab - user can press back
       window.open(url, '_blank');
     } else {
-      // Word docs - trigger download
       var a = document.createElement('a');
-      a.href = url;
-      a.download = doc.name;
-      a.click();
+      a.href = url; a.download = doc.name; a.click();
     }
     setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
   } catch(e) {
-    // Fallback for data URL
     var w = window.open('', '_blank');
     if (isImg) {
       w.document.write('<html><body style="margin:0;background:#111;display:flex;justify-content:center;"><img src="' + doc.data + '" style="max-width:100%;"></body></html>');
