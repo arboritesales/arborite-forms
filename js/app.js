@@ -408,6 +408,15 @@ function attachSigListeners(canvas, id) {
       var url = canvas.toDataURL('image/png');
       if (url && url.length > 100 && url !== 'data:,') {
         pads[id].dataUrl = url;
+        // Trigger auto-save for whichever panel this canvas lives in
+        var el = canvas.parentNode;
+        while (el && el !== document.body) {
+          if (el.id && AUTO_SAVE_PANELS.indexOf(el.id) !== -1) {
+            scheduleAutoSave(el.id);
+            break;
+          }
+          el = el.parentNode;
+        }
       }
     } catch(e) {}
   }
@@ -1958,7 +1967,7 @@ function syncSuperNameText() {
 
 // ── AUTO-SAVE ──
 var autoSaveTimer = null;
-var AUTO_SAVE_PANELS = ['signoff', 'method', 'daily', 'powa', 'safety'];
+var AUTO_SAVE_PANELS = ['signoff', 'method', 'daily', 'powa', 'safety', 'audit', 'emergency'];
 
 function scheduleAutoSave(panelId) {
   if (!currentJobRef) return;
