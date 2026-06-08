@@ -555,26 +555,28 @@ function showLoadModal() {
     var refreshTimeout = setTimeout(function() {
       var list = document.getElementById('jobList');
       if (list && list.innerHTML.indexOf('Loading saved jobs') > -1) {
-        list.innerHTML = '<div class="job-empty" style="color:#c0392b;">Taking a while — check your signal. <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
+        list.innerHTML = '<div class="job-empty" style="color:#e67e22;">Server is waking up, please wait… <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
       }
-    }, 8000);
+    }, 15000);
     supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=not.like.TBT-*&order=updated_at.desc&limit=200')
       .then(function(r) {
         clearTimeout(refreshTimeout);
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (!r.ok) return r.text().then(function(t){ throw new Error('HTTP ' + r.status + ': ' + t); });
         return r.json();
       })
       .then(function(rows) {
-        if (!Array.isArray(rows)) throw new Error('Bad response');
+        if (!Array.isArray(rows)) throw new Error('Unexpected response: ' + JSON.stringify(rows).substring(0,100));
         allJobs = rows;
         renderJobList(allJobs);
       })
-      .catch(function() {
+      .catch(function(e) {
         clearTimeout(refreshTimeout);
+        var msg = e && e.message ? e.message : 'Unknown error';
         if (allJobs && allJobs.length > 0) {
-          renderJobList(allJobs); // fall back to cached list
+          renderJobList(allJobs);
+          setStatus('Refresh failed: ' + msg, 'err');
         } else {
-          document.getElementById('jobList').innerHTML = '<div class="job-empty" style="color:#c0392b;">Could not load jobs — check your connection. <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
+          document.getElementById('jobList').innerHTML = '<div class="job-empty" style="color:#c0392b;">Error: ' + msg + '<br><span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
         }
       });
   }
@@ -880,7 +882,7 @@ function loadJobByRef(ref) {
         showDashboard();
       }
     })
-    .catch(function(){ setStatus('Load failed', 'err'); });
+    .catch(function(e){ setStatus('Load failed: ' + (e && e.message ? e.message : 'check connection'), 'err'); });
 }
 
 function compressSignatures(data) {
