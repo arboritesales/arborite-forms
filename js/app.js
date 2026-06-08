@@ -1060,9 +1060,20 @@ function saveAndClose() {
 }
 
 function doSaveAndClose(formData, savedRef) {
-  uploadDocsToStorage(formData, function() {
-    var payload = {quote_ref:savedRef, form_data:formData, updated_at:new Date().toISOString()};
-    supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
+  // Strip any base64 document data — docs are already in Storage from the upload step.
+  // Only keep storage: refs to keep the payload small.
+  if (formData._documents) {
+    var DC2 = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
+    DC2.forEach(function(cat) {
+      if (!formData._documents[cat]) return;
+      formData._documents[cat] = formData._documents[cat].map(function(doc) {
+        return {name:doc.name, type:doc.type, data: (doc.data && doc.data.indexOf('storage:') === 0) ? doc.data : ''};
+      }).filter(function(doc){ return doc.data; });
+      if (!formData._documents[cat].length) delete formData._documents[cat];
+    });
+  }
+  var payload = {quote_ref:savedRef, form_data:formData, updated_at:new Date().toISOString()};
+  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
         setStatus('Saved & closed', 'ok');
@@ -1083,7 +1094,6 @@ function doSaveAndClose(formData, savedRef) {
       var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
       for (var j=0;j<btns2.length;j++) btns2[j].disabled = false;
     });
-  }); // end uploadDocsToStorage
 }
 
 // ── COLLECT / RESTORE ──
