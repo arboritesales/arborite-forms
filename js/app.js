@@ -1699,10 +1699,10 @@ function _prefetchStorageDocs() {
       var path = doc.data.substring(8);
       if (_docBlobCache[path]) return; // already cached
       var url = _docPublicUrl(path);
-      fetch(url, {credentials:'omit'})
-        .then(function(r) { return r.blob(); })
+      fetch(url, {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}})
+        .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
         .then(function(blob) { _docBlobCache[path] = URL.createObjectURL(blob); })
-        .catch(function() {}); // silently fail — will fall back to direct URL
+        .catch(function() {}); // silently fail — will fall back to direct URL on tap
     });
   });
 }
@@ -1907,6 +1907,8 @@ function viewDoc(categoryId, idx) {
   function _renderContent(url) {
     // Update Open button href now that we have the final URL
     openBtn.href = url;
+    var isBlobUrl = url && url.indexOf('blob:') === 0;
+
     if (isImg) {
       var img = document.createElement('img');
       img.src = url;
@@ -1915,20 +1917,23 @@ function viewDoc(categoryId, idx) {
       content.appendChild(img);
 
     } else if (isPdf) {
-      if (isIOS || isAndroid) {
-        content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
-          + '<div style="font-size:52px;margin-bottom:18px;">📄</div>'
-          + '<div style="font-size:20px;font-weight:700;margin-bottom:10px;">' + doc.name + '</div>'
-          + '<div style="font-size:14px;opacity:.75;margin-bottom:28px;">Tap the button below to open the PDF in your device\'s viewer</div>'
-          + '<a href="' + url + '" target="_blank" rel="noopener" style="background:#4a7a2a;color:white;padding:14px 32px;border-radius:5px;font-weight:700;font-size:16px;text-decoration:none;text-transform:uppercase;display:inline-block;">↗ Open PDF</a>'
-          + '</div>';
-      } else {
+      // Use inline iframe for blob URLs (already local — fast on all platforms including iOS)
+      // Use "Open" button for remote Supabase URLs on mobile (avoids slow remote iframe)
+      if (isBlobUrl || (!isIOS && !isAndroid)) {
         var iframe = document.createElement('iframe');
         iframe.src = url;
         iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
         content.style.display = 'block';
         content.innerHTML = '';
         content.appendChild(iframe);
+      } else {
+        // Mobile + remote URL: prompt to open in native viewer
+        content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
+          + '<div style="font-size:52px;margin-bottom:18px;">📄</div>'
+          + '<div style="font-size:20px;font-weight:700;margin-bottom:10px;">' + doc.name + '</div>'
+          + '<div style="font-size:14px;opacity:.75;margin-bottom:28px;">Loading… tap Open if it doesn\'t appear</div>'
+          + '<a href="' + url + '" target="_blank" rel="noopener" style="background:#4a7a2a;color:white;padding:14px 32px;border-radius:5px;font-weight:700;font-size:16px;text-decoration:none;text-transform:uppercase;display:inline-block;">↗ Open PDF</a>'
+          + '</div>';
       }
 
     } else {
@@ -1950,8 +1955,8 @@ function viewDoc(categoryId, idx) {
       + '<div style="font-size:36px;margin-bottom:16px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>'
       + '<div style="font-size:15px;opacity:.8;margin-top:8px;">Loading document…</div>'
       + '</div>';
-    fetch(_docPublicUrl(storagePath), {credentials:'omit'})
-      .then(function(r) { return r.blob(); })
+    fetch(_docPublicUrl(storagePath), {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
       .then(function(blob) {
         var blobUrl = URL.createObjectURL(blob);
         _docBlobCache[storagePath] = blobUrl;
