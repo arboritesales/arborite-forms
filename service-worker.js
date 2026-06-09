@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arborite-field-forms-v51';
+const CACHE_NAME = 'arborite-field-forms-v56';
 const APP_SHELL = [
   './',
   './index.html',
@@ -29,9 +29,15 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
-  // Network-first for HTML page navigations — always pulls the latest index.html
-  // so iOS devices pick up new versions without manual cache clearing
-  if (event.request.mode === 'navigate') {
+  const url = event.request.url;
+
+  // Always network-first for the main HTML and core app files so updates arrive immediately
+  const isAppShell = event.request.mode === 'navigate'
+    || url.endsWith('/app.js')
+    || url.endsWith('/app.css')
+    || url.includes('index.html');
+
+  if (isAppShell) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
@@ -44,7 +50,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for all other assets (CSS, JS, images)
+  // Cache-first for images, fonts and third-party libs
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request))
   );

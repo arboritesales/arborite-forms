@@ -1,7 +1,13 @@
 
 // ── AUTO-UPDATE: when a new service worker takes over, reload to get latest files ──
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.ready.then(function(reg) { reg.update(); });
+  navigator.serviceWorker.ready.then(function(reg) {
+    reg.update();
+    // Check for updates every time the user switches back to the tab
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') reg.update();
+    });
+  });
   navigator.serviceWorker.addEventListener('controllerchange', function() {
     window.location.reload();
   });
