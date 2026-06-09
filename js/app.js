@@ -645,6 +645,35 @@ function hideModals() {
   document.getElementById('loadModal').className = 'modal-bg';
 }
 
+// ── JOB DOCUMENTS TABLE ──
+var DOC_TABLE = 'job_documents';
+
+function _docFetch(method, path, body, prefer) {
+  var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+  if (prefer) h['Prefer'] = prefer;
+  var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(SUPA_URL + '/rest/v1/' + path, opts);
+}
+
+function _docDbSave(jobRef, cat, name, mimeType, dataUrl, cb) {
+  _docFetch('POST', DOC_TABLE, {job_ref:jobRef, category:cat, name:name, mime_type:mimeType, data:dataUrl}, 'return=representation')
+    .then(function(r){ return r.json(); })
+    .then(function(rows){ cb(null, rows && rows[0] ? rows[0].id : null); })
+    .catch(function(e){ cb(e, null); });
+}
+
+function _docDbDelete(id) {
+  _docFetch('DELETE', DOC_TABLE + '?id=eq.' + id).catch(function(){});
+}
+
+function _docDbLoad(jobRef, cb) {
+  _docFetch('GET', DOC_TABLE + '?job_ref=eq.' + encodeURIComponent(jobRef) + '&select=id,category,name,mime_type,data')
+    .then(function(r){ return r.json(); })
+    .then(function(rows){ cb(null, rows || []); })
+    .catch(function(e){ cb(e, []); });
+}
+
 // ── SUPABASE ──
 function supaFetch(method, path, body) {
   var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
@@ -993,11 +1022,23 @@ function loadJobByRef(ref) {
           if (fd.ms_w3w) updateW3WLink('ms_w3w_link', fd.ms_w3w);
         }
       }, 50);
-      setJobRef(rows[0].quote_ref);
-      _saveJobLocalCache(rows[0].quote_ref, fd_parsed);
+      var loadedRef = rows[0].quote_ref;
+      setJobRef(loadedRef);
+      _saveJobLocalCache(loadedRef, fd_parsed);
       syncShared();
-      setTimeout(function(){ _mergeLocalDocs(rows[0].quote_ref); _prefetchStorageDocs(); }, 500);
-      setStatus('Loaded: ' + rows[0].quote_ref, 'ok');
+      setStatus('Loaded: ' + loadedRef, 'ok');
+      // Load documents from dedicated table
+      _docDbLoad(loadedRef, function(err, docs) {
+        docStore = {};
+        if (!err && docs.length) {
+          docs.forEach(function(row) {
+            if (!docStore[row.category]) docStore[row.category] = [];
+            docStore[row.category].push({name:row.name, type:row.mime_type, data:row.data, status:'saved', dbId:row.id});
+          });
+        }
+        renderAllDocLists();
+        _mergeLocalDocs(loadedRef);
+      });
       if (_fromJobSelect) {
         _fromJobSelect = false;
         hideModals();
@@ -1012,9 +1053,18 @@ function loadJobByRef(ref) {
         restoreFormData(cached);
         setJobRef(ref);
         syncShared();
-        renderAllDocLists();
-        setTimeout(function(){ _mergeLocalDocs(ref); }, 200);
-        setStatus('Offline — loaded from local cache', 'warn');
+        _docDbLoad(ref, function(err, docs) {
+          docStore = {};
+          if (!err && docs.length) {
+            docs.forEach(function(row) {
+              if (!docStore[row.category]) docStore[row.category] = [];
+              docStore[row.category].push({name:row.name, type:row.mime_type, data:row.data, status:'saved', dbId:row.id});
+            });
+          }
+          renderAllDocLists();
+          _mergeLocalDocs(ref);
+        });
+        setStatus('Loaded from local cache', 'warn');
         if (_fromJobSelect) { _fromJobSelect = false; hideModals(); showDashboard(); }
       } else {
         setStatus('Load failed — offline and no cached data available', 'err');
@@ -1368,9 +1418,9 @@ function collectFormData() {
       var cat = DOC_CATS_SAVE[dc];
       if (docStore[cat] && docStore[cat].length) {
         var catDocs = docStore[cat].map(function(d) {
-          // Include both storage refs and data: URLs — docs are compressed so payload stays manageable
-          return {name: d.name, type: d.type, data: d.data || '', status: d.status || ''};
-        }).filter(function(d){ return d.data && (d.data.indexOf('storage:') === 0 || d.data.indexOf('data:') === 0); });
+          // Store only metadata — actual data lives in job_documents table
+          return {name: d.name, type: d.type, status: d.status || '', dbId: d.dbId || ''};
+        }).filter(function(d){ return d.dbId || d.status === 'local'; });
         if (catDocs.length) data._documents[cat] = catDocs;
       }
     }
@@ -1852,18 +1902,30 @@ function _addDocFiles(files, categoryId) {
       entry.data = dataUrl;
       entry.type = mimeType;
       entry.name = uploadName;
-      entry.status = 'local';
+      entry.status = 'uploading';
 
-      // Save to localStorage immediately as a backup
+      // Save to localStorage as backup immediately
       if (currentJobRef) _saveDocLocal(currentJobRef, categoryId, uploadName, dataUrl, mimeType);
 
       renderDocList(categoryId);
 
       if (currentJobRef) {
-        // Save the whole job — document data is now embedded in form_data
         setStatus('Saving document…', '');
-        saveJob();
+        _docDbSave(currentJobRef, categoryId, uploadName, mimeType, dataUrl, function(err, id) {
+          if (!err && id) {
+            entry.dbId = id;
+            entry.status = 'saved';
+            _removeDocLocal(currentJobRef, categoryId, uploadName);
+            setStatus('Document saved ✓', 'ok');
+          } else {
+            entry.status = 'local';
+            setStatus('Saved locally — will sync when connected', 'warn');
+          }
+          renderDocList(categoryId);
+        });
       } else {
+        entry.status = 'local';
+        renderDocList(categoryId);
         setStatus('Document ready — load a job to save it', 'warn');
       }
     }
@@ -2126,9 +2188,13 @@ function viewDoc(categoryId, idx) {
 
 function removeDoc(categoryId, idx) {
   if (!docStore[categoryId]) return;
+  var doc = docStore[categoryId][idx];
+  if (doc) {
+    if (doc.dbId) _docDbDelete(doc.dbId);
+    if (currentJobRef) _removeDocLocal(currentJobRef, categoryId, doc.name);
+  }
   docStore[categoryId].splice(idx, 1);
   renderDocList(categoryId);
-  if (currentJobRef) saveJob();
 }
 
 function retryDocUpload(categoryId, idx) {
@@ -2137,25 +2203,19 @@ function retryDocUpload(categoryId, idx) {
   if (!currentJobRef) { setStatus('Open a job first', 'err'); return; }
   doc.status = 'uploading';
   renderDocList(categoryId);
-  setStatus('Retrying upload…', '');
-  var path = _docPath(currentJobRef, categoryId, doc.name);
-  _uploadDocFile(path, doc.data, doc.type)
-    .then(function(r) {
-      if (r.ok || r.status === 200 || r.status === 201) {
-        doc.data = 'storage:' + path;
-        doc.status = 'saved';
-        setStatus('Document saved ✓', 'ok');
-        renderDocList(categoryId);
-        saveJob();
-      } else {
-        return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
-      }
-    })
-    .catch(function(e) {
+  setStatus('Retrying save…', '');
+  _docDbSave(currentJobRef, categoryId, doc.name, doc.type, doc.data, function(err, id) {
+    if (!err && id) {
+      doc.dbId = id;
+      doc.status = 'saved';
+      _removeDocLocal(currentJobRef, categoryId, doc.name);
+      setStatus('Document saved ✓', 'ok');
+    } else {
       doc.status = 'local';
-      setStatus('Retry failed: ' + (e && e.message ? e.message : 'check connection'), 'err');
-      renderDocList(categoryId);
-    });
+      setStatus('Retry failed — check connection', 'err');
+    }
+    renderDocList(categoryId);
+  });
 }
 
 function renderAllDocLists() {
