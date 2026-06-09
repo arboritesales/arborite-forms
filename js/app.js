@@ -1119,7 +1119,7 @@ function uploadSigsToStorage(formData) {
   var idx = 0;
 
   function uploadNext() {
-    if (idx >= toUpload.length) { uploadDocsToStorage(formData, function(){ sendSave(formData); }); return; }
+    if (idx >= toUpload.length) { sendSave(formData); return; }
     var id = toUpload[idx++];
     var path = _storagePath(currentJobRef, id);
     _uploadSig(path, sigs[id])
@@ -1368,9 +1368,9 @@ function collectFormData() {
       var cat = DOC_CATS_SAVE[dc];
       if (docStore[cat] && docStore[cat].length) {
         var catDocs = docStore[cat].map(function(d) {
-          // Only keep storage refs in DB — keeps payload small. Local data: URLs are in localStorage.
-          return {name: d.name, type: d.type, data: (d.data && d.data.indexOf('storage:') === 0) ? d.data : '', status: d.status || ''};
-        }).filter(function(d){ return d.data; });
+          // Include both storage refs and data: URLs — docs are compressed so payload stays manageable
+          return {name: d.name, type: d.type, data: d.data || '', status: d.status || ''};
+        }).filter(function(d){ return d.data && (d.data.indexOf('storage:') === 0 || d.data.indexOf('data:') === 0); });
         if (catDocs.length) data._documents[cat] = catDocs;
       }
     }
@@ -1852,34 +1852,18 @@ function _addDocFiles(files, categoryId) {
       entry.data = dataUrl;
       entry.type = mimeType;
       entry.name = uploadName;
+      entry.status = 'local';
 
-      // Save to localStorage immediately — survives page reload regardless of network
+      // Save to localStorage immediately as a backup
       if (currentJobRef) _saveDocLocal(currentJobRef, categoryId, uploadName, dataUrl, mimeType);
 
+      renderDocList(categoryId);
+
       if (currentJobRef) {
-        entry.status = 'uploading';
-        renderDocList(categoryId);
-        var path = _docPath(currentJobRef, categoryId, uploadName);
-        _uploadDocFile(path, dataUrl, mimeType)
-          .then(function(r) {
-            if (r.ok || r.status === 200 || r.status === 201) {
-              entry.data = 'storage:' + path;
-              entry.status = 'saved';
-              _removeDocLocal(currentJobRef, categoryId, uploadName); // no longer needed locally
-              setStatus('Document saved ✓', 'ok');
-            } else {
-              entry.status = 'local';
-              setStatus('Saved locally — will upload when connected', 'warn');
-            }
-          })
-          .catch(function() {
-            entry.status = 'local';
-            setStatus('Saved locally — will upload when connected', 'warn');
-          })
-          .finally(function() { renderDocList(categoryId); saveJob(); });
+        // Save the whole job — document data is now embedded in form_data
+        setStatus('Saving document…', '');
+        saveJob();
       } else {
-        entry.status = 'local';
-        renderDocList(categoryId);
         setStatus('Document ready — load a job to save it', 'warn');
       }
     }
@@ -1985,7 +1969,7 @@ function renderDocList(categoryId) {
     if (doc.status === 'processing') statusBadge = '<span style="color:#8e44ad;font-size:10px;"> ⚙ Compressing…</span>';
     else if (doc.status === 'uploading') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⏳ Uploading...</span>';
     else if (doc.status === 'saved') statusBadge = '<span style="color:#27ae60;font-size:10px;"> ✓ Saved</span>';
-    else if (doc.status === 'local') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⚠ Saved locally</span>';
+    else if (doc.status === 'local') statusBadge = doc.data && doc.data.indexOf('data:') === 0 ? '<span style="color:#27ae60;font-size:10px;"> ✓ Saved</span>' : '<span style="color:#e67e22;font-size:10px;"> ⚠ Pending</span>';
     var canView = doc.data && (doc.data.indexOf('storage:') === 0 || doc.data.indexOf('data:') === 0);
     var canRetry = doc.status === 'local' && doc.data && doc.data.indexOf('data:') === 0;
     return '<div style="background:#f5f5f2;border:1px solid #ddd;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">'
