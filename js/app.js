@@ -707,7 +707,11 @@ function uploadDocsToStorage(formData, done) {
       .then(function(r) {
         if (r.ok || r.status === 200 || r.status === 201) {
           docs[item.cat][item.idx].data = 'storage:' + path;
-          if (docStore[item.cat] && docStore[item.cat][item.idx]) docStore[item.cat][item.idx].data = 'storage:' + path;
+          if (docStore[item.cat] && docStore[item.cat][item.idx]) {
+            docStore[item.cat][item.idx].data = 'storage:' + path;
+            docStore[item.cat][item.idx].status = 'saved';
+            renderDocList(item.cat);
+          }
         }
         uploadNext();
       })
@@ -1316,8 +1320,8 @@ function collectFormData() {
       var cat = DOC_CATS_SAVE[dc];
       if (docStore[cat] && docStore[cat].length) {
         var catDocs = docStore[cat].map(function(d) {
-          return {name: d.name, type: d.type, data: (d.data && d.data.indexOf('storage:') === 0) ? d.data : '', status: d.status || ''};
-        }).filter(function(d){ return d.data; }); // only save docs that made it to Storage
+          return {name: d.name, type: d.type, data: d.data || '', status: d.status || ''};
+        }).filter(function(d){ return d.data && (d.data.indexOf('storage:') === 0 || d.data.indexOf('data:') === 0); }); // save storage refs AND local data URLs
         if (catDocs.length) data._documents[cat] = catDocs;
       }
     }
