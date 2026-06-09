@@ -195,6 +195,7 @@ function showTab(id, btn) {
     tabs[i].className = isActive ? base + ' active' : base;
   }
   window.scrollTo(0, 0);
+  if (id === 'documents') setTimeout(_prefetchStorageDocs, 200);
   setTimeout(function() {
     // Only init canvases in the visible panel, then restore cached signatures
     var cs = document.querySelectorAll('#' + id + ' .sig-wrap canvas');
@@ -543,8 +544,9 @@ function clearAllForms() {
     if (pd && pd.ctx && pd.sized) pd.ctx.clearRect(0, 0, pd.canvas.width, pd.canvas.height);
   }
   CUSTOM_STAFF = []; CUSTOM_MACHINES = [];
-  // Clear all uploaded documents
+  // Clear all uploaded documents and pre-fetch cache
   docStore = {};
+  _docBlobCache = {};
   sigCache = {};
   setTimeout(renderAllDocLists, 50);
   // Reset overall rating buttons
@@ -943,6 +945,7 @@ function loadJobByRef(ref) {
       setJobRef(rows[0].quote_ref);
       _saveJobLocalCache(rows[0].quote_ref, fd_parsed);
       syncShared();
+      setTimeout(_prefetchStorageDocs, 1000);
       setStatus('Loaded: ' + rows[0].quote_ref, 'ok');
       if (_fromJobSelect) {
         _fromJobSelect = false;
@@ -1686,6 +1689,23 @@ function printTBT() {
 var docStore = {};
 var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
 var MAX_DOCS_PER_CAT = 2;
+var _docBlobCache = {}; // key: storage path → blob URL (pre-fetched)
+
+function _prefetchStorageDocs() {
+  DOC_CATS.forEach(function(cat) {
+    var docs = docStore[cat] || [];
+    docs.forEach(function(doc) {
+      if (!doc.data || doc.data.indexOf('storage:') !== 0) return;
+      var path = doc.data.substring(8);
+      if (_docBlobCache[path]) return; // already cached
+      var url = _docPublicUrl(path);
+      fetch(url, {credentials:'omit'})
+        .then(function(r) { return r.blob(); })
+        .then(function(blob) { _docBlobCache[path] = URL.createObjectURL(blob); })
+        .catch(function() {}); // silently fail — will fall back to direct URL
+    });
+  });
+}
 
 function _addDocFiles(files, categoryId) {
   files = Array.from(files);
@@ -1832,10 +1852,13 @@ function viewDoc(categoryId, idx) {
     } catch(e) { return dataUrl; }
   }
 
-  // Resolve the display URL
+  // Resolve the display URL — use pre-fetched blob if available
+  var storagePath = doc.data.indexOf('storage:') === 0 ? doc.data.substring(8) : null;
   var displayUrl;
-  if (doc.data.indexOf('storage:') === 0) {
-    displayUrl = _docPublicUrl(doc.data.substring(8));
+  if (storagePath && _docBlobCache[storagePath]) {
+    displayUrl = _docBlobCache[storagePath];
+  } else if (storagePath) {
+    displayUrl = null; // will fetch on-demand below
   } else if (doc.data.indexOf('data:') === 0) {
     displayUrl = dataUrlToObjectUrl(doc.data);
   } else {
@@ -1857,8 +1880,11 @@ function viewDoc(categoryId, idx) {
   var btns = document.createElement('div');
   btns.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
 
+  // Fallback direct URL for the Open button (always works, even before blob cache ready)
+  var directUrl = storagePath ? _docPublicUrl(storagePath) : displayUrl;
+
   var openBtn = document.createElement('a');
-  openBtn.href = displayUrl; openBtn.target = '_blank'; openBtn.rel = 'noopener';
+  openBtn.href = directUrl || '#'; openBtn.target = '_blank'; openBtn.rel = 'noopener';
   if (!isImg && !isPdf) openBtn.setAttribute('download', doc.name);
   openBtn.style.cssText = 'background:#4a7a2a;color:white;padding:7px 14px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;text-decoration:none;text-transform:uppercase;white-space:nowrap;display:inline-flex;align-items:center;';
   openBtn.textContent = '↗ Open';
@@ -1878,39 +1904,63 @@ function viewDoc(categoryId, idx) {
   var content = document.createElement('div');
   content.style.cssText = 'flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;-webkit-overflow-scrolling:touch;';
 
-  if (isImg) {
-    var img = document.createElement('img');
-    img.src = displayUrl;
-    img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
-    content.appendChild(img);
+  function _renderContent(url) {
+    // Update Open button href now that we have the final URL
+    openBtn.href = url;
+    if (isImg) {
+      var img = document.createElement('img');
+      img.src = url;
+      img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
+      content.innerHTML = '';
+      content.appendChild(img);
 
-  } else if (isPdf) {
-    if (isIOS || isAndroid) {
-      // Mobile: iframes are unreliable for PDFs — prompt user to open in native viewer
-      content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
-        + '<div style="font-size:52px;margin-bottom:18px;">📄</div>'
-        + '<div style="font-size:20px;font-weight:700;margin-bottom:10px;">' + doc.name + '</div>'
-        + '<div style="font-size:14px;opacity:.75;margin-bottom:28px;">Tap the button below to open the PDF in your device\'s viewer</div>'
-        + '<a href="' + displayUrl + '" target="_blank" rel="noopener" style="background:#4a7a2a;color:white;padding:14px 32px;border-radius:5px;font-weight:700;font-size:16px;text-decoration:none;text-transform:uppercase;display:inline-block;">↗ Open PDF</a>'
-        + '</div>';
+    } else if (isPdf) {
+      if (isIOS || isAndroid) {
+        content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
+          + '<div style="font-size:52px;margin-bottom:18px;">📄</div>'
+          + '<div style="font-size:20px;font-weight:700;margin-bottom:10px;">' + doc.name + '</div>'
+          + '<div style="font-size:14px;opacity:.75;margin-bottom:28px;">Tap the button below to open the PDF in your device\'s viewer</div>'
+          + '<a href="' + url + '" target="_blank" rel="noopener" style="background:#4a7a2a;color:white;padding:14px 32px;border-radius:5px;font-weight:700;font-size:16px;text-decoration:none;text-transform:uppercase;display:inline-block;">↗ Open PDF</a>'
+          + '</div>';
+      } else {
+        var iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+        content.style.display = 'block';
+        content.innerHTML = '';
+        content.appendChild(iframe);
+      }
+
     } else {
-      // Desktop: iframe works well
-      var iframe = document.createElement('iframe');
-      iframe.src = displayUrl;
-      iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
-      content.style.display = 'block';
-      content.appendChild(iframe);
+      var fileIcon = /\.(docx?|doc)$/i.test(doc.name) ? '📝' : /\.(xlsx?|xls|csv)$/i.test(doc.name) ? '📊' : '📎';
+      content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
+        + '<div style="font-size:52px;margin-bottom:18px;">' + fileIcon + '</div>'
+        + '<div style="font-size:20px;font-weight:700;margin-bottom:10px;">' + doc.name + '</div>'
+        + '<div style="font-size:14px;opacity:.75;margin-bottom:28px;">This file type cannot be previewed in the browser.<br>Tap below to open or download it.</div>'
+        + '<a href="' + url + '" target="_blank" rel="noopener" download="' + doc.name + '" style="background:#4a7a2a;color:white;padding:14px 32px;border-radius:5px;font-weight:700;font-size:16px;text-decoration:none;text-transform:uppercase;display:inline-block;">↗ Open / Download</a>'
+        + '</div>';
     }
+  }
 
+  if (displayUrl) {
+    _renderContent(displayUrl);
   } else {
-    // Word, Excel, or other — offer open/download
-    var fileIcon = /\.(docx?|doc)$/i.test(doc.name) ? '📝' : /\.(xlsx?|xls|csv)$/i.test(doc.name) ? '📊' : '📎';
+    // Not yet pre-fetched — show spinner and fetch now
     content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
-      + '<div style="font-size:52px;margin-bottom:18px;">' + fileIcon + '</div>'
-      + '<div style="font-size:20px;font-weight:700;margin-bottom:10px;">' + doc.name + '</div>'
-      + '<div style="font-size:14px;opacity:.75;margin-bottom:28px;">This file type cannot be previewed in the browser.<br>Tap below to open or download it.</div>'
-      + '<a href="' + displayUrl + '" target="_blank" rel="noopener" download="' + doc.name + '" style="background:#4a7a2a;color:white;padding:14px 32px;border-radius:5px;font-weight:700;font-size:16px;text-decoration:none;text-transform:uppercase;display:inline-block;">↗ Open / Download</a>'
+      + '<div style="font-size:36px;margin-bottom:16px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>'
+      + '<div style="font-size:15px;opacity:.8;margin-top:8px;">Loading document…</div>'
       + '</div>';
+    fetch(_docPublicUrl(storagePath), {credentials:'omit'})
+      .then(function(r) { return r.blob(); })
+      .then(function(blob) {
+        var blobUrl = URL.createObjectURL(blob);
+        _docBlobCache[storagePath] = blobUrl;
+        if (document.getElementById('docViewerModal')) _renderContent(blobUrl);
+      })
+      .catch(function() {
+        // Fallback to direct URL if fetch fails
+        if (document.getElementById('docViewerModal')) _renderContent(_docPublicUrl(storagePath));
+      });
   }
 
   modal.appendChild(content);
