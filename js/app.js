@@ -1707,6 +1707,78 @@ function _prefetchStorageDocs() {
   });
 }
 
+// ── PDF COMPRESSION via PDF.js ──
+var _pdfJsReady = false;
+var _pdfJsLoading = false;
+var _pdfJsQueue = [];
+var PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+function _loadPdfJs(cb) {
+  if (_pdfJsReady) { cb(); return; }
+  _pdfJsQueue.push(cb);
+  if (_pdfJsLoading) return;
+  _pdfJsLoading = true;
+  var s = document.createElement('script');
+  s.src = PDFJS_CDN;
+  s.onload = function() {
+    try { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; } catch(e) {}
+    _pdfJsReady = true; _pdfJsLoading = false;
+    _pdfJsQueue.forEach(function(fn) { fn(); }); _pdfJsQueue = [];
+  };
+  s.onerror = function() {
+    _pdfJsLoading = false;
+    _pdfJsQueue.forEach(function(fn) { fn(true); }); _pdfJsQueue = [];
+  };
+  document.head.appendChild(s);
+}
+
+// Renders all PDF pages onto a single tall JPEG — much smaller than the original PDF
+function _compressPdfToImage(arrayBuffer, originalName, callback) {
+  // callback(result) where result = {dataUrl, type:'image/jpeg', name} or null on failure
+  _loadPdfJs(function(err) {
+    if (err) { callback(null); return; }
+    pdfjsLib.getDocument({data: arrayBuffer}).promise
+      .then(function(pdf) {
+        var total = pdf.numPages;
+        var scale = 1.5; // good readability on retina screens
+        var rendered = [];
+        var totalH = 0, maxW = 0;
+
+        function renderPage(n) {
+          if (n > total) {
+            // Composite all pages into one canvas
+            var out = document.createElement('canvas');
+            out.width = maxW; out.height = totalH;
+            var ctx = out.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, maxW, totalH);
+            var y = 0;
+            rendered.forEach(function(c) { ctx.drawImage(c, 0, y); y += c.height; });
+            var dataUrl = out.toDataURL('image/jpeg', 0.82);
+            callback({dataUrl: dataUrl, type: 'image/jpeg', name: originalName});
+            return;
+          }
+          pdf.getPage(n).then(function(page) {
+            var vp = page.getViewport({scale: scale});
+            var c = document.createElement('canvas');
+            c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+            if (c.width > maxW) maxW = c.width;
+            totalH += c.height;
+            var ctx2 = c.getContext('2d');
+            ctx2.fillStyle = '#ffffff';
+            ctx2.fillRect(0, 0, c.width, c.height);
+            page.render({canvasContext: ctx2, viewport: vp}).promise
+              .then(function() { rendered.push(c); renderPage(n + 1); })
+              .catch(function() { rendered.push(c); renderPage(n + 1); });
+          }).catch(function() { renderPage(n + 1); });
+        }
+        renderPage(1);
+      })
+      .catch(function() { callback(null); });
+  });
+}
+
 function _addDocFiles(files, categoryId) {
   files = Array.from(files);
   if (!files.length) return;
@@ -1717,20 +1789,21 @@ function _addDocFiles(files, categoryId) {
   }
   files = files.slice(0, MAX_DOCS_PER_CAT - existing);
   files.forEach(function(file) {
-    // Add placeholder entry immediately so user sees it
-    var entry = {name: file.name, type: file.type, data: '', status: 'uploading'};
+    var entry = {name: file.name, type: file.type, data: '', status: 'processing'};
     docStore[categoryId].push(entry);
     var idx = docStore[categoryId].length - 1;
     renderDocList(categoryId);
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var dataUrl = e.target.result;
+    setStatus('Processing ' + file.name + '…', '');
+
+    function _doUpload(dataUrl, mimeType, uploadName) {
       entry.data = dataUrl;
+      entry.type = mimeType;
+      entry.name = uploadName;
       if (currentJobRef) {
         entry.status = 'uploading';
         renderDocList(categoryId);
-        var path = _docPath(currentJobRef, categoryId, file.name);
-        _uploadDocFile(path, dataUrl, file.type)
+        var path = _docPath(currentJobRef, categoryId, uploadName);
+        _uploadDocFile(path, dataUrl, mimeType)
           .then(function(r) {
             if (r.ok || r.status === 200 || r.status === 201) {
               entry.data = 'storage:' + path;
@@ -1745,21 +1818,57 @@ function _addDocFiles(files, categoryId) {
             entry.status = 'local';
             setStatus('Upload failed — doc kept locally', 'err');
           })
-          .finally(function() {
-            renderDocList(categoryId);
-            saveJob();
-          });
+          .finally(function() { renderDocList(categoryId); saveJob(); });
       } else {
         entry.status = 'local';
         renderDocList(categoryId);
+        setStatus('Document ready', 'ok');
       }
-    };
-    reader.onerror = function() {
-      docStore[categoryId].splice(idx, 1);
-      renderDocList(categoryId);
-      setStatus('Could not read file', 'err');
-    };
-    reader.readAsDataURL(file);
+    }
+
+    var isPdfFile = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+    if (isPdfFile) {
+      // Compress PDF → JPEG image for fast loading on all devices
+      var abReader = new FileReader();
+      abReader.onload = function(e) {
+        _compressPdfToImage(e.target.result, file.name, function(result) {
+          if (result) {
+            var origKB = Math.round(file.size / 1024);
+            var newKB  = Math.round(result.dataUrl.length * 0.75 / 1024);
+            setStatus('PDF compressed: ' + origKB + 'KB → ' + newKB + 'KB ✓', 'ok');
+            _doUpload(result.dataUrl, result.type, result.name);
+          } else {
+            // Fallback: store original PDF as-is
+            var fbReader = new FileReader();
+            fbReader.onload = function(ev) { _doUpload(ev.target.result, file.type, file.name); };
+            fbReader.onerror = function() {
+              docStore[categoryId].splice(idx, 1);
+              renderDocList(categoryId);
+              setStatus('Could not read file', 'err');
+            };
+            fbReader.readAsDataURL(file);
+          }
+        });
+      };
+      abReader.onerror = function() {
+        docStore[categoryId].splice(idx, 1);
+        renderDocList(categoryId);
+        setStatus('Could not read file', 'err');
+      };
+      abReader.readAsArrayBuffer(file);
+
+    } else {
+      // Non-PDF: read as data URL directly
+      var reader = new FileReader();
+      reader.onload = function(e) { _doUpload(e.target.result, file.type, file.name); };
+      reader.onerror = function() {
+        docStore[categoryId].splice(idx, 1);
+        renderDocList(categoryId);
+        setStatus('Could not read file', 'err');
+      };
+      reader.readAsDataURL(file);
+    }
   });
 }
 
@@ -1815,7 +1924,8 @@ function renderDocList(categoryId) {
     var isWord = /\.(docx?|doc)$/i.test(doc.name);
     var icon = isImg ? '🖼' : isPdf ? '📄' : isXls ? '📊' : isWord ? '📝' : '📎';
     var statusBadge = '';
-    if (doc.status === 'uploading') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⏳ Uploading...</span>';
+    if (doc.status === 'processing') statusBadge = '<span style="color:#8e44ad;font-size:10px;"> ⚙ Compressing…</span>';
+    else if (doc.status === 'uploading') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⏳ Uploading...</span>';
     else if (doc.status === 'saved') statusBadge = '<span style="color:#27ae60;font-size:10px;"> ✓ Saved</span>';
     else if (doc.status === 'local') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⚠ Saved locally</span>';
     var canView = doc.data && (doc.data.indexOf('storage:') === 0 || doc.data.indexOf('data:') === 0);

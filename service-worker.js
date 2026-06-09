@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arborite-field-forms-v48';
+const CACHE_NAME = 'arborite-field-forms-v51';
 const APP_SHELL = [
   './',
   './index.html',
@@ -7,7 +7,9 @@ const APP_SHELL = [
   './manifest.json',
   './arborite-logo-192.png',
   './arborite-logo-512.png',
-  './arborite-leaf.svg'
+  './arborite-leaf.svg',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
 ];
 
 self.addEventListener('install', event => {
