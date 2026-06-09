@@ -758,6 +758,33 @@ function _loadJobListCache() {
   try { var s = localStorage.getItem('arb_job_list'); return s ? JSON.parse(s) : null; } catch(e) { return null; }
 }
 
+// ── OFFLINE JOB CACHE ──
+function _saveJobLocalCache(ref, data) {
+  try { localStorage.setItem('arb_job_' + ref, JSON.stringify(data)); } catch(e) {}
+}
+function _loadJobLocalCache(ref) {
+  try { var s = localStorage.getItem('arb_job_' + ref); return s ? JSON.parse(s) : null; } catch(e) { return null; }
+}
+function _markOfflinePending(ref) {
+  try { localStorage.setItem('arb_offline_pending', ref); } catch(e) {}
+}
+function _clearOfflinePending() {
+  try { localStorage.removeItem('arb_offline_pending'); } catch(e) {}
+}
+function _getOfflinePending() {
+  try { return localStorage.getItem('arb_offline_pending'); } catch(e) { return null; }
+}
+window.addEventListener('online', function() {
+  var pending = _getOfflinePending();
+  if (!pending) return;
+  if (currentJobRef && currentJobRef === pending) {
+    setStatus('Back online — syncing…', '');
+    setTimeout(saveJob, 800);
+  } else {
+    setStatus('Back online — open job "' + pending + '" and save to sync', '');
+  }
+});
+
 function fetchJobList() {
   // Load from cache immediately so list is never blank
   var cached = _loadJobListCache();
@@ -914,6 +941,7 @@ function loadJobByRef(ref) {
         }
       }, 50);
       setJobRef(rows[0].quote_ref);
+      _saveJobLocalCache(rows[0].quote_ref, fd_parsed);
       syncShared();
       setStatus('Loaded: ' + rows[0].quote_ref, 'ok');
       if (_fromJobSelect) {
@@ -922,7 +950,21 @@ function loadJobByRef(ref) {
         showDashboard();
       }
     })
-    .catch(function(e){ setStatus('Load failed: ' + (e && e.message ? e.message : 'check connection'), 'err'); });
+    .catch(function(e){
+      var cached = _loadJobLocalCache(ref);
+      if (cached) {
+        clearAllForms();
+        initAllStaffSelects();
+        restoreFormData(cached);
+        setJobRef(ref);
+        syncShared();
+        renderAllDocLists();
+        setStatus('Offline — loaded from local cache', 'warn');
+        if (_fromJobSelect) { _fromJobSelect = false; hideModals(); showDashboard(); }
+      } else {
+        setStatus('Load failed — offline and no cached data available', 'err');
+      }
+    });
 }
 
 function compressSignatures(data) {
@@ -1052,6 +1094,8 @@ function sendSave(formData) {
     .then(function(r){
       clearTimeout(saveTimeout);
       if (r.ok || r.status === 201 || r.status === 204) {
+        _saveJobLocalCache(currentJobRef, payload.form_data);
+        _clearOfflinePending();
         setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
         fetchJobList();
       } else {
@@ -1060,7 +1104,13 @@ function sendSave(formData) {
     })
     .catch(function(e){
       clearTimeout(saveTimeout);
-      setStatus('Save failed: ' + e.message, 'err');
+      try {
+        _saveJobLocalCache(currentJobRef, payload.form_data);
+        _markOfflinePending(currentJobRef);
+        setStatus('Saved offline ✓ — will sync when connected', 'warn');
+      } catch(ex) {
+        setStatus('Save failed: ' + (e && e.message ? e.message : 'check connection'), 'err');
+      }
     })
     .finally(function(){
       var en = !!currentJobRef;
@@ -1074,6 +1124,8 @@ function sendSaveRaw(payload) {
   supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
+        _saveJobLocalCache(currentJobRef, payload.form_data);
+        _clearOfflinePending();
         setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
         fetchJobList();
       } else {
@@ -1633,7 +1685,7 @@ function printTBT() {
 // ── DOCUMENT STORE ──
 var docStore = {};
 var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
-var MAX_DOCS_PER_CAT = 10;
+var MAX_DOCS_PER_CAT = 2;
 
 function _addDocFiles(files, categoryId) {
   files = Array.from(files);
@@ -1698,7 +1750,7 @@ function handleDocUpload(input, categoryId) {
 
 function _processDroppedFiles(files, categoryId) {
   _addDocFiles(Array.from(files).filter(function(f){
-    return /\.(pdf|docx?|png|jpe?g)$/i.test(f.name);
+    return /\.(pdf|docx?|xlsx?|csv|png|jpe?g)$/i.test(f.name);
   }), categoryId);
 }
 
@@ -1737,14 +1789,16 @@ function renderDocList(categoryId) {
   if (!docs.length) { el.innerHTML = '<div style="color:#999;font-size:12px;padding:8px 0;">No documents uploaded</div>'; return; }
   var btnStyle = 'border:none;padding:6px 12px;border-radius:3px;font-size:11px;font-weight:700;cursor:pointer;font-family:Barlow Condensed,sans-serif;text-transform:uppercase;letter-spacing:.5px;';
   el.innerHTML = docs.map(function(doc, idx) {
-    var isImg = doc.type && doc.type.startsWith('image/');
-    var isPdf = doc.type === 'application/pdf';
-    var icon = isImg ? '🖼' : isPdf ? '📄' : '📎';
+    var isImg  = doc.type && doc.type.indexOf('image/') === 0;
+    var isPdf  = doc.type === 'application/pdf';
+    var isXls  = /\.(xlsx?|xls|csv)$/i.test(doc.name);
+    var isWord = /\.(docx?|doc)$/i.test(doc.name);
+    var icon = isImg ? '🖼' : isPdf ? '📄' : isXls ? '📊' : isWord ? '📝' : '📎';
     var statusBadge = '';
     if (doc.status === 'uploading') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⏳ Uploading...</span>';
     else if (doc.status === 'saved') statusBadge = '<span style="color:#27ae60;font-size:10px;"> ✓ Saved</span>';
-    else if (doc.status === 'local') statusBadge = '<span style="color:#c0392b;font-size:10px;"> ⚠ Upload failed</span>';
-    var canView = doc.data && doc.data.indexOf('storage:') === 0;
+    else if (doc.status === 'local') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⚠ Saved locally</span>';
+    var canView = doc.data && (doc.data.indexOf('storage:') === 0 || doc.data.indexOf('data:') === 0);
     var canRetry = doc.status === 'local' && doc.data && doc.data.indexOf('data:') === 0;
     return '<div style="background:#f5f5f2;border:1px solid #ddd;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">'
       + '<div style="font-size:11px;font-weight:700;color:#333;word-break:break-all;line-height:1.4;">' + icon + ' ' + doc.name + statusBadge + '</div>'
@@ -1759,56 +1813,108 @@ function renderDocList(categoryId) {
 function viewDoc(categoryId, idx) {
   var doc = (docStore[categoryId] || [])[idx];
   if (!doc || !doc.data) return;
-  var url = doc.data.indexOf('storage:') === 0 ? _docPublicUrl(doc.data.substring(8)) : doc.data;
-  var isImg = doc.type && doc.type.startsWith('image/');
-  var isPdf = doc.type === 'application/pdf';
-  // Build in-app viewer modal — works on iOS, Android, desktop
+
+  var isImg  = doc.type && doc.type.indexOf('image/') === 0;
+  var isPdf  = doc.type === 'application/pdf';
+  var isIOS  = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var isAndroid = /Android/.test(navigator.userAgent);
+
+  // Convert a data: URL to an object URL so iframes / <a download> work on all platforms
+  function dataUrlToObjectUrl(dataUrl) {
+    try {
+      var parts = dataUrl.split(',');
+      var mime  = parts[0].split(':')[1].split(';')[0];
+      var byteStr = atob(parts[1]);
+      var ab = new ArrayBuffer(byteStr.length);
+      var ia = new Uint8Array(ab);
+      for (var i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+      return URL.createObjectURL(new Blob([ab], {type: mime}));
+    } catch(e) { return dataUrl; }
+  }
+
+  // Resolve the display URL
+  var displayUrl;
+  if (doc.data.indexOf('storage:') === 0) {
+    displayUrl = _docPublicUrl(doc.data.substring(8));
+  } else if (doc.data.indexOf('data:') === 0) {
+    displayUrl = dataUrlToObjectUrl(doc.data);
+  } else {
+    displayUrl = doc.data;
+  }
+
+  // Build modal
   var existing = document.getElementById('docViewerModal');
   if (existing) document.body.removeChild(existing);
   var modal = document.createElement('div');
   modal.id = 'docViewerModal';
-  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:99999;display:flex;flex-direction:column;';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#111;z-index:99999;display:flex;flex-direction:column;-webkit-overflow-scrolling:touch;';
+
+  // Header — always visible, close always reachable
   var header = document.createElement('div');
-  header.style.cssText = 'background:#1a2e10;color:white;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;';
-  header.innerHTML = '<span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;">' + doc.name + '</span>';
+  header.style.cssText = 'background:#1a2e10;color:white;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;min-height:52px;box-sizing:border-box;';
+  header.innerHTML = '<span style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%;">' + doc.name + '</span>';
+
   var btns = document.createElement('div');
   btns.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
-  // Open in browser button
+
   var openBtn = document.createElement('a');
-  openBtn.href = url; openBtn.target = '_blank'; openBtn.rel = 'noopener';
-  openBtn.style.cssText = 'background:#4a7a2a;color:white;padding:6px 12px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;text-decoration:none;text-transform:uppercase;';
+  openBtn.href = displayUrl; openBtn.target = '_blank'; openBtn.rel = 'noopener';
+  if (!isImg && !isPdf) openBtn.setAttribute('download', doc.name);
+  openBtn.style.cssText = 'background:#4a7a2a;color:white;padding:7px 14px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;text-decoration:none;text-transform:uppercase;white-space:nowrap;display:inline-flex;align-items:center;';
   openBtn.textContent = '↗ Open';
-  // Close button
+
   var closeBtn = document.createElement('button');
-  closeBtn.style.cssText = 'background:#c0392b;color:white;border:none;padding:6px 12px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;';
+  closeBtn.style.cssText = 'background:#c0392b;color:white;border:none;padding:7px 14px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-transform:uppercase;white-space:nowrap;';
   closeBtn.textContent = '✕ Close';
-  closeBtn.onclick = function(){ document.body.removeChild(modal); };
+  closeBtn.onclick = function() {
+    var m = document.getElementById('docViewerModal');
+    if (m) document.body.removeChild(m);
+  };
   btns.appendChild(openBtn); btns.appendChild(closeBtn);
   header.appendChild(btns);
   modal.appendChild(header);
+
+  // Content area
   var content = document.createElement('div');
-  content.style.cssText = 'flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;';
+  content.style.cssText = 'flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;-webkit-overflow-scrolling:touch;';
+
   if (isImg) {
     var img = document.createElement('img');
-    img.src = url; img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
+    img.src = displayUrl;
+    img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
     content.appendChild(img);
+
   } else if (isPdf) {
-    var iframe = document.createElement('iframe');
-    iframe.src = url; iframe.style.cssText = 'width:100%;height:100%;border:none;';
-    content.appendChild(iframe);
+    if (isIOS || isAndroid) {
+      // Mobile: iframes are unreliable for PDFs — prompt user to open in native viewer
+      content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
+        + '<div style="font-size:52px;margin-bottom:18px;">📄</div>'
+        + '<div style="font-size:20px;font-weight:700;margin-bottom:10px;">' + doc.name + '</div>'
+        + '<div style="font-size:14px;opacity:.75;margin-bottom:28px;">Tap the button below to open the PDF in your device\'s viewer</div>'
+        + '<a href="' + displayUrl + '" target="_blank" rel="noopener" style="background:#4a7a2a;color:white;padding:14px 32px;border-radius:5px;font-weight:700;font-size:16px;text-decoration:none;text-transform:uppercase;display:inline-block;">↗ Open PDF</a>'
+        + '</div>';
+    } else {
+      // Desktop: iframe works well
+      var iframe = document.createElement('iframe');
+      iframe.src = displayUrl;
+      iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+      content.style.display = 'block';
+      content.appendChild(iframe);
+    }
+
   } else {
-    // Non-previewable file — show download prompt
-    content.innerHTML = '<div style="color:white;text-align:center;padding:40px;font-family:Barlow Condensed,sans-serif;">'
-      + '<div style="font-size:48px;margin-bottom:16px;">📎</div>'
-      + '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">' + doc.name + '</div>'
-      + '<div style="font-size:13px;opacity:.7;margin-bottom:24px;">Tap Open to view this file</div>'
-      + '<a href="' + url + '" target="_blank" rel="noopener" style="background:#4a7a2a;color:white;padding:12px 24px;border-radius:4px;font-weight:700;font-size:14px;text-decoration:none;text-transform:uppercase;">↗ Open File</a>'
+    // Word, Excel, or other — offer open/download
+    var fileIcon = /\.(docx?|doc)$/i.test(doc.name) ? '📝' : /\.(xlsx?|xls|csv)$/i.test(doc.name) ? '📊' : '📎';
+    content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
+      + '<div style="font-size:52px;margin-bottom:18px;">' + fileIcon + '</div>'
+      + '<div style="font-size:20px;font-weight:700;margin-bottom:10px;">' + doc.name + '</div>'
+      + '<div style="font-size:14px;opacity:.75;margin-bottom:28px;">This file type cannot be previewed in the browser.<br>Tap below to open or download it.</div>'
+      + '<a href="' + displayUrl + '" target="_blank" rel="noopener" download="' + doc.name + '" style="background:#4a7a2a;color:white;padding:14px 32px;border-radius:5px;font-weight:700;font-size:16px;text-decoration:none;text-transform:uppercase;display:inline-block;">↗ Open / Download</a>'
       + '</div>';
   }
+
   modal.appendChild(content);
   document.body.appendChild(modal);
-  // Close on background tap
-  modal.addEventListener('click', function(e){ if (e.target === modal) document.body.removeChild(modal); });
 }
 
 function removeDoc(categoryId, idx) {
