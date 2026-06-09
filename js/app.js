@@ -668,10 +668,19 @@ function _docDbDelete(id) {
 }
 
 function _docDbLoad(jobRef, cb) {
-  _docFetch('GET', DOC_TABLE + '?job_ref=eq.' + encodeURIComponent(jobRef) + '&select=id,category,name,mime_type,data')
+  // Load metadata only (no data) — fast on all devices
+  _docFetch('GET', DOC_TABLE + '?job_ref=eq.' + encodeURIComponent(jobRef) + '&select=id,category,name,mime_type')
     .then(function(r){ return r.json(); })
     .then(function(rows){ cb(null, rows || []); })
     .catch(function(e){ cb(e, []); });
+}
+
+function _docDbLoadData(id, cb) {
+  // Fetch data for a single document on demand (when user taps View)
+  _docFetch('GET', DOC_TABLE + '?id=eq.' + id + '&select=data')
+    .then(function(r){ return r.json(); })
+    .then(function(rows){ cb(null, rows && rows[0] ? rows[0].data : null); })
+    .catch(function(e){ cb(e, null); });
 }
 
 // ── SUPABASE ──
@@ -1033,7 +1042,8 @@ function loadJobByRef(ref) {
         if (!err && docs.length) {
           docs.forEach(function(row) {
             if (!docStore[row.category]) docStore[row.category] = [];
-            docStore[row.category].push({name:row.name, type:row.mime_type, data:row.data, status:'saved', dbId:row.id});
+            // data is null — fetched on demand when user taps View
+            docStore[row.category].push({name:row.name, type:row.mime_type, data:null, status:'saved', dbId:row.id});
           });
         }
         renderAllDocLists();
@@ -2032,7 +2042,7 @@ function renderDocList(categoryId) {
     else if (doc.status === 'uploading') statusBadge = '<span style="color:#e67e22;font-size:10px;"> ⏳ Uploading...</span>';
     else if (doc.status === 'saved') statusBadge = '<span style="color:#27ae60;font-size:10px;"> ✓ Saved</span>';
     else if (doc.status === 'local') statusBadge = doc.data && doc.data.indexOf('data:') === 0 ? '<span style="color:#27ae60;font-size:10px;"> ✓ Saved</span>' : '<span style="color:#e67e22;font-size:10px;"> ⚠ Pending</span>';
-    var canView = doc.data && (doc.data.indexOf('storage:') === 0 || doc.data.indexOf('data:') === 0);
+    var canView = doc.dbId || (doc.data && (doc.data.indexOf('storage:') === 0 || doc.data.indexOf('data:') === 0));
     var canRetry = doc.status === 'local' && doc.data && doc.data.indexOf('data:') === 0;
     return '<div style="background:#f5f5f2;border:1px solid #ddd;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">'
       + '<div style="font-size:11px;font-weight:700;color:#333;word-break:break-all;line-height:1.4;">' + icon + ' ' + doc.name + statusBadge + '</div>'
@@ -2046,7 +2056,23 @@ function renderDocList(categoryId) {
 
 function viewDoc(categoryId, idx) {
   var doc = (docStore[categoryId] || [])[idx];
-  if (!doc || !doc.data) return;
+  if (!doc) return;
+
+  // If data not yet loaded but we have a DB id, fetch it first then re-open
+  if (!doc.data && doc.dbId) {
+    setStatus('Loading document…', '');
+    _docDbLoadData(doc.dbId, function(err, data) {
+      if (!err && data) {
+        doc.data = data;
+        setStatus('', '');
+        viewDoc(categoryId, idx); // re-call with data now loaded
+      } else {
+        setStatus('Could not load document — check connection', 'err');
+      }
+    });
+    return;
+  }
+  if (!doc.data) return;
 
   var isImg  = doc.type && doc.type.indexOf('image/') === 0;
   var isPdf  = doc.type === 'application/pdf';
