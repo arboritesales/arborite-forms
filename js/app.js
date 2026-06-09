@@ -707,6 +707,7 @@ function uploadDocsToStorage(formData, done) {
       .then(function(r) {
         if (r.ok || r.status === 200 || r.status === 201) {
           docs[item.cat][item.idx].data = 'storage:' + path;
+          _removeDocLocal(currentJobRef, item.cat, item.doc.name);
           if (docStore[item.cat] && docStore[item.cat][item.idx]) {
             docStore[item.cat][item.idx].data = 'storage:' + path;
             docStore[item.cat][item.idx].status = 'saved';
@@ -790,6 +791,52 @@ window.addEventListener('online', function() {
     setStatus('Back online — open job "' + pending + '" and save to sync', '');
   }
 });
+
+// ── LOCAL DOC PERSISTENCE (survives page reload even if Storage upload pending) ──
+function _saveDocLocal(ref, cat, name, dataUrl, mimeType) {
+  try {
+    localStorage.setItem('arb_doc_' + ref + '_' + cat + '_' + name, dataUrl);
+    var idx = [];
+    try { idx = JSON.parse(localStorage.getItem('arb_docidx_' + ref) || '[]'); } catch(e){}
+    if (!idx.some(function(x){ return x.cat===cat && x.name===name; })) {
+      idx.push({cat:cat, name:name, type:mimeType||'image/jpeg'});
+      localStorage.setItem('arb_docidx_' + ref, JSON.stringify(idx));
+    }
+  } catch(e) {}
+}
+function _removeDocLocal(ref, cat, name) {
+  try {
+    localStorage.removeItem('arb_doc_' + ref + '_' + cat + '_' + name);
+    var idx = [];
+    try { idx = JSON.parse(localStorage.getItem('arb_docidx_' + ref) || '[]'); } catch(e){}
+    idx = idx.filter(function(x){ return !(x.cat===cat && x.name===name); });
+    if (idx.length) localStorage.setItem('arb_docidx_' + ref, JSON.stringify(idx));
+    else localStorage.removeItem('arb_docidx_' + ref);
+  } catch(e) {}
+}
+function _mergeLocalDocs(ref) {
+  if (!ref) return;
+  var idx = [];
+  try { idx = JSON.parse(localStorage.getItem('arb_docidx_' + ref) || '[]'); } catch(e){}
+  if (!idx.length) return;
+  var changed = false;
+  idx.forEach(function(item) {
+    var cats = docStore[item.cat] || [];
+    // If doc already made it to Supabase Storage, clear local copy
+    var savedToStorage = cats.some(function(d){ return d.name===item.name && d.data && d.data.indexOf('storage:')===0; });
+    if (savedToStorage) { _removeDocLocal(ref, item.cat, item.name); return; }
+    // Don't add duplicate
+    if (cats.some(function(d){ return d.name===item.name; })) return;
+    // Restore from localStorage
+    var dataUrl = '';
+    try { dataUrl = localStorage.getItem('arb_doc_' + ref + '_' + item.cat + '_' + item.name) || ''; } catch(e){}
+    if (!dataUrl) return;
+    if (!docStore[item.cat]) docStore[item.cat] = [];
+    docStore[item.cat].push({name:item.name, type:item.type||'image/jpeg', data:dataUrl, status:'local'});
+    changed = true;
+  });
+  if (changed) setTimeout(renderAllDocLists, 50);
+}
 
 function fetchJobList() {
   // Load from cache immediately so list is never blank
@@ -949,7 +996,7 @@ function loadJobByRef(ref) {
       setJobRef(rows[0].quote_ref);
       _saveJobLocalCache(rows[0].quote_ref, fd_parsed);
       syncShared();
-      setTimeout(_prefetchStorageDocs, 1000);
+      setTimeout(function(){ _mergeLocalDocs(rows[0].quote_ref); _prefetchStorageDocs(); }, 500);
       setStatus('Loaded: ' + rows[0].quote_ref, 'ok');
       if (_fromJobSelect) {
         _fromJobSelect = false;
@@ -966,6 +1013,7 @@ function loadJobByRef(ref) {
         setJobRef(ref);
         syncShared();
         renderAllDocLists();
+        setTimeout(function(){ _mergeLocalDocs(ref); }, 200);
         setStatus('Offline — loaded from local cache', 'warn');
         if (_fromJobSelect) { _fromJobSelect = false; hideModals(); showDashboard(); }
       } else {
@@ -1320,8 +1368,9 @@ function collectFormData() {
       var cat = DOC_CATS_SAVE[dc];
       if (docStore[cat] && docStore[cat].length) {
         var catDocs = docStore[cat].map(function(d) {
-          return {name: d.name, type: d.type, data: d.data || '', status: d.status || ''};
-        }).filter(function(d){ return d.data && (d.data.indexOf('storage:') === 0 || d.data.indexOf('data:') === 0); }); // save storage refs AND local data URLs
+          // Only keep storage refs in DB — keeps payload small. Local data: URLs are in localStorage.
+          return {name: d.name, type: d.type, data: (d.data && d.data.indexOf('storage:') === 0) ? d.data : '', status: d.status || ''};
+        }).filter(function(d){ return d.data; });
         if (catDocs.length) data._documents[cat] = catDocs;
       }
     }
@@ -1803,6 +1852,10 @@ function _addDocFiles(files, categoryId) {
       entry.data = dataUrl;
       entry.type = mimeType;
       entry.name = uploadName;
+
+      // Save to localStorage immediately — survives page reload regardless of network
+      if (currentJobRef) _saveDocLocal(currentJobRef, categoryId, uploadName, dataUrl, mimeType);
+
       if (currentJobRef) {
         entry.status = 'uploading';
         renderDocList(categoryId);
@@ -1812,21 +1865,22 @@ function _addDocFiles(files, categoryId) {
             if (r.ok || r.status === 200 || r.status === 201) {
               entry.data = 'storage:' + path;
               entry.status = 'saved';
+              _removeDocLocal(currentJobRef, categoryId, uploadName); // no longer needed locally
               setStatus('Document saved ✓', 'ok');
             } else {
               entry.status = 'local';
-              setStatus('Upload failed — doc kept locally', 'err');
+              setStatus('Saved locally — will upload when connected', 'warn');
             }
           })
           .catch(function() {
             entry.status = 'local';
-            setStatus('Upload failed — doc kept locally', 'err');
+            setStatus('Saved locally — will upload when connected', 'warn');
           })
           .finally(function() { renderDocList(categoryId); saveJob(); });
       } else {
         entry.status = 'local';
         renderDocList(categoryId);
-        setStatus('Document ready', 'ok');
+        setStatus('Document ready — load a job to save it', 'warn');
       }
     }
 
