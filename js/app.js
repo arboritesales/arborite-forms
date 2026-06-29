@@ -2639,18 +2639,115 @@ function fetchVehList() {
       var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
       var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
       var miles = r.mileage ? Number(r.mileage).toLocaleString() + ' miles' : '';
-      return '<div class="veh-list-entry">'
+      return '<div class="veh-list-entry" onclick="openVehRecord(\'' + r.id + '\')">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
         + '<span class="veh-list-reg">' + (r.vehicle || 'Unknown') + '</span>'
         + '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + (r.overall_rating || 'No rating') + '</span>'
         + '</div>'
         + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + (miles ? ' · ' + miles : '') + '</div>'
+        + '<div style="font-size:11px;color:rgba(126,200,32,.6);margin-top:4px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">🔒 Tap to view</div>'
         + '</div>';
     }).join('');
   })
   .catch(function() {
     listEl.innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;font-size:13px;">Could not load inspections</div>';
   });
+}
+
+var _vehPendingRecordId = null;
+
+function openVehRecord(id) {
+  _vehPendingRecordId = id;
+  var modal = document.getElementById('vehPassModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    var inp = document.getElementById('vehPassInp');
+    if (inp) { inp.value = ''; inp.focus(); }
+    document.getElementById('vehPassErr').textContent = '';
+  }
+}
+
+function closeVehPassModal() {
+  var modal = document.getElementById('vehPassModal');
+  if (modal) modal.style.display = 'none';
+  _vehPendingRecordId = null;
+}
+
+function confirmVehPass() {
+  var inp = document.getElementById('vehPassInp');
+  var err = document.getElementById('vehPassErr');
+  if (!inp) return;
+  if (inp.value === '2001') {
+    closeVehPassModal();
+    loadVehRecord(_vehPendingRecordId);
+  } else {
+    err.textContent = 'Incorrect password — try again';
+    inp.value = '';
+    inp.focus();
+  }
+}
+
+function loadVehRecord(id) {
+  document.getElementById('vehListPanel').style.display = 'none';
+  document.getElementById('vehPinPanel').style.display = 'none';
+  document.getElementById('vehDetailPanel').style.display = 'block';
+  document.getElementById('vehDetailContent').innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;">Loading…</div>';
+  document.getElementById('checksView').scrollTop = 0;
+
+  fetch(SUPA_URL + '/rest/v1/vehicle_checks?id=eq.' + id, {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + _authToken() }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) {
+    if (!rows || !rows[0]) { document.getElementById('vehDetailContent').innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record</div>'; return; }
+    var d = rows[0];
+    var rating = (d.overall_rating || '').toLowerCase();
+    var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
+    var dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '';
+
+    var fields = [
+      ['Vehicle',d.vehicle],['Mileage',d.mileage ? Number(d.mileage).toLocaleString() + ' miles' : ''],
+      ['Used since last inspection',d.used_since_last],
+      ['Wheels & Tyres',d.wheels_tyres],['Lights',d.lights],['Number Plate',d.number_plate],
+      ['Bodywork',d.bodywork],['Exhaust',d.exhaust],['Tow Hitch',d.tow_hitch],
+      ['Mirrors',d.mirrors],['Wipers',d.wipers],['Washer Fluid',d.washer_fluid],
+      ['Seatbelt',d.seatbelt],['Horn',d.horn],
+      ['Engine Oil',d.engine_oil],['Engine Coolant',d.engine_coolant],
+      ['Power Steering',d.power_steering],['Hydraulic System',d.hydraulic_system],
+      ['Hydraulic Fluid',d.hydraulic_fluid],['Tipping System',d.tipping_system],
+      ['First Aid Kit',d.first_aid],['Fire Extinguisher',d.fire_extinguisher],
+      ['Handbook Present',d.handbook],['Spanner & Socket Set',d.spanner_socket],
+      ['Ladders',d.ladders]
+    ];
+
+    var rows_html = fields.map(function(f) {
+      if (!f[1]) return '';
+      var val = f[1];
+      var colour = '';
+      if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
+      else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
+      else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
+      return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;' + colour + '">' + val + '</div></div>';
+    }).filter(Boolean).join('');
+
+    document.getElementById('vehDetailContent').innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding:0 4px;">'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:white;">' + (d.vehicle || '') + '</div>'
+      + '<span class="veh-list-badge ' + badgeCls + '">' + (d.overall_rating || '') + '</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;padding:0 4px;">' + (d.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + '</div>'
+      + '<div style="background:white;border-radius:8px;overflow:hidden;margin-bottom:14px;">' + rows_html + '</div>'
+      + (d.remedial_notes ? '<div style="background:#2b2b2b;border-radius:8px;padding:14px 16px;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Remedial Notes</div><div style="font-size:13px;color:white;line-height:1.6;">' + d.remedial_notes + '</div></div>' : '');
+  })
+  .catch(function() {
+    document.getElementById('vehDetailContent').innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Failed to load</div>';
+  });
+}
+
+function closeVehDetail() {
+  document.getElementById('vehDetailPanel').style.display = 'none';
+  document.getElementById('vehListPanel').style.display = 'block';
+  document.getElementById('checksView').scrollTop = 0;
 }
 
 // ── TOOLBOX TALKS ──
