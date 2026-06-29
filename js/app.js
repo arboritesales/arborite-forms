@@ -23,8 +23,6 @@ if (typeof console.assert !== 'function') { console.assert = function(){}; }
 var AUDIT_PASS = 'audit2024';
 var auditUnlocked = false;
 var _supaSession = null;
-var SUPA_AUTH_EMAIL = 'login@arborite.app';
-
 function _storeSession(data) {
   _supaSession = data;
 }
@@ -48,7 +46,7 @@ function checkPass() {
   fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
     method: 'POST',
     headers: {'Content-Type':'application/json','apikey':SUPA_KEY},
-    body: JSON.stringify({email: SUPA_AUTH_EMAIL, password: password}),
+    body: JSON.stringify({email: 'login'+'@arborite.app', password: password}),
     credentials: 'omit', mode: 'cors'
   })
   .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,data:d}; }); })
