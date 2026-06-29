@@ -25,23 +25,11 @@ var auditUnlocked = false;
 var _supaSession = null;
 var SUPA_AUTH_EMAIL = 'login@arborite.app';
 
-function _getStoredSession() {
-  try {
-    var s = localStorage.getItem('arb_session');
-    if (!s) return null;
-    var p = JSON.parse(s);
-    if (p.expires_at && (Date.now() / 1000) > (p.expires_at - 60)) return null;
-    return p;
-  } catch(e) { return null; }
-}
-
 function _storeSession(data) {
-  try { localStorage.setItem('arb_session', JSON.stringify(data)); } catch(e) {}
   _supaSession = data;
 }
 
 function _clearSession() {
-  try { localStorage.removeItem('arb_session'); } catch(e) {}
   _supaSession = null;
 }
 
@@ -84,21 +72,7 @@ function checkPass() {
   });
 }
 
-(function tryAutoUnlock() {
-  var session = _getStoredSession();
-  if (!session) return;
-  _supaSession = session;
-  function hideLock() {
-    var ls = document.getElementById('lockScreen');
-    if (ls) ls.style.display = 'none';
-    showJobSelectScreen();
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', hideLock);
-  } else {
-    hideLock();
-  }
-})();
+
 
 // ── CONFIG ──
 var SUPA_URL = 'https://labskiotmfvdgcfbhbbl.supabase.co';
