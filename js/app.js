@@ -1812,13 +1812,6 @@ function printCurrentForm() {
   printPanel(currentPanelId);
 }
 
-function printTBT() {
-  var view = document.getElementById('tbtView');
-  if (view) view.classList.add('printing-tbt');
-  window.print();
-  if (view) view.classList.remove('printing-tbt');
-}
-
 // ── DOCUMENT STORE ──
 var docStore = {};
 var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
