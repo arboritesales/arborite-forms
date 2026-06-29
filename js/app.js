@@ -2416,6 +2416,243 @@ function attachAutoSave(panelId) {
 }
 
 
+// ── CHECKS / VEHICLE INSPECTIONS ──
+var VEH_EMPLOYEES = {
+  '1995': 'Joe Grace',
+  '6230': 'Jason Hiscock',
+  '1599': 'Luke Richardson',
+  '1961': 'Dave Norris',
+  '0000': 'James Hilborne',
+  '4033': 'Joel Cripps',
+  '1234': 'Jon Challinor',
+  '0206': 'Liam Couling',
+  '2580': 'Liam Cooper',
+  '6252': 'Jack Fisher'
+};
+var _vehInspector = null;
+var _vehAutoSaveTimer = null;
+var _vehCurrentId = null;
+
+function openChecksView() {
+  document.getElementById('checksView').style.display = 'block';
+  showVehList();
+  fetchVehList();
+}
+
+function closeChecksView() {
+  document.getElementById('checksView').style.display = 'none';
+}
+
+function showVehList() {
+  document.getElementById('vehListPanel').style.display = 'block';
+  document.getElementById('vehPinPanel').style.display = 'none';
+  document.getElementById('vehFormPanel').style.display = 'none';
+  document.getElementById('checksView').scrollTop = 0;
+}
+
+function showVehPinPanel() {
+  document.getElementById('vehListPanel').style.display = 'none';
+  document.getElementById('vehPinPanel').style.display = 'block';
+  document.getElementById('vehFormPanel').style.display = 'none';
+  document.getElementById('vehPin').value = '';
+  document.getElementById('vehPinName').style.display = 'none';
+  document.getElementById('vehPinConfirm').style.display = 'none';
+  document.getElementById('vehPinErr').textContent = '';
+  document.getElementById('checksView').scrollTop = 0;
+}
+
+function checkVehPin(val) {
+  var nameEl = document.getElementById('vehPinName');
+  var errEl = document.getElementById('vehPinErr');
+  var confirmBtn = document.getElementById('vehPinConfirm');
+  errEl.textContent = '';
+  nameEl.style.display = 'none';
+  confirmBtn.style.display = 'none';
+  if (val.length >= 3) {
+    var name = VEH_EMPLOYEES[val];
+    if (name) {
+      nameEl.textContent = '✓ ' + name;
+      nameEl.style.display = 'block';
+      confirmBtn.style.display = 'inline-block';
+    } else if (val.length >= 4) {
+      errEl.textContent = 'PIN not recognised — try again';
+    }
+  }
+}
+
+function confirmVehPin() {
+  var pinEl = document.getElementById('vehPin');
+  var name = VEH_EMPLOYEES[pinEl.value];
+  if (!name) return;
+  _vehInspector = name;
+  _vehCurrentId = null;
+  document.getElementById('vehInspectorDisplay').textContent = name;
+  document.getElementById('vehDateDisplay').textContent = new Date().toLocaleDateString('en-GB', {weekday:'short',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('vehPinPanel').style.display = 'none';
+  document.getElementById('vehFormPanel').style.display = 'block';
+  document.getElementById('checksView').scrollTop = 0;
+  vehClearForm();
+}
+
+function vehClearForm() {
+  document.getElementById('veh_reg').value = '';
+  document.getElementById('veh_mileage').value = '';
+  document.getElementById('veh_notes').value = '';
+  document.querySelectorAll('.veh-opts .veh-btn').forEach(function(b){ b.className = b.classList.contains('veh-multi') ? 'veh-btn veh-multi' : 'veh-btn'; });
+  document.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
+  document.getElementById('vehSaveStatus').textContent = '';
+}
+
+function vehSel(groupId, btn, val) {
+  var group = document.getElementById(groupId);
+  group.querySelectorAll('.veh-btn:not(.veh-multi)').forEach(function(b){ b.className = 'veh-btn'; });
+  group.querySelectorAll('.veh-btn.veh-multi').forEach(function(b){ b.className = 'veh-btn veh-multi'; });
+  var cls = 'active-' + val.toLowerCase().replace(/\//g,'').replace(/ /g,'');
+  btn.classList.add(cls);
+  vehAutoSave();
+}
+
+function vehToggle(groupId, btn, val) {
+  var group = document.getElementById(groupId);
+  group.querySelectorAll('.veh-btn:not(.veh-multi)').forEach(function(b){ b.className = 'veh-btn'; });
+  var cls = 'active-' + val.toLowerCase().replace(/ /g,'');
+  if (btn.classList.contains(cls)) { btn.classList.remove(cls); } else { btn.classList.add(cls); }
+  vehAutoSave();
+}
+
+function vehRating(btn, val) {
+  document.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
+  btn.classList.add('active-' + val.toLowerCase());
+  vehAutoSave();
+}
+
+function vehGetFieldVal(groupId) {
+  var group = document.getElementById(groupId);
+  if (!group) return '';
+  var active = [];
+  group.querySelectorAll('.veh-btn').forEach(function(b) {
+    var cls = Array.from(b.classList).find(function(c){ return c.startsWith('active-'); });
+    if (cls) active.push(b.textContent.trim());
+  });
+  return active.join(', ');
+}
+
+function vehGetRating() {
+  var btn = document.querySelector('.veh-rating-btn[class*="active-"]');
+  return btn ? btn.textContent.trim().replace(/\n.*/,'').trim() : '';
+}
+
+function vehAutoSave() {
+  clearTimeout(_vehAutoSaveTimer);
+  var s = document.getElementById('vehSaveStatus');
+  if (s) s.textContent = 'Saving…';
+  _vehAutoSaveTimer = setTimeout(function(){ saveVehCheck(true); }, 1200);
+}
+
+function saveVehCheck(isAuto) {
+  var reg = document.getElementById('veh_reg').value;
+  var mileage = document.getElementById('veh_mileage').value;
+  var rating = vehGetRating();
+  var s = document.getElementById('vehSaveStatus');
+
+  var payload = {
+    inspector_name: _vehInspector,
+    vehicle: reg,
+    mileage: mileage ? parseInt(mileage) : null,
+    used_since_last: vehGetFieldVal('veh_used'),
+    wheels_tyres: vehGetFieldVal('veh_wheels'),
+    lights: vehGetFieldVal('veh_lights'),
+    number_plate: vehGetFieldVal('veh_plate'),
+    bodywork: vehGetFieldVal('veh_body'),
+    exhaust: vehGetFieldVal('veh_exhaust'),
+    tow_hitch: vehGetFieldVal('veh_tow'),
+    mirrors: vehGetFieldVal('veh_mirrors'),
+    wipers: vehGetFieldVal('veh_wipers'),
+    washer_fluid: vehGetFieldVal('veh_washer'),
+    seatbelt: vehGetFieldVal('veh_seatbelt'),
+    horn: vehGetFieldVal('veh_horn'),
+    engine_oil: vehGetFieldVal('veh_oil'),
+    engine_coolant: vehGetFieldVal('veh_coolant'),
+    power_steering: vehGetFieldVal('veh_steering'),
+    hydraulic_system: vehGetFieldVal('veh_hyd_sys'),
+    hydraulic_fluid: vehGetFieldVal('veh_hyd_fluid'),
+    tipping_system: vehGetFieldVal('veh_tip'),
+    first_aid: vehGetFieldVal('veh_firstaid'),
+    fire_extinguisher: vehGetFieldVal('veh_fire'),
+    handbook: vehGetFieldVal('veh_handbook'),
+    spanner_socket: vehGetFieldVal('veh_spanner'),
+    ladders: vehGetFieldVal('veh_ladders'),
+    overall_rating: rating,
+    remedial_notes: document.getElementById('veh_notes').value
+  };
+
+  var method = 'POST';
+  var url = SUPA_URL + '/rest/v1/vehicle_checks';
+  if (_vehCurrentId) {
+    method = 'PATCH';
+    url += '?id=eq.' + _vehCurrentId;
+  }
+
+  fetch(url, {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + _authToken(),
+      'Prefer': _vehCurrentId ? 'return=minimal' : 'return=representation'
+    },
+    body: JSON.stringify(_vehCurrentId ? payload : payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (!_vehCurrentId && Array.isArray(d) && d[0] && d[0].id) {
+      _vehCurrentId = d[0].id;
+    }
+    if (s) {
+      s.style.color = 'var(--lime)';
+      s.textContent = '✓ ' + (isAuto ? 'Auto-saved' : 'Saved successfully!');
+      if (!isAuto) { setTimeout(function(){ showVehList(); fetchVehList(); }, 1000); }
+      else { setTimeout(function(){ if(s) s.textContent = ''; }, 2000); }
+    }
+  })
+  .catch(function() {
+    if (s) { s.style.color = '#ff6b6b'; s.textContent = 'Save failed — check connection'; }
+  });
+}
+
+function fetchVehList() {
+  var listEl = document.getElementById('vehList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading…</div>';
+  fetch(SUPA_URL + '/rest/v1/vehicle_checks?order=created_at.desc&limit=50', {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + _authToken() }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      listEl.innerHTML = '<div style="color:rgba(255,255,255,.4);padding:40px;text-align:center;font-size:13px;">No inspections yet — tap + New Inspection to begin</div>';
+      return;
+    }
+    listEl.innerHTML = rows.map(function(r) {
+      var rating = (r.overall_rating || '').toLowerCase();
+      var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
+      var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
+      var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
+      var miles = r.mileage ? Number(r.mileage).toLocaleString() + ' miles' : '';
+      return '<div class="veh-list-entry">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
+        + '<span class="veh-list-reg">' + (r.vehicle || 'Unknown') + '</span>'
+        + '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + (r.overall_rating || 'No rating') + '</span>'
+        + '</div>'
+        + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + (miles ? ' · ' + miles : '') + '</div>'
+        + '</div>';
+    }).join('');
+  })
+  .catch(function() {
+    listEl.innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;font-size:13px;">Could not load inspections</div>';
+  });
+}
+
 // ── TOOLBOX TALKS ──
 var currentTBTRef = null;
 
