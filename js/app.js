@@ -1,4 +1,4 @@
-
+﻿
 // ── AUTO-UPDATE: when a new service worker takes over, reload to get latest files ──
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.ready.then(function(reg) {
@@ -19,32 +19,75 @@ if (typeof console === 'undefined') {
 }
 if (typeof console.assert !== 'function') { console.assert = function(){}; }
 
-// ── PASSWORDS ──
-var APP_PASS   = 'arborite2024';  // Change this to your preferred password
-var AUDIT_PASS = 'audit2024';     // Separate password for Audit tab
+// ── AUTH ──
+var AUDIT_PASS = 'audit2024';
 var auditUnlocked = false;
+var _supaSession = null;
+var SUPA_AUTH_EMAIL = 'login@arborite.app';
+
+function _getStoredSession() {
+  try {
+    var s = localStorage.getItem('arb_session');
+    if (!s) return null;
+    var p = JSON.parse(s);
+    if (p.expires_at && (Date.now() / 1000) > (p.expires_at - 60)) return null;
+    return p;
+  } catch(e) { return null; }
+}
+
+function _storeSession(data) {
+  try { localStorage.setItem('arb_session', JSON.stringify(data)); } catch(e) {}
+  _supaSession = data;
+}
+
+function _clearSession() {
+  try { localStorage.removeItem('arb_session'); } catch(e) {}
+  _supaSession = null;
+}
+
+function _authToken() {
+  return (_supaSession && _supaSession.access_token) ? _supaSession.access_token : SUPA_KEY;
+}
 
 function checkPass() {
   var inp = document.getElementById('lockPass');
   var err = document.getElementById('lockErr');
   if (!inp) return;
-  var val = inp.value;
-  if (val === APP_PASS) {
-    var ls = document.getElementById('lockScreen');
-    if (ls) ls.style.display = 'none';
-    try { sessionStorage.setItem('arb_auth','1'); } catch(e){}
-    showJobSelectScreen();
-  } else {
-    if (err) err.textContent = 'Incorrect password \u2014 try again';
-    inp.value = '';
+  var password = inp.value;
+  if (!password) return;
+  inp.disabled = true;
+  if (err) err.textContent = '';
+  fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY},
+    body: JSON.stringify({email: SUPA_AUTH_EMAIL, password: password}),
+    credentials: 'omit', mode: 'cors'
+  })
+  .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,data:d}; }); })
+  .then(function(res) {
+    inp.disabled = false;
+    if (res.ok && res.data.access_token) {
+      _storeSession({access_token:res.data.access_token, refresh_token:res.data.refresh_token, expires_at:res.data.expires_at});
+      var ls = document.getElementById('lockScreen');
+      if (ls) ls.style.display = 'none';
+      showJobSelectScreen();
+    } else {
+      if (err) err.textContent = 'Incorrect password — try again';
+      inp.value = '';
+      inp.focus();
+    }
+  })
+  .catch(function() {
+    inp.disabled = false;
+    if (err) err.textContent = 'Connection error — try again';
     inp.focus();
-  }
+  });
 }
 
 (function tryAutoUnlock() {
-  try {
-    if (sessionStorage.getItem('arb_auth') !== '1') return;
-  } catch(e) { return; }
+  var session = _getStoredSession();
+  if (!session) return;
+  _supaSession = session;
   function hideLock() {
     var ls = document.getElementById('lockScreen');
     if (ls) ls.style.display = 'none';
@@ -655,7 +698,7 @@ function hideModals() {
 var DOC_TABLE = 'job_documents';
 
 function _docFetch(method, path, body, prefer) {
-  var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+  var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
   if (prefer) h['Prefer'] = prefer;
   var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
   if (body) opts.body = JSON.stringify(body);
@@ -691,7 +734,7 @@ function _docDbLoadData(id, cb) {
 
 // ── SUPABASE ──
 function supaFetch(method, path, body) {
-  var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
+  var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
   if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
   // credentials:'omit' required for iOS Safari cross-origin fetch to work correctly
   var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
@@ -728,7 +771,7 @@ function _uploadDocFile(path, dataUrl, mimeType) {
   for (var i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
   return fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + path, {
     method: 'POST',
-    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':mimeType||'application/octet-stream','x-upsert':'true'},
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':mimeType||'application/octet-stream','x-upsert':'true'},
     body: bytes, credentials: 'omit', mode: 'cors'
   });
 }
@@ -778,7 +821,7 @@ function _uploadSig(path, jpegDataUrl) {
   for (var i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
   return fetch(SUPA_URL + '/storage/v1/object/' + SIG_BUCKET + '/' + path, {
     method: 'POST',
-    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':'image/jpeg','x-upsert':'true'},
     body: bytes, credentials: 'omit', mode: 'cors'
   });
 }
