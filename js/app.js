@@ -59,7 +59,7 @@ function checkPass() {
 
 // ── CONFIG ──
 var SUPA_URL = 'https://labskiotmfvdgcfbhbbl.supabase.co';
-var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhYnNraW90bWZ2ZGdjZmJoYmJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNDQ4MjQsImV4cCI6MjA5MDYyMDgyNH0._TV9AxkwUTY_Ea4S7qUHoCRJ88NSRvPA3KUD4WiDroI';
+var SUPA_KEY = 'sb_publishable_D15QbbKwIm3FB1Lwdcn_YA_TxfXuDX9';
 var TABLE    = 'job_forms';
 var PANELS   = ['powa','signoff','method','daily','documents','emergency','audit','safety'];
 var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads, drCount, docStore;
