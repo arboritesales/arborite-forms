@@ -2719,8 +2719,28 @@ function confirmVehPass() {
 
 var _vehDetailRecordId = null;
 
+function vehFieldList(d) {
+  return [
+    ['Vehicle',d.vehicle],['Mileage',d.mileage ? Number(d.mileage).toLocaleString() + ' miles' : ''],
+    ['Used since last inspection',d.used_since_last],
+    ['Wheels & Tyres',d.wheels_tyres],['Lights',d.lights],['Number Plate',d.number_plate],
+    ['Bodywork',d.bodywork],['Exhaust',d.exhaust],['Tow Hitch',d.tow_hitch],
+    ['Mirrors',d.mirrors],['Wipers',d.wipers],['Washer Fluid',d.washer_fluid],
+    ['Seatbelt',d.seatbelt],['Horn',d.horn],
+    ['Engine Oil',d.engine_oil],['Engine Coolant',d.engine_coolant],
+    ['Power Steering',d.power_steering],['Hydraulic System',d.hydraulic_system],
+    ['Hydraulic Fluid',d.hydraulic_fluid],['Tipping System',d.tipping_system],
+    ['First Aid Kit',d.first_aid],['Fire Extinguisher',d.fire_extinguisher],
+    ['Handbook Present',d.handbook],['Spanner & Socket Set',d.spanner_socket],
+    ['Ladders',d.ladders]
+  ];
+}
+
+var _vehDetailData = null;
+
 function loadVehRecord(id) {
   _vehDetailRecordId = id;
+  _vehDetailData = null;
   document.getElementById('vehListPanel').style.display = 'none';
   document.getElementById('vehPinPanel').style.display = 'none';
   document.getElementById('vehDetailPanel').style.display = 'block';
@@ -2739,24 +2759,12 @@ function loadVehRecord(id) {
       return;
     }
     var d = rows[0];
+    _vehDetailData = d;
     var rating = (d.overall_rating || '').toLowerCase();
     var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
     var dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '';
 
-    var fields = [
-      ['Vehicle',d.vehicle],['Mileage',d.mileage ? Number(d.mileage).toLocaleString() + ' miles' : ''],
-      ['Used since last inspection',d.used_since_last],
-      ['Wheels & Tyres',d.wheels_tyres],['Lights',d.lights],['Number Plate',d.number_plate],
-      ['Bodywork',d.bodywork],['Exhaust',d.exhaust],['Tow Hitch',d.tow_hitch],
-      ['Mirrors',d.mirrors],['Wipers',d.wipers],['Washer Fluid',d.washer_fluid],
-      ['Seatbelt',d.seatbelt],['Horn',d.horn],
-      ['Engine Oil',d.engine_oil],['Engine Coolant',d.engine_coolant],
-      ['Power Steering',d.power_steering],['Hydraulic System',d.hydraulic_system],
-      ['Hydraulic Fluid',d.hydraulic_fluid],['Tipping System',d.tipping_system],
-      ['First Aid Kit',d.first_aid],['Fire Extinguisher',d.fire_extinguisher],
-      ['Handbook Present',d.handbook],['Spanner & Socket Set',d.spanner_socket],
-      ['Ladders',d.ladders]
-    ];
+    var fields = vehFieldList(d);
 
     var rows_html = fields.map(function(f) {
       if (!f[1]) return '';
@@ -2787,6 +2795,39 @@ function printVehRecord() {
   view.classList.add('printing-veh');
   window.print();
   setTimeout(function() { view.classList.remove('printing-veh'); }, 1000);
+}
+
+function exportFieldsToExcel(filename, title, meta, fieldPairs) {
+  if (typeof XLSX === 'undefined') { alert('Excel export is unavailable — please check your internet connection and try again.'); return; }
+  var data = [[title], []];
+  meta.forEach(function(m){ data.push(m); });
+  data.push([]);
+  data.push(['Item', 'Result']);
+  fieldPairs.forEach(function(f) {
+    if (f[1] !== undefined && f[1] !== null && f[1] !== '') data.push([f[0], f[1]]);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 60 }, { wch: 30 }];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Check');
+  XLSX.writeFile(wb, filename);
+}
+
+function safeFileSegment(s) {
+  return String(s || 'record').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '');
+}
+
+function downloadVehExcel() {
+  var d = _vehDetailData;
+  if (!d) return;
+  var dateStr = d.created_at ? new Date(d.created_at).toLocaleString('en-GB') : '';
+  var meta = [
+    ['Inspector', d.inspector_name || ''],
+    ['Date', dateStr],
+    ['Overall Rating', d.overall_rating || '']
+  ];
+  var filename = 'Vehicle_Check_' + safeFileSegment(d.vehicle) + '_' + safeFileSegment(dateStr) + '.xlsx';
+  exportFieldsToExcel(filename, 'Vehicle Check — ' + (d.vehicle || ''), meta, vehFieldList(d));
 }
 
 function closeVehDetail() {
@@ -3140,6 +3181,7 @@ function renderCategoryPanel(cat) {
     + '<div style="font-size:11px;color:rgba(255,255,255,.4);font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">MANAGER ACCESS</div>'
     + '<div style="display:flex;gap:8px;">'
     + '<button onclick="printCatRecord(\'' + cat + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128190; Download PDF</button>'
+    + '<button onclick="downloadCatExcel(\'' + cat + '\')" style="background:#1d6f42;border:none;color:white;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128202; Download Excel</button>'
     + '<button onclick="deleteCatRecord(\'' + cat + '\')" style="background:#c62828;border:none;color:white;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128465; Delete</button>'
     + '</div></div>'
     + '<div id="catDetailContent_' + cat + '"></div>'
@@ -3326,9 +3368,20 @@ function openCatRecord(cat, id) {
   }
 }
 
+var _catDetailData = {};
+
+function catFieldRows(cat, d) {
+  var cfg = CHECK_CATEGORIES[cat];
+  var fieldRows = [];
+  if (cfg.hasMileage) fieldRows.push([cfg.mileageLabel, (d.mileage != null && d.mileage !== '') ? d.mileage : '']);
+  cfg.fields.forEach(function(f) { fieldRows.push([f.label, d[f.key]]); });
+  return fieldRows;
+}
+
 function loadCatRecord(cat, id) {
   var cfg = CHECK_CATEGORIES[cat];
   _catDetailRecordId[cat] = id;
+  _catDetailData[cat] = null;
   document.getElementById('catListPanel_' + cat).style.display = 'none';
   document.getElementById('catPinPanel_' + cat).style.display = 'none';
   document.getElementById('catDetailPanel_' + cat).style.display = 'block';
@@ -3348,13 +3401,12 @@ function loadCatRecord(cat, id) {
       return;
     }
     var d = rows[0];
+    _catDetailData[cat] = d;
     var rating = (d.overall_rating || '').toLowerCase();
     var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
     var dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '';
 
-    var fieldRows = [];
-    if (cfg.hasMileage) fieldRows.push([cfg.mileageLabel, (d.mileage != null && d.mileage !== '') ? d.mileage : '']);
-    cfg.fields.forEach(function(f) { fieldRows.push([f.label, d[f.key]]); });
+    var fieldRows = catFieldRows(cat, d);
 
     var rows_html = fieldRows.map(function(f) {
       if (!f[1] && f[1] !== 0) return '';
@@ -3421,6 +3473,20 @@ function printCatRecord(cat) {
   view.classList.add('printing-veh');
   window.print();
   setTimeout(function() { view.classList.remove('printing-veh'); }, 1000);
+}
+
+function downloadCatExcel(cat) {
+  var cfg = CHECK_CATEGORIES[cat];
+  var d = _catDetailData[cat];
+  if (!d) return;
+  var dateStr = d.created_at ? new Date(d.created_at).toLocaleString('en-GB') : '';
+  var meta = [
+    ['Inspector', d.inspector_name || ''],
+    ['Date', dateStr],
+    ['Overall Rating', d.overall_rating || '']
+  ];
+  var filename = cfg.label.replace(/[^a-z0-9]+/gi,'_') + '_Check_' + safeFileSegment(d.machine) + '_' + safeFileSegment(dateStr) + '.xlsx';
+  exportFieldsToExcel(filename, cfg.label + ' Check — ' + (d.machine || ''), meta, catFieldRows(cat, d));
 }
 
 Object.keys(CHECK_CATEGORIES).forEach(renderCategoryPanel);
