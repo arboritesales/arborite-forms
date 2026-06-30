@@ -2433,8 +2433,18 @@ var _vehInspector = null;
 var _vehAutoSaveTimer = null;
 var _vehCurrentId = null;
 
+function switchChecksTab(tab) {
+  document.querySelectorAll('.checks-tab-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-checkstab') === tab);
+  });
+  document.querySelectorAll('.checks-tab-content').forEach(function(c) {
+    c.style.display = (c.id === 'checksTab_' + tab) ? 'block' : 'none';
+  });
+}
+
 function openChecksView() {
   document.getElementById('checksView').style.display = 'block';
+  switchChecksTab('vehicle');
   showVehList();
   fetchVehList();
 }
