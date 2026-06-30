@@ -807,17 +807,30 @@ function _deleteStorageBucketFolder(bucket, prefix) {
   })
   .then(function(r){ return r.json(); })
   .then(function(files){
-    if (!files || !files.length || files.error) return;
+    if (!files || files.error) {
+      console.error('Storage list failed for ' + bucket + '/' + prefix, files);
+      return { ok: false, reason: (files && (files.message || files.error)) || 'could not list files' };
+    }
+    if (!files.length) return { ok: true, deleted: 0 };
     var names = files.map(function(f){ return prefix + f.name; });
     return fetch(SUPA_URL + '/storage/v1/object/' + bucket, {
       method: 'DELETE',
       headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':'application/json'},
       body: JSON.stringify({prefixes: names}), credentials: 'omit'
     }).then(function(r) {
-      if (!r.ok) return r.json().then(function(body){ console.error('Storage cleanup failed for ' + bucket + '/' + prefix, body); });
+      if (!r.ok) {
+        return r.json().catch(function(){ return null; }).then(function(body) {
+          console.error('Storage delete failed for ' + bucket + '/' + prefix, r.status, body);
+          return { ok: false, reason: (body && body.message) || ('HTTP ' + r.status) };
+        });
+      }
+      return { ok: true, deleted: names.length };
     });
   })
-  .catch(function(e){ console.error('Storage cleanup error for ' + bucket + '/' + prefix, e); });
+  .catch(function(e){
+    console.error('Storage cleanup error for ' + bucket + '/' + prefix, e);
+    return { ok: false, reason: (e && e.message) || 'network error' };
+  });
 }
 
 function _deleteStorageFolder(quoteRef) {
@@ -960,14 +973,25 @@ function deleteStorageOrphans() {
   var statusEl = document.getElementById('storageCleanupStatus');
   statusEl.textContent = 'Deleting…';
   var tasks = toDelete.map(function(o) {
-    if (o.bucket === SIG_BUCKET) return _deleteStorageBucketFolder(SIG_BUCKET, o.folder + '/');
+    if (o.bucket === SIG_BUCKET) {
+      return _deleteStorageBucketFolder(SIG_BUCKET, o.folder + '/').then(function(r){ return { o: o, r: r }; });
+    }
     return Promise.all(DOC_CATEGORIES.map(function(cat) {
       return _deleteStorageBucketFolder(DOC_BUCKET, o.folder + '/' + cat + '/');
-    }));
+    })).then(function(results) {
+      var failed = results.filter(function(r){ return !r.ok; });
+      return { o: o, r: failed.length ? failed[0] : { ok: true } };
+    });
   });
-  Promise.all(tasks).then(function() {
+  Promise.all(tasks).then(function(results) {
+    var failures = results.filter(function(x){ return !x.r.ok; });
+    if (failures.length) {
+      var sample = failures.slice(0, 3).map(function(x){ return x.o.folder + ' (' + x.r.reason + ')'; }).join('; ');
+      alert('Could not delete ' + failures.length + ' folder(s) — ' + sample + (failures.length > 3 ? ' …' : '') + '. This is usually a Supabase Storage permissions (RLS) issue — check the storage.objects DELETE policy for the authenticated role.');
+    }
     scanStorageOrphans();
-  }).catch(function() {
+  }).catch(function(e) {
+    console.error('Storage cleanup failed', e);
     statusEl.textContent = 'Some files may not have been removed — re-scanning…';
     scanStorageOrphans();
   });
