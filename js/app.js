@@ -2603,7 +2603,16 @@ function saveVehCheck(isAuto) {
     },
     body: JSON.stringify(_vehCurrentId ? payload : payload)
   })
-  .then(function(r){ return r.json(); })
+  .then(function(r) {
+    if (!r.ok) {
+      return r.json().catch(function(){ return null; }).then(function(body) {
+        var reason = (body && (body.message || body.hint || body.code)) ? (body.message || body.hint || body.code) : ('HTTP ' + r.status);
+        throw new Error(reason);
+      });
+    }
+    if (r.status === 204) return null;
+    return r.json().catch(function(){ return null; });
+  })
   .then(function(d) {
     if (!_vehCurrentId && Array.isArray(d) && d[0] && d[0].id) {
       _vehCurrentId = d[0].id;
@@ -2615,8 +2624,9 @@ function saveVehCheck(isAuto) {
       else { setTimeout(function(){ if(s) s.textContent = ''; }, 2000); }
     }
   })
-  .catch(function() {
-    if (s) { s.style.color = '#ff6b6b'; s.textContent = 'Save failed — check connection'; }
+  .catch(function(err) {
+    console.error('vehicle_checks save failed', err);
+    if (s) { s.style.color = '#ff6b6b'; s.textContent = 'Save failed — ' + (err && err.message ? err.message : 'check connection'); }
   });
 }
 
