@@ -2427,6 +2427,7 @@ function hideOfficeModal() {
 }
 
 function showOfficeView() {
+  document.getElementById('jobSelectScreen').style.display = 'none';
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('appView').style.display = 'none';
   document.getElementById('officeView').style.display = 'block';
@@ -2436,7 +2437,7 @@ function showOfficeView() {
 
 function backFromOffice() {
   document.getElementById('officeView').style.display = 'none';
-  showDashboard();
+  showJobSelectScreen();
 }
 
 function openFormFromOffice(panelId) {
