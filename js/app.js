@@ -832,6 +832,30 @@ function _deleteStorageFolder(quoteRef) {
 
 // ── STORAGE CLEANUP (find & remove orphaned files left behind by deleted jobs) ──
 var _storageCleanupOrphans = [];
+var _storageCleanupJobs = [];
+
+function toggleStorageCleanupJobs() {
+  var listEl = document.getElementById('storageCleanupJobsList');
+  var btn = document.getElementById('storageCleanupJobsToggle');
+  var showing = listEl.style.display !== 'none';
+  if (showing) {
+    listEl.style.display = 'none';
+    btn.innerHTML = '&#128065; Show Current Jobs (for reference)';
+  } else {
+    listEl.style.display = 'block';
+    btn.innerHTML = '&#128065; Hide Current Jobs';
+    if (!_storageCleanupJobs.length) {
+      listEl.innerHTML = '<div style="color:rgba(255,255,255,.4);font-size:12px;padding:10px;">No jobs found.</div>';
+    } else {
+      listEl.innerHTML = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">' + _storageCleanupJobs.length + ' Current Job(s)</div>'
+        + '<div style="background:#2b2b2b;border-radius:8px;padding:4px 0;max-height:260px;overflow-y:auto;">'
+        + _storageCleanupJobs.map(function(ref) {
+            return '<div style="padding:7px 14px;font-size:12px;color:white;border-bottom:1px solid rgba(255,255,255,.06);">' + ref + '</div>';
+          }).join('')
+        + '</div>';
+    }
+  }
+}
 
 function _listStorageRoot(bucket) {
   return fetch(SUPA_URL + '/storage/v1/object/list/' + bucket, {
@@ -859,15 +883,20 @@ function scanStorageOrphans() {
   listEl.innerHTML = '';
   btnEl.style.display = 'none';
   _storageCleanupOrphans = [];
+  _storageCleanupJobs = [];
+  document.getElementById('storageCleanupJobsList').style.display = 'none';
+  document.getElementById('storageCleanupJobsToggle').innerHTML = '&#128065; Show Current Jobs (for reference)';
 
   Promise.all([
-    fetch(SUPA_URL + '/rest/v1/' + TABLE + '?select=quote_ref', { headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()} }).then(function(r){ return r.json(); }),
+    fetch(SUPA_URL + '/rest/v1/' + TABLE + '?select=quote_ref&order=quote_ref.asc', { headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()} }).then(function(r){ return r.json(); }),
     _listStorageRoot(SIG_BUCKET),
     _listStorageRoot(DOC_BUCKET)
   ]).then(function(results) {
     var jobs = Array.isArray(results[0]) ? results[0] : [];
     var sigEntries = Array.isArray(results[1]) ? results[1] : [];
     var docEntries = Array.isArray(results[2]) ? results[2] : [];
+
+    _storageCleanupJobs = jobs.map(function(j){ return j.quote_ref; }).filter(Boolean);
 
     var validRefs = {};
     jobs.forEach(function(j) {
