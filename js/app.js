@@ -747,10 +747,12 @@ function _uploadDocFile(path, dataUrl, mimeType) {
     body: bytes, credentials: 'omit', mode: 'cors'
   });
 }
+var DOC_CATEGORIES = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
+
 function uploadDocsToStorage(formData, done) {
   var docs = formData._documents || {};
   var toUpload = [];
-  var DC = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
+  var DC = DOC_CATEGORIES;
   DC.forEach(function(cat) {
     if (!docs[cat]) return;
     docs[cat].forEach(function(doc, idx) {
@@ -797,24 +799,35 @@ function _uploadSig(path, jpegDataUrl) {
     body: bytes, credentials: 'omit', mode: 'cors'
   });
 }
-function _deleteStorageFolder(quoteRef) {
-  var prefix = quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/';
-  fetch(SUPA_URL + '/storage/v1/object/list/' + SIG_BUCKET, {
+function _deleteStorageBucketFolder(bucket, prefix) {
+  return fetch(SUPA_URL + '/storage/v1/object/list/' + bucket, {
     method: 'POST',
-    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':'application/json'},
     body: JSON.stringify({prefix:prefix, limit:500}), credentials:'omit'
   })
   .then(function(r){ return r.json(); })
   .then(function(files){
-    if (!files || !files.length) return;
+    if (!files || !files.length || files.error) return;
     var names = files.map(function(f){ return prefix + f.name; });
-    fetch(SUPA_URL + '/storage/v1/object/' + SIG_BUCKET, {
+    return fetch(SUPA_URL + '/storage/v1/object/' + bucket, {
       method: 'DELETE',
-      headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+      headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':'application/json'},
       body: JSON.stringify({prefixes: names}), credentials: 'omit'
+    }).then(function(r) {
+      if (!r.ok) return r.json().then(function(body){ console.error('Storage cleanup failed for ' + bucket + '/' + prefix, body); });
     });
   })
-  .catch(function(){});
+  .catch(function(e){ console.error('Storage cleanup error for ' + bucket + '/' + prefix, e); });
+}
+
+function _deleteStorageFolder(quoteRef) {
+  var prefix = quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/';
+  _deleteStorageBucketFolder(SIG_BUCKET, prefix);
+  // documents bucket is nested one level deeper (quoteRef/category/file), and the
+  // storage list API only lists one level — so each category folder must be cleared individually
+  DOC_CATEGORIES.forEach(function(cat) {
+    _deleteStorageBucketFolder(DOC_BUCKET, prefix + cat + '/');
+  });
 }
 
 function _saveJobListCache(rows) {
