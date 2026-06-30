@@ -899,8 +899,12 @@ function scanStorageOrphans() {
     _storageCleanupJobs = jobs.map(function(j){ return j.quote_ref; }).filter(Boolean);
 
     var validRefs = {};
+    var fuzzyRefs = {};
     jobs.forEach(function(j) {
-      if (j.quote_ref) validRefs[j.quote_ref.replace(/[^a-zA-Z0-9_-]/g,'_')] = true;
+      if (!j.quote_ref) return;
+      validRefs[j.quote_ref.replace(/[^a-zA-Z0-9_-]/g,'_')] = true;
+      var fuzzy = j.quote_ref.toLowerCase().replace(/[^a-z0-9]/g,'');
+      if (fuzzy) fuzzyRefs[fuzzy] = j.quote_ref;
     });
 
     var orphans = [];
@@ -911,17 +915,35 @@ function scanStorageOrphans() {
       if (e.name && !validRefs[e.name]) orphans.push({ bucket: DOC_BUCKET, bucketLabel: 'Documents', folder: e.name });
     });
 
+    // cross-reference against current jobs in case sanitisation mismatches make a real job look orphaned
+    orphans.forEach(function(o) {
+      var fuzzyFolder = o.folder.toLowerCase().replace(/[^a-z0-9]/g,'');
+      o.matchedJob = fuzzyRefs[fuzzyFolder] || null;
+    });
+
     _storageCleanupOrphans = orphans;
 
     if (orphans.length === 0) {
       statusEl.textContent = '✓ No orphaned files found — storage is clean.';
       return;
     }
-    statusEl.textContent = orphans.length + ' orphaned folder(s) found (no matching job record):';
+    var flaggedCount = orphans.filter(function(o){ return o.matchedJob; }).length;
+    statusEl.textContent = orphans.length + ' orphaned folder(s) found (no matching job record)'
+      + (flaggedCount ? ', ' + flaggedCount + ' possibly matching a current job — review before deleting:' : ':');
     listEl.innerHTML = orphans.map(function(o) {
-      return '<div style="padding:8px 12px;background:#2b2b2b;border-radius:4px;margin-bottom:6px;font-size:12px;color:white;display:flex;justify-content:space-between;align-items:center;"><span>' + o.folder + '</span><span style="color:rgba(255,255,255,.4);font-family:\'Barlow Condensed\',sans-serif;text-transform:uppercase;letter-spacing:.5px;">' + o.bucketLabel + '</span></div>';
+      var warn = o.matchedJob
+        ? '<div style="font-size:11px;color:#ffb300;margin-top:2px;">&#9888; Possibly matches current job "' + o.matchedJob + '" — check before deleting</div>'
+        : '';
+      var bg = o.matchedJob ? '#4a3a00' : '#2b2b2b';
+      return '<div style="padding:8px 12px;background:' + bg + ';border-radius:4px;margin-bottom:6px;font-size:12px;color:white;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;"><span>' + o.folder + '</span><span style="color:rgba(255,255,255,.4);font-family:\'Barlow Condensed\',sans-serif;text-transform:uppercase;letter-spacing:.5px;">' + o.bucketLabel + '</span></div>'
+        + warn
+        + '</div>';
     }).join('');
     btnEl.style.display = 'inline-block';
+    btnEl.textContent = flaggedCount
+      ? '🗑️ Delete Unflagged Orphaned Files (' + (orphans.length - flaggedCount) + ')'
+      : '🗑️ Delete All Orphaned Files';
   })
   .catch(function() {
     statusEl.textContent = 'Could not scan storage — check connection and try again.';
@@ -929,11 +951,15 @@ function scanStorageOrphans() {
 }
 
 function deleteStorageOrphans() {
-  if (!_storageCleanupOrphans.length) return;
-  if (!confirm('Permanently delete ' + _storageCleanupOrphans.length + ' orphaned folder(s) from Storage? This cannot be undone.')) return;
+  var toDelete = _storageCleanupOrphans.filter(function(o){ return !o.matchedJob; });
+  if (!toDelete.length) return;
+  var flaggedCount = _storageCleanupOrphans.length - toDelete.length;
+  var msg = 'Permanently delete ' + toDelete.length + ' orphaned folder(s) from Storage? This cannot be undone.'
+    + (flaggedCount ? ' (' + flaggedCount + ' folder(s) possibly matching a current job have been left out — review those separately.)' : '');
+  if (!confirm(msg)) return;
   var statusEl = document.getElementById('storageCleanupStatus');
   statusEl.textContent = 'Deleting…';
-  var tasks = _storageCleanupOrphans.map(function(o) {
+  var tasks = toDelete.map(function(o) {
     if (o.bucket === SIG_BUCKET) return _deleteStorageBucketFolder(SIG_BUCKET, o.folder + '/');
     return Promise.all(DOC_CATEGORIES.map(function(cat) {
       return _deleteStorageBucketFolder(DOC_BUCKET, o.folder + '/' + cat + '/');
