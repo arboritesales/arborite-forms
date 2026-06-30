@@ -2767,6 +2767,13 @@ function loadVehRecord(id) {
   });
 }
 
+function printVehRecord() {
+  var view = document.getElementById('checksView');
+  view.classList.add('printing-veh');
+  window.print();
+  setTimeout(function() { view.classList.remove('printing-veh'); }, 1000);
+}
+
 function closeVehDetail() {
   document.getElementById('vehDetailPanel').style.display = 'none';
   document.getElementById('vehListPanel').style.display = 'block';
