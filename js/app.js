@@ -2930,7 +2930,7 @@ var CHECK_CATEGORIES = {
   handheld: {
     label: 'Hand Held Tools', icon: '🔧', table: 'handheld_tool_checks',
     machineLabel: 'Serial / Reference / Model / Reg No',
-    machines: ['BR600', '170BT', 'Hand blower stihl', 'Hand blower', 'BG88C', 'Br700', 'Br800'],
+    machines: ['BR600', '170BT', 'Hand blower stihl', 'Hand blower', 'BG88C', 'Br700', 'Br800', 'Stihl FS 94RC - Jack', 'Stihl FS 94RC - Luke', 'Stihl FS 94RC - Jason', 'Stihl FS 94RC - Dave', 'Stihl FS 94RC - Spare', 'Stihl HS 81TC - 1 (Handheld)', 'Sthil HS 81TC - 2 (Handheld)', 'Luke BR600', 'Jason BR700', 'Liam BR600', 'Jack BR800c', 'Liam Couling BR600', 'Stihl FS 561 E', 'Sthil FS 360 C'],
     fields: [
       {key:'used_since_last', label:'Has this machine been used since its last inspection?', options:['Yes','No']},
       {key:'guards', label:'Are all the machine guards in place?', options:['Yes','No']},
@@ -2943,8 +2943,56 @@ var CHECK_CATEGORIES = {
       {key:'air_filter', label:'Air filter clean and undamaged?', options:['Yes','No']},
       {key:'cooling_ports', label:'Air cooling ports clear of debris?', options:['Yes','No']},
       {key:'starter_cord', label:'Starter cord and housing inspected and condition noted?', options:['Good','Fair','Poor']},
-      {key:'throttle_interlock', label:'Throttle interlock functions?', options:['Yes','No','Could not test at point of inspection']},
-      {key:'onoff_switch', label:'Clearly marked on/off system which is operable?', options:['Yes','No']}
+      {key:'throttle_interlock', label:'Throttle interlock and/or blade lock functions?', options:['Yes','No','Could not test at point of inspection']},
+      {key:'onoff_switch', label:'Clearly marked on/off system which is operable?', options:['Yes','No']},
+      {key:'blade_condition', label:'Overall blade condition?', options:['Good','Fair','Poor','N/A']},
+      {key:'grease_levels', label:'Grease levels?', options:['Correct','Too Low','Topped Up','N/A']}
+    ]
+  },
+  trailer: {
+    label: 'Trailers', icon: '🚛', table: 'trailer_checks',
+    machineLabel: 'Serial / Reference / Model / Reg No',
+    machines: ['Brian James trailer', 'Ifor Williams Trailer', 'Ifor Williams 3.5t trailer', 'Ifor Williams Cage trailer', 'Ifor Williams GH27', 'Ifor Williams GH94', 'Towmate Trailer'],
+    fields: [
+      {key:'used_since_last', label:'Has this item of equipment been used since its last inspection?', options:['Yes','No']},
+      {key:'tyres', label:'Tyre pressure and condition', options:['Good','Fair','Poor']},
+      {key:'wheel_bearings', label:'Play in wheel bearings?', options:['Yes','No']},
+      {key:'handbrake', label:'Handbrake operation?', options:['Functions correctly','Requires maintenance']},
+      {key:'breakaway', label:'Snatch cable/breakaway?', options:['Intact and present','Damaged or missing']},
+      {key:'jockey_wheel', label:'Jockey wheel condition/function?', options:['Functions correctly','Damaged and requires maintenance']},
+      {key:'numberplate_light', label:'Number plate position and light?', options:['Correct numberplate and light works','Requires attention']},
+      {key:'lights', label:'Lights in working order?', options:['Fully functioning and clean','Working but require maintenance','Not working']},
+      {key:'towing_socket', label:'Towing socket or ring function?', options:['Intact and functioning','Damaged or requires attention']},
+      {key:'general_condition', label:'General condition of sides and frame?', options:['Good','Fair','Poor']}
+    ]
+  },
+  mewp: {
+    label: 'MEWP', icon: '🏗️', table: 'mewp_checks',
+    machineLabel: 'Select Machine',
+    machines: ['Hinowa MEWP'],
+    fields: [
+      {key:'used_since_last', label:'Has the Machine been used since its last inspection?', options:['Yes','No']},
+      {key:'thorough_exam', label:'Current thorough examination record (dated within six months)?', options:['Yes','No']},
+      {key:'fasteners', label:'Are all retaining nuts, bolts and fasteners present and visually secure?', options:['Yes','No']},
+      {key:'handbook', label:'Is the handbook/operators manual present?', options:['Yes','No']},
+      {key:'tracks', label:'Where fitted, are tracks free from defect and correctly tensioned?', options:['Yes','No','N/A']},
+      {key:'fluid_levels', label:'Fluid levels — engine oil, coolant level, hydraulic level?', options:['Yes','No']},
+      {key:'battery', label:'Battery — electrolyte, security?', options:['Yes','No']},
+      {key:'hydraulic_leaks', label:'Hydraulic leaks, pipe connections, rams, cylinders?', options:['Yes','No']},
+      {key:'hoses_cables', label:'Hoses and cables security and condition?', options:['Yes','No']},
+      {key:'cable_trays', label:'Power track cable trays?', options:['Yes','No']},
+      {key:'outriggers', label:'Outriggers/stabilisers — general condition, misalignment, corrosion?', options:['Yes','No']},
+      {key:'pins_chains', label:'Pins, retainers and chains?', options:['Yes','No']},
+      {key:'platform_cage', label:'Platform/cage — steps for access/egress, secure, undamaged, clear?', options:['Yes','No']},
+      {key:'entrance_gate_1', label:'Entrance gate, guard rail and retaining pins?', options:['Yes','No']},
+      {key:'harness_anchor', label:'Harness anchor point?', options:['Yes','No']},
+      {key:'entrance_gate_2', label:'Entrance gate, guard rail and retaining pins? (basket)', options:['Yes','No']},
+      {key:'cage_clear', label:'Cage clear of rubbish, debris and obstructions?', options:['Yes','No']},
+      {key:'id_plate_decals', label:'ID plate, safety, warning and information decals legible?', options:['Yes','No']},
+      {key:'control_decals', label:'Controls — identification decals, directional arrows?', options:['Yes','No']},
+      {key:'platform_loads', label:'Platform loads indicated — SWL and max wind speed?', options:['Yes','No']},
+      {key:'platform_controls', label:'Function check of platform controls completed?', options:['Yes','No']},
+      {key:'ground_controls', label:'Function check of ground controls completed?', options:['Yes','No']}
     ]
   }
 };
