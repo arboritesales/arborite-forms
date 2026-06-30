@@ -2702,7 +2702,12 @@ function loadVehRecord(id) {
   })
   .then(function(r){ return r.json(); })
   .then(function(rows) {
-    if (!rows || !rows[0]) { document.getElementById('vehDetailContent').innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record</div>'; return; }
+    if (!rows || !rows[0]) {
+      console.error('vehicle_checks load failed for id=' + id, rows);
+      var reason = (rows && (rows.message || rows.hint || rows.code)) ? (rows.message || rows.hint || rows.code) : 'No record returned';
+      document.getElementById('vehDetailContent').innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record<br><span style="font-size:11px;opacity:.7;">' + reason + '</span></div>';
+      return;
+    }
     var d = rows[0];
     var rating = (d.overall_rating || '').toLowerCase();
     var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
@@ -2763,13 +2768,19 @@ function deleteVehRecord() {
     headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + _authToken() }
   })
   .then(function(r) {
-    if (!r.ok) throw new Error('Delete failed');
+    if (!r.ok) {
+      return r.json().catch(function(){ return null; }).then(function(body) {
+        console.error('vehicle_checks delete failed for id=' + id, r.status, body);
+        var reason = (body && (body.message || body.hint || body.code)) ? (body.message || body.hint || body.code) : ('HTTP ' + r.status);
+        throw new Error(reason);
+      });
+    }
     _vehDetailRecordId = null;
     closeVehDetail();
     fetchVehList();
   })
-  .catch(function() {
-    alert('Could not delete record — check connection and try again.');
+  .catch(function(err) {
+    alert('Could not delete record — ' + (err && err.message ? err.message : 'check connection and try again.'));
   });
 }
 
