@@ -2657,6 +2657,10 @@ function fetchVehList() {
 var _vehPendingRecordId = null;
 
 function openVehRecord(id) {
+  if (!id || id === 'null' || id === 'undefined') {
+    alert('This record can\'t be opened — it\'s missing an ID. Please let the office know so it can be fixed.');
+    return;
+  }
   _vehPendingRecordId = id;
   var modal = document.getElementById('vehPassModal');
   if (modal) {
@@ -2760,7 +2764,10 @@ function closeVehDetail() {
 }
 
 function deleteVehRecord() {
-  if (!_vehDetailRecordId) return;
+  if (!_vehDetailRecordId || _vehDetailRecordId === 'null' || _vehDetailRecordId === 'undefined') {
+    alert('This record can\'t be deleted — it\'s missing an ID. Please let the office know so it can be fixed.');
+    return;
+  }
   if (!confirm('Delete this inspection record? This cannot be undone.')) return;
   var id = _vehDetailRecordId;
   fetch(SUPA_URL + '/rest/v1/vehicle_checks?id=eq.' + id, {
