@@ -830,6 +830,94 @@ function _deleteStorageFolder(quoteRef) {
   });
 }
 
+// ── STORAGE CLEANUP (find & remove orphaned files left behind by deleted jobs) ──
+var _storageCleanupOrphans = [];
+
+function _listStorageRoot(bucket) {
+  return fetch(SUPA_URL + '/storage/v1/object/list/' + bucket, {
+    method: 'POST',
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':'application/json'},
+    body: JSON.stringify({prefix:'', limit:1000}), credentials:'omit'
+  }).then(function(r){ return r.json(); });
+}
+
+function openStorageCleanup() {
+  document.getElementById('storageCleanupView').style.display = 'block';
+  document.getElementById('storageCleanupDeleteBtn').style.display = 'none';
+  scanStorageOrphans();
+}
+
+function closeStorageCleanup() {
+  document.getElementById('storageCleanupView').style.display = 'none';
+}
+
+function scanStorageOrphans() {
+  var statusEl = document.getElementById('storageCleanupStatus');
+  var listEl = document.getElementById('storageCleanupList');
+  var btnEl = document.getElementById('storageCleanupDeleteBtn');
+  statusEl.textContent = 'Scanning…';
+  listEl.innerHTML = '';
+  btnEl.style.display = 'none';
+  _storageCleanupOrphans = [];
+
+  Promise.all([
+    fetch(SUPA_URL + '/rest/v1/' + TABLE + '?select=quote_ref', { headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()} }).then(function(r){ return r.json(); }),
+    _listStorageRoot(SIG_BUCKET),
+    _listStorageRoot(DOC_BUCKET)
+  ]).then(function(results) {
+    var jobs = Array.isArray(results[0]) ? results[0] : [];
+    var sigEntries = Array.isArray(results[1]) ? results[1] : [];
+    var docEntries = Array.isArray(results[2]) ? results[2] : [];
+
+    var validRefs = {};
+    jobs.forEach(function(j) {
+      if (j.quote_ref) validRefs[j.quote_ref.replace(/[^a-zA-Z0-9_-]/g,'_')] = true;
+    });
+
+    var orphans = [];
+    sigEntries.forEach(function(e) {
+      if (e.name && !validRefs[e.name]) orphans.push({ bucket: SIG_BUCKET, bucketLabel: 'Signatures', folder: e.name });
+    });
+    docEntries.forEach(function(e) {
+      if (e.name && !validRefs[e.name]) orphans.push({ bucket: DOC_BUCKET, bucketLabel: 'Documents', folder: e.name });
+    });
+
+    _storageCleanupOrphans = orphans;
+
+    if (orphans.length === 0) {
+      statusEl.textContent = '✓ No orphaned files found — storage is clean.';
+      return;
+    }
+    statusEl.textContent = orphans.length + ' orphaned folder(s) found (no matching job record):';
+    listEl.innerHTML = orphans.map(function(o) {
+      return '<div style="padding:8px 12px;background:#2b2b2b;border-radius:4px;margin-bottom:6px;font-size:12px;color:white;display:flex;justify-content:space-between;align-items:center;"><span>' + o.folder + '</span><span style="color:rgba(255,255,255,.4);font-family:\'Barlow Condensed\',sans-serif;text-transform:uppercase;letter-spacing:.5px;">' + o.bucketLabel + '</span></div>';
+    }).join('');
+    btnEl.style.display = 'inline-block';
+  })
+  .catch(function() {
+    statusEl.textContent = 'Could not scan storage — check connection and try again.';
+  });
+}
+
+function deleteStorageOrphans() {
+  if (!_storageCleanupOrphans.length) return;
+  if (!confirm('Permanently delete ' + _storageCleanupOrphans.length + ' orphaned folder(s) from Storage? This cannot be undone.')) return;
+  var statusEl = document.getElementById('storageCleanupStatus');
+  statusEl.textContent = 'Deleting…';
+  var tasks = _storageCleanupOrphans.map(function(o) {
+    if (o.bucket === SIG_BUCKET) return _deleteStorageBucketFolder(SIG_BUCKET, o.folder + '/');
+    return Promise.all(DOC_CATEGORIES.map(function(cat) {
+      return _deleteStorageBucketFolder(DOC_BUCKET, o.folder + '/' + cat + '/');
+    }));
+  });
+  Promise.all(tasks).then(function() {
+    scanStorageOrphans();
+  }).catch(function() {
+    statusEl.textContent = 'Some files may not have been removed — re-scanning…';
+    scanStorageOrphans();
+  });
+}
+
 function _saveJobListCache(rows) {
   try { localStorage.setItem('arb_job_list', JSON.stringify(rows)); } catch(e) {}
 }
