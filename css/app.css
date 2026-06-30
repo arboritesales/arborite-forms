@@ -44,6 +44,8 @@ body{font-family:'Barlow',sans-serif;font-size:13px;background:#e0ddd6;color:var
 .field-row.c2{grid-template-columns:1fr 1fr;}
 .field-row.lw{grid-template-columns:200px 1fr;}
 .field-row.lm{grid-template-columns:180px 1fr;}
+.field-row.stack{grid-template-columns:1fr;}
+.field-row.stack .fc.lbl{border-right:none;border-bottom:1px solid #e0e0d8;white-space:normal;line-height:1.4;padding:10px 12px;}
 .field-row.c4{grid-template-columns:200px 1fr 160px 1fr;}
 .fc{padding:6px 12px;display:flex;align-items:center;border-right:1px solid #e0e0d8;min-height:36px;}
 .fc:last-child{border-right:none;}

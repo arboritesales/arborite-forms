@@ -2888,7 +2888,7 @@ var CHECK_CATEGORIES = {
       {key:'flail_teeth', label:'In what condition are the teeth on the flail head?', options:['Good','Fair','Poor','Not using on site']},
       {key:'greased', label:'Has the machine been greased in accordance with manufacturers instructions?', options:['Yes','No']},
       {key:'guards', label:'Are all the machine guards in place?', options:['Yes','No']},
-      {key:'walkaround', label:'Walk around inspection — look for visible damage, loose nuts/screws and leaks; check for accumulated dirt near hot components (engine/DPF/muffler/exhaust/manifold/tubes) and remove as necessary; check for accumulated residues from operation.', options:['Yes','No']},
+      {key:'walkaround', label:'Walk around inspection — look for visible damage, loose nuts/screws and leaks; check for accumulated dirt near hot components (engine/DPF/muffler/exhaust/manifold/tubes) and remove as necessary; check for accumulated residues from operation.', options:['Yes','No'], stack:true},
       {key:'engine_oil', label:'Is the engine oil level correct?', options:['Yes','No']},
       {key:'engine_coolant', label:'Is the engine coolant level correct?', options:['Yes','No']},
       {key:'hydraulic_oil', label:'Is the hydraulic oil level correct?', options:['Yes','No']},
@@ -3004,19 +3004,29 @@ function catState(cat) {
 }
 var _catDetailRecordId = {};
 
+function catOptionClass(opt) {
+  var o = opt.toLowerCase();
+  if (/^n\/a$|not using on site/.test(o)) return 'active-na';
+  if (/too low/.test(o)) return 'active-toolow';
+  if (/topped up/.test(o)) return 'active-toppedup';
+  if (/^yes$|^good$|^correct$|excellent|intact and (present|functioning)|functions correctly|fully functioning and clean|correct numberplate/.test(o)) return 'active-good';
+  if (/^no\b|^poor$|damaged|requires maintenance|requires attention|not working|unsatisfactory/.test(o)) return 'active-poor';
+  if (/^fair$|satisfactory|working but require maintenance|could not test/.test(o)) return 'active-fair';
+  return 'active-' + o.replace(/\//g,'').replace(/[^a-z0-9]/g,'');
+}
+
 function catFieldRow(cat, f) {
   var btns = f.options.map(function(opt) {
-    var cls = 'active-' + opt.toLowerCase().replace(/\//g,'').replace(/[^a-z0-9]/g,'');
     return '<button class="veh-btn" onclick="catFieldSel(\'' + cat + '\',\'' + f.key + '\',this,\'' + opt.replace(/'/g,"\\'") + '\')">' + opt + '</button>';
   }).join('');
-  return '<div class="field-row lw"><div class="fc lbl">' + f.label + '</div><div class="fc veh-opts" id="catField_' + cat + '_' + f.key + '">' + btns + '</div></div>';
+  var rowCls = f.stack ? 'field-row stack' : 'field-row lw';
+  return '<div class="' + rowCls + '"><div class="fc lbl">' + f.label + '</div><div class="fc veh-opts" id="catField_' + cat + '_' + f.key + '">' + btns + '</div></div>';
 }
 
 function catFieldSel(cat, key, btn, val) {
   var group = document.getElementById('catField_' + cat + '_' + key);
   group.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
-  var cls = 'active-' + val.toLowerCase().replace(/\//g,'').replace(/[^a-z0-9]/g,'');
-  btn.classList.add(cls);
+  btn.classList.add(catOptionClass(val));
   catAutoSave(cat);
 }
 
