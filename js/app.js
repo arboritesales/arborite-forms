@@ -2692,8 +2692,9 @@ function confirmVehPass() {
   var err = document.getElementById('vehPassErr');
   if (!inp) return;
   if (inp.value === '2001') {
+    var recordId = _vehPendingRecordId;
     closeVehPassModal();
-    loadVehRecord(_vehPendingRecordId);
+    loadVehRecord(recordId);
   } else {
     err.textContent = 'Incorrect password — try again';
     inp.value = '';
