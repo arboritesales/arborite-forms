@@ -63,7 +63,6 @@
     <div class="dash-tile" onclick="openChecksView()" style="text-align:center;padding:20px 16px;">
       <div class="dash-tile-icon">&#9989;</div>
       <div class="dash-tile-name">Checks</div>
-      <div class="dash-tile-sub">Vehicle inspections</div>
     </div>
   </div>
   </div><!-- end content wrapper -->
@@ -2677,7 +2676,7 @@
 
   <!-- Sub-tabs -->
   <div style="display:flex;background:#132a0a;border-bottom:2px solid rgba(126,200,32,.3);padding:0 20px;">
-    <div style="padding:12px 20px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--lime);border-bottom:3px solid var(--lime);margin-bottom:-2px;cursor:pointer;">&#128661; Vehicles</div>
+    <div style="padding:12px 20px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--lime);border-bottom:3px solid var(--lime);margin-bottom:-2px;cursor:pointer;">&#128661; Vehicle Checks</div>
   </div>
 
   <!-- Vehicle tab content -->
@@ -2815,7 +2814,8 @@
     <div id="vehDetailPanel" style="display:none;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <button onclick="closeVehDetail()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8592; Back to List</button>
-        <div style="font-size:11px;color:rgba(255,255,255,.4);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">READ ONLY</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.4);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANAGER ACCESS</div>
+        <button onclick="deleteVehRecord()" style="background:#c62828;border:none;color:white;padding:7px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128465; Delete</button>
       </div>
       <div id="vehDetailContent"></div>
     </div>

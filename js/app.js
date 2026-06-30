@@ -2687,7 +2687,10 @@ function confirmVehPass() {
   }
 }
 
+var _vehDetailRecordId = null;
+
 function loadVehRecord(id) {
+  _vehDetailRecordId = id;
   document.getElementById('vehListPanel').style.display = 'none';
   document.getElementById('vehPinPanel').style.display = 'none';
   document.getElementById('vehDetailPanel').style.display = 'block';
@@ -2748,6 +2751,26 @@ function closeVehDetail() {
   document.getElementById('vehDetailPanel').style.display = 'none';
   document.getElementById('vehListPanel').style.display = 'block';
   document.getElementById('checksView').scrollTop = 0;
+  _vehDetailRecordId = null;
+}
+
+function deleteVehRecord() {
+  if (!_vehDetailRecordId) return;
+  if (!confirm('Delete this inspection record? This cannot be undone.')) return;
+  var id = _vehDetailRecordId;
+  fetch(SUPA_URL + '/rest/v1/vehicle_checks?id=eq.' + id, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + _authToken() }
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('Delete failed');
+    _vehDetailRecordId = null;
+    closeVehDetail();
+    fetchVehList();
+  })
+  .catch(function() {
+    alert('Could not delete record — check connection and try again.');
+  });
 }
 
 // ── TOOLBOX TALKS ──
