@@ -463,7 +463,7 @@ function attachSigListeners(canvas, id) {
         var el = canvas.parentNode;
         while (el && el !== document.body) {
           if (el.id && AUTO_SAVE_PANELS.indexOf(el.id) !== -1) {
-            scheduleAutoSave(el.id);
+            scheduleAutoSave(el.id, true);
             break;
           }
           el = el.parentNode;
@@ -1853,6 +1853,23 @@ function setOverall(val) {
 }
 
 // ── PRINT / CLEAR ──
+// Adds className, prints, then removes it once the print dialog actually
+// closes (window.onafterprint) rather than a blind timer — a fixed delay can
+// fire before/during print rendering on a slow device, reverting the DOM
+// mid-print so the exported PDF doesn't match what was on screen.
+function _printWithClass(onCleanup) {
+  var done = false;
+  function cleanup() {
+    if (done) return;
+    done = true;
+    onCleanup();
+    window.onafterprint = null;
+  }
+  window.onafterprint = cleanup;
+  window.print();
+  setTimeout(cleanup, 5000); // fallback in case onafterprint doesn't fire
+}
+
 function printPanel(id) {
   // Add printing-active class only to the target panel so only it prints
   var allPanels = document.querySelectorAll('.panel');
@@ -1861,14 +1878,12 @@ function printPanel(id) {
   }
   var target = document.getElementById(id);
   if (target) target.classList.add('printing-active');
-  window.print();
-  // After print dialog closes, remove the class
-  setTimeout(function(){
+  _printWithClass(function() {
     var allP = document.querySelectorAll('.panel');
     for (var j = 0; j < allP.length; j++) {
       allP[j].classList.remove('printing-active');
     }
-  }, 1000);
+  });
 }
 
 function clearForm(id) {
@@ -2637,14 +2652,17 @@ function syncSuperNameText() {
 var autoSaveTimer = null;
 var AUTO_SAVE_PANELS = ['signoff', 'method', 'daily', 'powa', 'safety', 'emergency'];
 
-function scheduleAutoSave(panelId) {
+function scheduleAutoSave(panelId, immediate) {
   if (!currentJobRef) return;
   if (AUTO_SAVE_PANELS.indexOf(panelId) === -1) return;
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  // A finished signature is a complete action, not something to debounce like
+  // typing — save it right away so it can't be lost by navigating away inside
+  // the old 2s window (text fields still debounce, to avoid saving every keystroke).
   autoSaveTimer = setTimeout(function() {
     autoSaveTimer = null;
     saveJob();
-  }, 2000);
+  }, immediate ? 300 : 2000);
 }
 
 function attachAutoSave(panelId) {
@@ -2657,12 +2675,12 @@ function attachAutoSave(panelId) {
       el.addEventListener('input', function() { scheduleAutoSave(panelId); });
     })(inputs[i]);
   }
-  // Canvas changes (signatures)
+  // Canvas changes (signatures) — save immediately, no debounce
   var canvases = panel.querySelectorAll('canvas');
   for (var ci = 0; ci < canvases.length; ci++) {
     (function(canvas) {
-      canvas.addEventListener('mouseup', function() { scheduleAutoSave(panelId); });
-      canvas.addEventListener('touchend', function() { scheduleAutoSave(panelId); });
+      canvas.addEventListener('mouseup', function() { scheduleAutoSave(panelId, true); });
+      canvas.addEventListener('touchend', function() { scheduleAutoSave(panelId, true); });
     })(canvases[ci]);
   }
 }
@@ -3056,8 +3074,7 @@ function loadVehRecord(id) {
 function printVehRecord() {
   var view = document.getElementById('checksView');
   view.classList.add('printing-veh');
-  window.print();
-  setTimeout(function() { view.classList.remove('printing-veh'); }, 1000);
+  _printWithClass(function() { view.classList.remove('printing-veh'); });
 }
 
 function exportFieldsToExcel(filename, title, meta, fieldPairs) {
@@ -3736,8 +3753,7 @@ function deleteCatRecord(cat) {
 function printCatRecord(cat) {
   var view = document.getElementById('checksView');
   view.classList.add('printing-veh');
-  window.print();
-  setTimeout(function() { view.classList.remove('printing-veh'); }, 1000);
+  _printWithClass(function() { view.classList.remove('printing-veh'); });
 }
 
 function downloadCatExcel(cat) {
@@ -3863,8 +3879,7 @@ function renderSurveyReport(data) {
 function printSurveyReport() {
   var view = document.getElementById('surveyReportView');
   view.classList.add('printing-survey');
-  window.print();
-  setTimeout(function() { view.classList.remove('printing-survey'); }, 1000);
+  _printWithClass(function() { view.classList.remove('printing-survey'); });
 }
 
 function exportSurveyExcel() {
@@ -4284,8 +4299,7 @@ function saveTBT() {
 function printTBT() {
   var view = document.getElementById('tbtView');
   view.classList.add('printing-tbt');
-  window.print();
-  setTimeout(function() { view.classList.remove('printing-tbt'); }, 1000);
+  _printWithClass(function() { view.classList.remove('printing-tbt'); });
 }
 
 // ── AUDITS (standalone, not tied to a job) ──
@@ -4483,8 +4497,7 @@ function saveAudit() {
 function printAudit() {
   var view = document.getElementById('auditView');
   view.classList.add('printing-audit');
-  window.print();
-  setTimeout(function() { view.classList.remove('printing-audit'); }, 1000);
+  _printWithClass(function() { view.classList.remove('printing-audit'); });
 }
 
 if ('serviceWorker' in navigator) {
