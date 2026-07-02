@@ -35,6 +35,28 @@ function _authToken() {
   return (_supaSession && _supaSession.access_token) ? _supaSession.access_token : SUPA_KEY;
 }
 
+// Lock screen has two modes: 'team' (the shared login every field user uses)
+// and 'manager' (a separate Supabase Auth account with the same UI/password
+// gates, but managerUnlocked=true — see openVehRecord/openCatRecord/Survey Report).
+var lockScreenMode = 'team';
+
+function toggleManagerLogin() {
+  lockScreenMode = (lockScreenMode === 'team') ? 'manager' : 'team';
+  var sub = document.getElementById('lockSubtitle');
+  var link = document.getElementById('lockModeLink');
+  var inp = document.getElementById('lockPass');
+  var err = document.getElementById('lockErr');
+  if (lockScreenMode === 'manager') {
+    if (sub) sub.textContent = 'Enter the manager password to continue';
+    if (link) link.textContent = '← Team login';
+  } else {
+    if (sub) sub.textContent = 'Enter the team password to continue';
+    if (link) link.textContent = 'Manager login';
+  }
+  if (inp) { inp.value = ''; inp.focus(); }
+  if (err) err.textContent = '';
+}
+
 function checkPass() {
   var inp = document.getElementById('lockPass');
   var err = document.getElementById('lockErr');
@@ -43,10 +65,11 @@ function checkPass() {
   if (!password) return;
   inp.disabled = true;
   if (err) err.textContent = '';
+  var email = (lockScreenMode === 'manager') ? ('manager' + '@arborite.app') : ('login' + '@arborite.app');
   fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
     method: 'POST',
     headers: {'Content-Type':'application/json','apikey':SUPA_KEY},
-    body: JSON.stringify({email: 'login'+'@arborite.app', password: password}),
+    body: JSON.stringify({email: email, password: password}),
     credentials: 'omit', mode: 'cors'
   })
   .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,data:d}; }); })
@@ -54,6 +77,7 @@ function checkPass() {
     inp.disabled = false;
     if (res.ok && res.data.access_token) {
       _storeSession({access_token:res.data.access_token, refresh_token:res.data.refresh_token, expires_at:res.data.expires_at});
+      managerUnlocked = (lockScreenMode === 'manager');
       var ls = document.getElementById('lockScreen');
       if (ls) ls.style.display = 'none';
       showJobSelectScreen();
@@ -76,7 +100,7 @@ function checkPass() {
 var SUPA_URL = 'https://labskiotmfvdgcfbhbbl.supabase.co';
 var SUPA_KEY = 'sb_publishable_D15QbbKwIm3FB1Lwdcn_YA_TxfXuDX9';
 var TABLE    = 'job_forms';
-var PANELS   = ['powa','signoff','method','daily','documents','emergency','audit','safety'];
+var PANELS   = ['powa','signoff','method','daily','documents','emergency','safety'];
 var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads, drCount, docStore;
 
 function init() {
@@ -94,11 +118,11 @@ var SHARED_MAP = {
   so_quote:     ['p_quote','ms_jobno','dr_quote','wl_quote'],
   so_works:     ['ms_scope','wl_scope'],
   wl_quote:     ['p_quote','so_quote','ms_jobno','dr_quote'],
-  wl_site:      ['p_address','so_site','ms_site','aud_site'],
-  wl_scope:     ['so_works','ms_scope'],
-  aud_site:     ['p_address','so_site','ms_site','wl_site']
+  wl_site:      ['p_address','so_site','ms_site'],
+  wl_scope:     ['so_works','ms_scope']
   // p_w3w removed — w3w fields sync directly to avoid restore wipe
   // p_supervisor removed — each form's supervisor is independent
+  // aud_site removed — Audit is now a standalone form, not tied to a job
 };
 
 function buildSupervisorList() {
@@ -1115,10 +1139,16 @@ function fetchJobList() {
 
 var _pendingDeleteRef = null;
 var _pendingDeleteIsTBT = false;
+var _pendingDeleteIsAudit = false;
 
 function deleteJob(ref) {
+  if (managerUnlocked) {
+    if (confirm('Delete this job? This cannot be undone.')) _executeDelete(ref, false, false);
+    return;
+  }
   _pendingDeleteRef = ref;
   _pendingDeleteIsTBT = false;
+  _pendingDeleteIsAudit = false;
   hideModals();
   document.getElementById('deletePassInput').value = '';
   document.getElementById('deletePassErr').textContent = '';
@@ -1126,8 +1156,26 @@ function deleteJob(ref) {
 }
 
 function deleteTBT(ref) {
+  if (managerUnlocked) {
+    if (confirm('Delete this toolbox talk? This cannot be undone.')) _executeDelete(ref, true, false);
+    return;
+  }
   _pendingDeleteRef = ref;
   _pendingDeleteIsTBT = true;
+  _pendingDeleteIsAudit = false;
+  document.getElementById('deletePassInput').value = '';
+  document.getElementById('deletePassErr').textContent = '';
+  document.getElementById('deletePassModal').className = 'modal-bg show';
+}
+
+function deleteAudit(ref) {
+  if (managerUnlocked) {
+    if (confirm('Delete this audit? This cannot be undone.')) _executeDelete(ref, false, true);
+    return;
+  }
+  _pendingDeleteRef = ref;
+  _pendingDeleteIsTBT = false;
+  _pendingDeleteIsAudit = true;
   document.getElementById('deletePassInput').value = '';
   document.getElementById('deletePassErr').textContent = '';
   document.getElementById('deletePassModal').className = 'modal-bg show';
@@ -1137,6 +1185,7 @@ function hideDeleteModal() {
   document.getElementById('deletePassModal').className = 'modal-bg';
   _pendingDeleteRef = null;
   _pendingDeleteIsTBT = false;
+  _pendingDeleteIsAudit = false;
 }
 
 function confirmDeletePass() {
@@ -1151,14 +1200,23 @@ function confirmDeletePass() {
   hideModals();
   var ref = _pendingDeleteRef;
   var isTBT = _pendingDeleteIsTBT;
+  var isAudit = _pendingDeleteIsAudit;
   _pendingDeleteRef = null;
   _pendingDeleteIsTBT = false;
+  _pendingDeleteIsAudit = false;
+  _executeDelete(ref, isTBT, isAudit);
+}
+
+function _executeDelete(ref, isTBT, isAudit) {
   supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))
     .then(function(r) {
       if (r.ok || r.status === 204) {
         if (isTBT) {
           fetchTBTList();
           setStatus('TBT deleted: ' + ref, '');
+        } else if (isAudit) {
+          fetchAuditList();
+          setStatus('Audit deleted: ' + ref, '');
         } else {
           _deleteStorageFolder(ref);
           allJobs = allJobs.filter(function(j){ return j.quote_ref !== ref; });
@@ -1571,17 +1629,20 @@ function collectFormData() {
     if (allCanvases[ci].id) initSig(allCanvases[ci].id);
   }
   var data = {signatures:{}};
-  var inputs = document.querySelectorAll('input[type="text"], input[type="date"], textarea, select');
+  // Audit is a standalone form (see collectAuditData/restoreAuditData) — excluded here
+  // so job saves never pick up whatever is currently in the Audit form.
+  var inputs = document.querySelectorAll('input[type="text"]:not(#auditFormPanel *), input[type="date"]:not(#auditFormPanel *), textarea:not(#auditFormPanel *), select:not(#auditFormPanel *)');
   for (var i = 0; i < inputs.length; i++) {
     var el = inputs[i];
     if (el.id && el.id !== 'newJobRef' && el.id !== 'loadSearch') data[el.id] = el.value;
   }
-  var radios = document.querySelectorAll('input[type="radio"]:checked');
+  var radios = document.querySelectorAll('input[type="radio"]:checked:not(#auditFormPanel *)');
   for (var i = 0; i < radios.length; i++) data[radios[i].name] = radios[i].value;
-  var checks = document.querySelectorAll('input[type="checkbox"][id]');
+  var checks = document.querySelectorAll('input[type="checkbox"][id]:not(#auditFormPanel *)');
   for (var i = 0; i < checks.length; i++) data[checks[i].id] = checks[i].checked;
   for (var id in pads) {
     if (!pads[id]) continue;
+    if (id === 's-auditor') continue;
     var padCanvas = pads[id].canvas || document.getElementById(id);
     if (!padCanvas) continue;
     pads[id].canvas = padCanvas;
@@ -1598,7 +1659,7 @@ function collectFormData() {
     }
   }
   // Also collect dynamic canvases not yet in pads (newly built rows)
-  var dynCanvases = document.querySelectorAll('.sig-wrap canvas[id]');
+  var dynCanvases = document.querySelectorAll('.sig-wrap canvas[id]:not(#auditFormPanel *)');
   for (var di = 0; di < dynCanvases.length; di++) {
     var cid = dynCanvases[di].id;
     if (!data.signatures[cid]) {
@@ -1648,6 +1709,7 @@ function restoreFormData(data) {
     if (SKIP[key]) continue;
     var el = document.getElementById(key);
     if (!el) continue;
+    if (el.closest && el.closest('#auditFormPanel')) continue; // Audit restores via restoreAuditData, not here
     if (el.tagName === 'SELECT' || el.type === 'text' || el.type === 'date' || el.tagName === 'TEXTAREA') {
       el.value = data[key];
     } else if (el.type === 'checkbox') {
@@ -1656,7 +1718,7 @@ function restoreFormData(data) {
   }
   var keys = Object.keys(data);
   for (var k = 0; k < keys.length; k++) {
-    var rads = document.querySelectorAll('input[type="radio"][name="' + keys[k] + '"]');
+    var rads = document.querySelectorAll('input[type="radio"][name="' + keys[k] + '"]:not(#auditFormPanel *)');
     if (rads.length) {
       for (var i = 0; i < rads.length; i++) rads[i].checked = (rads[i].value === data[keys[k]]);
     }
@@ -1665,7 +1727,6 @@ function restoreFormData(data) {
     var ct = document.getElementById('comms_other_text');
     if (ct) ct.style.display = 'inline-block';
   }
-  if (data.aud_overall) setOverall(data.aud_overall);
   if (data.signatures) {
     // Make all panels temporarily visible so canvases can be sized
     var hiddenPanels2 = [];
@@ -1678,7 +1739,7 @@ function restoreFormData(data) {
         hiddenPanels2.push(allPanels[rpi]);
       }
     }
-    for (var id in data.signatures) restoreSig(id, data.signatures[id]);
+    for (var id in data.signatures) { if (id !== 's-auditor') restoreSig(id, data.signatures[id]); }
     // Restore panels after a short delay (restoreSig uses setTimeout internally)
     setTimeout(function() {
       for (var hi = 0; hi < hiddenPanels2.length; hi++) {
@@ -1893,6 +1954,8 @@ function showJobSelectScreen() {
   if (dash) dash.style.display = 'none';
   if (app)  app.style.display  = 'none';
   if (off)  off.style.display  = 'none';
+  var officeTile = document.getElementById('officeTile');
+  if (officeTile) officeTile.style.display = managerUnlocked ? '' : 'none';
 }
 
 function showNewJobFromSelect() {
@@ -2449,6 +2512,7 @@ function dashPrintAll() {
 // ── OFFICE SUB-DASHBOARD ──
 var officeUnlocked = false;
 function openOffice() {
+  if (managerUnlocked) { showOfficeView(); return; }
   if (!officeUnlocked) {
     document.getElementById('officePassInput').value = '';
     document.getElementById('officePassErr').textContent = '';
@@ -2475,6 +2539,13 @@ function confirmOfficePass() {
 function hideOfficeModal() {
   document.getElementById('officePassModal').className = 'modal-bg';
 }
+
+// ── MANAGER ACCESS ──
+// Set by checkPass() when the manager Supabase Auth account (manager@arborite.app)
+// logs in successfully, instead of the shared team account. It bypasses the
+// 2001 prompt on completed check records so a manager can view Survey Reports
+// without re-entering that password. Office access and deletes are unaffected.
+var managerUnlocked = false;
 
 function showOfficeView() {
   document.getElementById('jobSelectScreen').style.display = 'none';
@@ -2564,7 +2635,7 @@ function syncSuperNameText() {
 
 // ── AUTO-SAVE ──
 var autoSaveTimer = null;
-var AUTO_SAVE_PANELS = ['signoff', 'method', 'daily', 'powa', 'safety', 'audit', 'emergency'];
+var AUTO_SAVE_PANELS = ['signoff', 'method', 'daily', 'powa', 'safety', 'emergency'];
 
 function scheduleAutoSave(panelId) {
   if (!currentJobRef) return;
@@ -2615,21 +2686,31 @@ var _vehAutoSaveTimer = null;
 var _vehCurrentId = null;
 
 function switchChecksTab(tab) {
-  document.querySelectorAll('.checks-tab-btn').forEach(function(b) {
-    b.classList.toggle('active', b.getAttribute('data-checkstab') === tab);
-  });
+  document.getElementById('checksHome').style.display = 'none';
   document.querySelectorAll('.checks-tab-content').forEach(function(c) {
     c.style.display = (c.id === 'checksTab_' + tab) ? 'block' : 'none';
   });
   if (tab === 'vehicle') { fetchVehList(); }
+  else if (tab === 'defects') { fetchDefects(); }
   else if (typeof CHECK_CATEGORIES !== 'undefined' && CHECK_CATEGORIES[tab]) { fetchCatList(tab); }
+}
+
+function showChecksHome() {
+  document.getElementById('checksHome').style.display = 'block';
+  document.querySelectorAll('.checks-tab-content').forEach(function(c) { c.style.display = 'none'; });
+}
+
+function checksBack() {
+  var home = document.getElementById('checksHome');
+  if (home && home.style.display !== 'none') { closeChecksView(); }
+  else { showChecksHome(); }
 }
 
 function openChecksView() {
   document.getElementById('checksView').style.display = 'block';
-  switchChecksTab('vehicle');
-  showVehList();
-  fetchVehList();
+  var defectsBtn = document.getElementById('defectsTabBtn');
+  if (defectsBtn) defectsBtn.style.display = managerUnlocked ? '' : 'none';
+  showChecksHome();
 }
 
 function closeChecksView() {
@@ -2864,6 +2945,7 @@ function openVehRecord(id) {
     alert('This record can\'t be opened — it\'s missing an ID. Please let the office know so it can be fixed.');
     return;
   }
+  if (managerUnlocked) { loadVehRecord(id); return; }
   _pendingManagerRecord = { kind: 'vehicle', id: id };
   var modal = document.getElementById('vehPassModal');
   if (modal) {
@@ -3361,6 +3443,7 @@ function renderCategoryPanel(cat) {
     + '<button onclick="closeCatDetail(\'' + cat + '\')" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8592; Back to List</button>'
     + '<div style="font-size:11px;color:rgba(255,255,255,.4);font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">MANAGER ACCESS</div>'
     + '<div style="display:flex;gap:8px;">'
+    + '<button onclick="openSurveyReport(\'cat\',\'' + cat + '\')" style="background:#4a6fa5;border:none;color:white;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128203; Survey Report</button>'
     + '<button onclick="printCatRecord(\'' + cat + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128190; Download PDF</button>'
     + '<button onclick="downloadCatExcel(\'' + cat + '\')" style="background:#1d6f42;border:none;color:white;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128202; Download Excel</button>'
     + '<button onclick="deleteCatRecord(\'' + cat + '\')" style="background:#c62828;border:none;color:white;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128465; Delete</button>'
@@ -3539,6 +3622,7 @@ function openCatRecord(cat, id) {
     alert('This record can\'t be opened — it\'s missing an ID. Please let the office know so it can be fixed.');
     return;
   }
+  if (managerUnlocked) { loadCatRecord(cat, id); return; }
   _pendingManagerRecord = { kind: 'cat', cat: cat, id: id };
   var modal = document.getElementById('vehPassModal');
   if (modal) {
@@ -3670,6 +3754,234 @@ function downloadCatExcel(cat) {
   exportFieldsToExcel(filename, cfg.label + ' Check — ' + (d.machine || ''), meta, catFieldRows(cat, d));
 }
 
+// ── SURVEY REPORT (Manager Access) ──
+// Flags any answered field that didn't classify as the top score, using the
+// same catOptionClass() bucketing already used to colour the record detail views.
+var _surveyReportData = null;
+
+// Fields that are identity/metadata rather than a quality score, per kind —
+// reused by both the single-record Survey Report and the Defects dashboard.
+function _surveyMeta(kind, cat) {
+  if (kind === 'vehicle') return { fieldRows: null, skipLabels: { 'Vehicle': 1, 'Mileage': 1 } };
+  var cfg = CHECK_CATEGORIES[cat];
+  var skipLabels = {};
+  if (cfg && cfg.hasMileage) skipLabels[cfg.mileageLabel] = 1;
+  return { cfg: cfg, skipLabels: skipLabels };
+}
+
+// Buckets a record's answered fields into good/fair/poor/na and lists what's flagged.
+function _scoreFieldRows(fieldRows, skipLabels) {
+  var counts = { good: 0, fair: 0, poor: 0, na: 0 };
+  var flagged = [];
+  fieldRows.forEach(function(f) {
+    var label = f[0], val = f[1];
+    if (val === undefined || val === null || val === '') return;
+    if (skipLabels[label]) return; // identity/meta fields (reg, mileage/hours) aren't a quality score
+    var cls = catOptionClass(String(val));
+    if (cls === 'active-good') counts.good++;
+    else if (cls === 'active-na') counts.na++;
+    else {
+      if (cls === 'active-fair') counts.fair++;
+      else counts.poor++; // active-poor and any other non-good bucket
+      flagged.push([label, val]);
+    }
+  });
+  return { counts: counts, flagged: flagged };
+}
+
+function _surveyBuildData(kind, cat) {
+  var d, fieldRows, title, meta = _surveyMeta(kind, cat);
+  if (kind === 'vehicle') {
+    d = _vehDetailData;
+    fieldRows = d ? vehFieldList(d) : [];
+    title = 'Vehicle Check — ' + (d && d.vehicle ? d.vehicle : '');
+  } else {
+    d = _catDetailData[cat];
+    fieldRows = d ? catFieldRows(cat, d) : [];
+    title = (meta.cfg ? meta.cfg.label : cat) + ' Check — ' + (d && d.machine ? d.machine : '');
+  }
+  var scored = _scoreFieldRows(fieldRows, meta.skipLabels);
+  return {
+    d: d, kind: kind, cat: cat, title: title,
+    inspector: (d && d.inspector_name) || '',
+    dateStr: (d && d.created_at) ? new Date(d.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '',
+    counts: scored.counts, flagged: scored.flagged
+  };
+}
+
+function _surveyChartSVG(counts) {
+  var total = counts.good + counts.fair + counts.poor;
+  if (total === 0) return '<div style="color:#888;font-size:12px;">No scored items on this record.</div>';
+  var r = 60, cx = 80, cy = 80, sw = 20;
+  var circumference = 2 * Math.PI * r;
+  var goodFrac = counts.good / total;
+  var goodLen = circumference * goodFrac;
+  var flagLen = circumference - goodLen;
+  return '<svg viewBox="0 0 160 160" width="160" height="160">'
+    + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#e6e6e6" stroke-width="' + sw + '"/>'
+    + (flagLen > 0 ? '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#c62828" stroke-width="' + sw + '" stroke-dasharray="' + flagLen + ' ' + circumference + '" stroke-dashoffset="' + (-goodLen) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>' : '')
+    + (goodLen > 0 ? '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#2d5a1b" stroke-width="' + sw + '" stroke-dasharray="' + goodLen + ' ' + circumference + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>' : '')
+    + '<text x="' + cx + '" y="' + (cy + 8) + '" text-anchor="middle" font-size="26" font-weight="800" fill="#222" font-family="Barlow Condensed, sans-serif">' + Math.round(goodFrac * 100) + '%</text>'
+    + '</svg>';
+}
+
+function openSurveyReport(kind, cat) {
+  var data = _surveyBuildData(kind, cat);
+  if (!data.d) { alert('This record hasn\'t loaded yet — please try again.'); return; }
+  _surveyReportData = data;
+  renderSurveyReport(data);
+  document.getElementById('surveyReportView').style.display = 'block';
+  document.getElementById('surveyReportView').scrollTop = 0;
+}
+
+function closeSurveyReport() {
+  document.getElementById('surveyReportView').style.display = 'none';
+  _surveyReportData = null;
+}
+
+function renderSurveyReport(data) {
+  var flaggedHtml = data.flagged.length
+    ? data.flagged.map(function(f) {
+        return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;color:#c62828;font-weight:700;">' + f[1] + '</div></div>';
+      }).join('')
+    : '<div style="padding:20px;text-align:center;color:#2d5a1b;font-weight:700;">&#10003; Everything scored top marks — nothing flagged.</div>';
+
+  document.getElementById('surveyReportContent').innerHTML =
+    '<div style="text-align:center;padding:0 0 16px;"><img src="arborite-logo-192.png" style="height:56px;" alt="Arborite"></div>'
+    + '<div style="text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:#222;margin-bottom:2px;">Survey Report</div>'
+    + '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:6px;">' + data.title + '</div>'
+    + '<div style="text-align:center;font-size:12px;color:#888;margin-bottom:20px;">' + (data.inspector ? data.inspector + ' &middot; ' : '') + data.dateStr + '</div>'
+    + '<div style="display:flex;justify-content:center;margin-bottom:10px;">' + _surveyChartSVG(data.counts) + '</div>'
+    + '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:24px;">'
+      + data.counts.good + ' Good &nbsp;&middot;&nbsp; ' + data.counts.fair + ' Fair &nbsp;&middot;&nbsp; ' + data.counts.poor + ' Poor'
+      + (data.counts.na ? ' &nbsp;&middot;&nbsp; ' + data.counts.na + ' N/A' : '')
+    + '</div>'
+    + '<div class="sec-head">Flagged Items (not top score)</div>'
+    + '<div style="background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;">' + flaggedHtml + '</div>';
+}
+
+function printSurveyReport() {
+  var view = document.getElementById('surveyReportView');
+  view.classList.add('printing-survey');
+  window.print();
+  setTimeout(function() { view.classList.remove('printing-survey'); }, 1000);
+}
+
+function exportSurveyExcel() {
+  if (!_surveyReportData) return;
+  var data = _surveyReportData;
+  var meta = [
+    ['Inspector', data.inspector],
+    ['Date', data.dateStr],
+    ['Good', data.counts.good],
+    ['Fair', data.counts.fair],
+    ['Poor', data.counts.poor],
+    ['N/A', data.counts.na]
+  ];
+  var rows = data.flagged.length ? data.flagged : [['(none)', 'Everything scored top marks']];
+  var filename = 'Survey_Report_' + safeFileSegment(data.title) + '.xlsx';
+  exportFieldsToExcel(filename, 'Survey Report — ' + data.title, meta, rows);
+}
+
+// ── DEFECTS DASHBOARD (Manager Access) ──
+// Scans recent completed checks across every category and surfaces any with
+// flagged (non-top-score) items, so a manager can triage without opening each
+// record individually. Reuses the same scoring logic as the Survey Report.
+function fetchDefects() {
+  var listEl = document.getElementById('defectsList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Scanning recent checks...</div>';
+
+  var jobs = [
+    fetch(SUPA_URL + '/rest/v1/vehicle_checks?order=created_at.desc&limit=50', {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+    }).then(function(r){ return r.json(); }).then(function(rows){
+      return (Array.isArray(rows) ? rows : []).map(function(d){ return _defectEntry('vehicle', null, d); });
+    }).catch(function(){ return []; })
+  ];
+  Object.keys(CHECK_CATEGORIES).forEach(function(cat) {
+    var cfg = CHECK_CATEGORIES[cat];
+    jobs.push(
+      fetch(SUPA_URL + '/rest/v1/' + cfg.table + '?order=created_at.desc&limit=30', {
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+      }).then(function(r){ return r.json(); }).then(function(rows){
+        return (Array.isArray(rows) ? rows : []).map(function(d){ return _defectEntry('cat', cat, d); });
+      }).catch(function(){ return []; })
+    );
+  });
+
+  Promise.all(jobs).then(function(results) {
+    var all = [].concat.apply([], results);
+    var defects = all.filter(function(e){ return e.flaggedCount > 0; });
+    defects.sort(function(a,b){ return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+    renderDefectsList(defects);
+  });
+}
+
+function _defectEntry(kind, cat, d) {
+  var fieldRows, name, categoryLabel, meta = _surveyMeta(kind, cat);
+  if (kind === 'vehicle') {
+    fieldRows = vehFieldList(d);
+    name = d.vehicle || 'Unknown vehicle';
+    categoryLabel = 'Vehicle';
+  } else {
+    fieldRows = catFieldRows(cat, d);
+    name = d.machine || 'Unknown machine';
+    categoryLabel = meta.cfg ? meta.cfg.label : cat;
+  }
+  var scored = _scoreFieldRows(fieldRows, meta.skipLabels);
+  return {
+    kind: kind, cat: cat, id: d.id, name: name, categoryLabel: categoryLabel,
+    inspector: d.inspector_name || '', createdAt: d.created_at || '',
+    dateStr: d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '',
+    flaggedCount: scored.flagged.length
+  };
+}
+
+function renderDefectsList(defects) {
+  var listEl = document.getElementById('defectsList');
+  if (!listEl) return;
+  if (!defects.length) {
+    listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">&#10003; No defects found in recent checks.</div>';
+    return;
+  }
+  listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px;">' + defects.map(function(e) {
+    return '<div style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:white;letter-spacing:.5px;">' + e.name + '</div>'
+      + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + e.categoryLabel + (e.inspector ? ' &middot; ' + e.inspector : '') + ' &middot; ' + e.dateStr + '</div>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">'
+      + '<span style="background:rgba(198,40,40,.25);border:1px solid rgba(198,40,40,.6);color:#ff8888;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;padding:4px 10px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px;">' + e.flaggedCount + ' flagged</span>'
+      + '<div style="font-size:22px;color:rgba(255,255,255,.4);">&#8250;</div>'
+      + '</div>'
+      + '</div>';
+  }).join('') + '</div>';
+}
+
+function openDefectRecord(kind, cat, id) {
+  if (kind === 'vehicle') {
+    switchChecksTab('vehicle');
+    loadVehRecord(id);
+    _waitAndOpenSurvey(function(){ return _vehDetailData && _vehDetailData.id === id; }, 'vehicle', null);
+  } else {
+    switchChecksTab(cat);
+    loadCatRecord(cat, id);
+    _waitAndOpenSurvey(function(){ return _catDetailData[cat] && _catDetailData[cat].id === id; }, 'cat', cat);
+  }
+}
+
+function _waitAndOpenSurvey(isReady, kind, cat) {
+  var tries = 0;
+  var iv = setInterval(function() {
+    tries++;
+    if (isReady() || tries > 30) {
+      clearInterval(iv);
+      if (isReady()) openSurveyReport(kind, cat);
+    }
+  }, 100);
+}
+
 Object.keys(CHECK_CATEGORIES).forEach(renderCategoryPanel);
 
 // ── TODAY'S CHECKS (manager-curated list of what needs checking) ──
@@ -3710,6 +4022,7 @@ function startTodayCheck(cat) {
 }
 
 function openManageTodayChecks() {
+  if (managerUnlocked) { _todayManageUnlocked = true; renderTodayChecks(); return; }
   _pendingManagerRecord = { kind: 'todayManage' };
   var modal = document.getElementById('vehPassModal');
   if (modal) {
@@ -3973,6 +4286,205 @@ function printTBT() {
   view.classList.add('printing-tbt');
   window.print();
   setTimeout(function() { view.classList.remove('printing-tbt'); }, 1000);
+}
+
+// ── AUDITS (standalone, not tied to a job) ──
+var currentAuditRef = null;
+
+function openAuditView() {
+  document.getElementById('auditView').style.display = 'block';
+  fetchAuditList();
+  showAuditList();
+}
+
+function closeAuditView() {
+  document.getElementById('auditView').style.display = 'none';
+}
+
+function showAuditList() {
+  document.getElementById('auditListPanel').style.display = 'block';
+  document.getElementById('auditFormPanel').style.display = 'none';
+  currentAuditRef = null;
+  document.getElementById('auditView').scrollTop = 0;
+}
+
+function fetchAuditList() {
+  var listEl = document.getElementById('auditList');
+  listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading...</div>';
+  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at,form_data&quote_ref=like.AUD-*&order=updated_at.desc&limit=100')
+    .then(function(r) { return r.json(); })
+    .then(function(rows) {
+      if (!Array.isArray(rows) || rows.length === 0) {
+        listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">No audits saved yet.<br><br>Tap <strong style="color:#7ec820;">+ New Audit</strong> to create one.</div>';
+        return;
+      }
+      var html = '<div style="display:flex;flex-direction:column;gap:12px;">';
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        var d = row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+        var site = (row.form_data && row.form_data.aud_site) ? row.form_data.aud_site : '';
+        var auditor = (row.form_data && row.form_data.aud_auditor) ? row.form_data.aud_auditor : '';
+        var ref = row.quote_ref;
+        var mainLine = site ? site : ref;
+        var subLine = (auditor ? auditor + ' &nbsp;·&nbsp; ' : '') + (site ? ref + ' &nbsp;·&nbsp; ' : '') + d;
+        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadAudit(\'' + ref + '\')">'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+          + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div></div>'
+          + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
+          + '<button onclick="event.stopPropagation();deleteAudit(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
+          + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
+          + '</div>'
+          + '</div>';
+      }
+      html += '</div>';
+      listEl.innerHTML = html;
+    })
+    .catch(function() {
+      listEl.innerHTML = '<div style="color:#f8d7da;padding:30px;text-align:center;font-size:13px;">Could not load records — check connection.</div>';
+    });
+}
+
+function generateAuditRef() {
+  var d = new Date();
+  var yr = d.getFullYear();
+  var mo = String(d.getMonth()+1).padStart(2,'0');
+  var dy = String(d.getDate()).padStart(2,'0');
+  var rand = String(Math.floor(Math.random()*900)+100);
+  return 'AUD-' + yr + mo + dy + '-' + rand;
+}
+
+function newAudit() {
+  clearAuditForm(true);
+  currentAuditRef = generateAuditRef();
+  document.getElementById('auditRef').textContent = currentAuditRef;
+  document.getElementById('aud_date').value = new Date().toISOString().slice(0,10);
+  showAuditForm();
+}
+
+function showAuditForm() {
+  document.getElementById('auditListPanel').style.display = 'none';
+  document.getElementById('auditFormPanel').style.display = 'block';
+  document.getElementById('auditView').scrollTop = 0;
+  setTimeout(function() { initSig('s-auditor'); }, 60);
+}
+
+function clearAuditForm(skipConfirm) {
+  if (!skipConfirm && !confirm('Clear all fields on this form?')) return;
+  var panel = document.getElementById('auditFormPanel');
+  var inputs = panel.querySelectorAll('input[type="text"], input[type="date"], input[type="hidden"], textarea');
+  for (var i = 0; i < inputs.length; i++) inputs[i].value = '';
+  var sels = panel.querySelectorAll('select');
+  for (var i = 0; i < sels.length; i++) sels[i].selectedIndex = 0;
+  var checks = panel.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+  for (var i = 0; i < checks.length; i++) checks[i].checked = false;
+  var btns = ['excellent','satisfactory','unsatisfactory'];
+  for (var i = 0; i < btns.length; i++) {
+    var b = document.getElementById('ovr_' + btns[i]);
+    if (b) b.className = 'ovr-btn';
+  }
+  var cv = document.getElementById('s-auditor');
+  if (cv) {
+    var p = pads['s-auditor'];
+    if (p && p.ctx && p.sized) p.ctx.clearRect(0, 0, cv.width, cv.height);
+    if (p) p.dataUrl = null;
+  }
+}
+
+function loadAudit(ref) {
+  currentAuditRef = ref;
+  document.getElementById('auditRef').textContent = ref;
+  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1')
+    .then(function(r) { return r.json(); })
+    .then(function(rows) {
+      clearAuditForm(true);
+      showAuditForm();
+      if (!rows || !rows[0] || !rows[0].form_data) return;
+      restoreAuditData(rows[0].form_data);
+    })
+    .catch(function() { showAuditForm(); });
+}
+
+function collectAuditData() {
+  var panel = document.getElementById('auditFormPanel');
+  var data = { signatures: {} };
+  var inputs = panel.querySelectorAll('input[type="text"][id], input[type="date"][id], input[type="hidden"][id], textarea[id], select[id]');
+  for (var i = 0; i < inputs.length; i++) data[inputs[i].id] = inputs[i].value;
+  var radios = panel.querySelectorAll('input[type="radio"]:checked');
+  for (var i = 0; i < radios.length; i++) data[radios[i].name] = radios[i].value;
+  var checks = panel.querySelectorAll('input[type="checkbox"][id]');
+  for (var i = 0; i < checks.length; i++) data[checks[i].id] = checks[i].checked;
+  var cv = document.getElementById('s-auditor');
+  var p = pads['s-auditor'];
+  if (p && p.dataUrl && p.dataUrl.indexOf('storage:') === 0) {
+    data.signatures['s-auditor'] = p.dataUrl;
+  } else if (cv && p && p.sized) {
+    try {
+      var tmp = document.createElement('canvas');
+      tmp.width = cv.width; tmp.height = cv.height;
+      var ctx2 = tmp.getContext('2d');
+      ctx2.fillStyle = '#ffffff';
+      ctx2.fillRect(0, 0, tmp.width, tmp.height);
+      ctx2.drawImage(cv, 0, 0);
+      var url = tmp.toDataURL('image/jpeg', 0.6);
+      if (url && url.length > 100) data.signatures['s-auditor'] = url;
+    } catch(e) {}
+  }
+  return data;
+}
+
+function restoreAuditData(data) {
+  if (!data) return;
+  var panel = document.getElementById('auditFormPanel');
+  var inputs = panel.querySelectorAll('input[type="text"][id], input[type="date"][id], input[type="hidden"][id], textarea[id], select[id]');
+  for (var i = 0; i < inputs.length; i++) {
+    if (data[inputs[i].id] !== undefined) inputs[i].value = data[inputs[i].id];
+  }
+  var radioGroups = panel.querySelectorAll('input[type="radio"][name]');
+  var seenNames = {};
+  for (var i = 0; i < radioGroups.length; i++) {
+    var name = radioGroups[i].name;
+    if (seenNames[name]) continue;
+    seenNames[name] = true;
+    if (data[name] !== undefined) {
+      var rads = panel.querySelectorAll('input[type="radio"][name="' + name + '"]');
+      for (var j = 0; j < rads.length; j++) rads[j].checked = (rads[j].value === data[name]);
+    }
+  }
+  var checks = panel.querySelectorAll('input[type="checkbox"][id]');
+  for (var i = 0; i < checks.length; i++) {
+    if (data[checks[i].id] !== undefined) checks[i].checked = !!data[checks[i].id];
+  }
+  if (data.aud_overall) setOverall(data.aud_overall);
+  if (data.signatures && data.signatures['s-auditor']) {
+    setTimeout(function() { restoreSig('s-auditor', data.signatures['s-auditor']); }, 80);
+  }
+}
+
+function saveAudit() {
+  if (!currentAuditRef) return;
+  var btn = document.getElementById('auditSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+  var data = collectAuditData();
+  var payload = { quote_ref: currentAuditRef, updated_at: new Date().toISOString(), form_data: data };
+  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
+    .then(function(r) {
+      if (btn) btn.disabled = false;
+      if (r.ok || r.status === 201 || r.status === 204) {
+        if (btn) { btn.textContent = '✓ Saved'; setTimeout(function(){ btn.textContent = 'Save'; }, 2000); }
+      } else {
+        if (btn) { btn.textContent = 'Save failed'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
+      }
+    })
+    .catch(function() {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save failed'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
+    });
+}
+
+function printAudit() {
+  var view = document.getElementById('auditView');
+  view.classList.add('printing-audit');
+  window.print();
+  setTimeout(function() { view.classList.remove('printing-audit'); }, 1000);
 }
 
 if ('serviceWorker' in navigator) {

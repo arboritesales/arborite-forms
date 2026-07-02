@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "static",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\Sales\\AppData\\Local\\Temp\\claude\\C--Users-Sales-OneDrive---Arborite-Tree-Services-Ltd-Desktop-App-details-arborite-app\\2e8ff85d-a2b5-42a7-a863-5c12dd2174e4\\scratchpad\\static-server.ps1"
+      ],
+      "port": 8787
+    }
+  ]
+}
