@@ -611,7 +611,15 @@ function clearAllForms() {
   // rows from the previous job lying around (or an out-of-sync drCount) —
   // ensureDailyRowsFor() rebuilds exactly what the newly loaded job needs.
   var drTbody = document.getElementById('drRows');
-  if (drTbody) drTbody.innerHTML = '';
+  if (drTbody) {
+    // Drop stale pads[] entries for the canvases we're about to destroy —
+    // otherwise initSig() sees pads[id].sized still true (from the old,
+    // now-detached canvas) and skips initializing the freshly built one,
+    // so signatures silently draw onto a canvas no longer in the DOM.
+    var oldSigCanvases = drTbody.querySelectorAll('canvas[id]');
+    for (var _oc = 0; _oc < oldSigCanvases.length; _oc++) delete pads[oldSigCanvases[_oc].id];
+    drTbody.innerHTML = '';
+  }
   drCount = 0;
   buildDailyRows(12);
   // Clear all uploaded documents and pre-fetch cache
