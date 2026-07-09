@@ -408,7 +408,25 @@ function addDrRow() {
     + '<td class="sig-cell"><div class="sig-wrap"><canvas id="' + sid + '" height="90"></canvas>'
     + '<button class="sig-clr" data-sig="' + sid + '" onclick="clrSig(this.dataset.sig)">&#x2715;</button></div></td>';
   tbody.appendChild(tr);
+  // Wire autosave immediately — rows added via "+ Add Row" while the panel
+  // is already open never get listeners otherwise (attachAutoSave only runs
+  // when the panel is opened), so typing in a fresh row silently went unsaved.
+  wireAutoSaveOn(tr, 'daily');
   setTimeout(function(s){ return function(){ initSig(s); }; }(sid), 100);
+}
+
+// Ensure the Daily Task Register has at least as many rows as the saved
+// data references (e.g. dr_date14 exists) — otherwise those fields have
+// nowhere to restore into, and the next autosave (a full overwrite) wipes
+// them from the database for good.
+function ensureDailyRowsFor(data) {
+  if (!data) return;
+  var maxN = 12;
+  for (var k in data) {
+    var m = /^dr_date(\d+)$/.exec(k);
+    if (m) { var n = parseInt(m[1], 10); if (n > maxN) maxN = n; }
+  }
+  while (drCount < maxN) addDrRow();
 }
 
 // ── SIGNATURES ──
@@ -589,6 +607,13 @@ function clearAllForms() {
     if (pd && pd.ctx && pd.sized) pd.ctx.clearRect(0, 0, pd.canvas.width, pd.canvas.height);
   }
   CUSTOM_STAFF = []; CUSTOM_MACHINES = [];
+  // Reset the Daily Task Register so switching jobs doesn't leave stale
+  // rows from the previous job lying around (or an out-of-sync drCount) —
+  // ensureDailyRowsFor() rebuilds exactly what the newly loaded job needs.
+  var drTbody = document.getElementById('drRows');
+  if (drTbody) drTbody.innerHTML = '';
+  drCount = 0;
+  buildDailyRows(12);
   // Clear all uploaded documents and pre-fetch cache
   docStore = {};
   _docBlobCache = {};
@@ -1246,6 +1271,11 @@ function loadJobByRef(ref) {
       // form_data may be a JSONB object OR a JSON string depending on Supabase column type
       var fd_raw = rows[0].form_data;
       var fd_parsed = (typeof fd_raw === 'string') ? JSON.parse(fd_raw) : fd_raw;
+      // Grow the Daily Task Register to fit however many rows this job
+      // actually has saved, BEFORE restoring — otherwise rows beyond the
+      // default 12 have no DOM element to restore into and get wiped by
+      // the next autosave (saves are a full overwrite, not a merge).
+      ensureDailyRowsFor(fd_parsed);
       restoreFormData(fd_parsed);
       // Re-sync shared fields and re-apply supervisor value after select is populated
       setTimeout(function() { /* 50ms: enough for selects to populate */
@@ -1319,6 +1349,7 @@ function loadJobByRef(ref) {
       if (cached) {
         clearAllForms();
         initAllStaffSelects();
+        ensureDailyRowsFor(cached);
         restoreFormData(cached);
         setJobRef(ref);
         syncShared();
@@ -2668,20 +2699,31 @@ function scheduleAutoSave(panelId, immediate) {
 function attachAutoSave(panelId) {
   var panel = document.getElementById(panelId);
   if (!panel) return;
-  var inputs = panel.querySelectorAll('input[type="text"], input[type="date"], textarea, select');
+  wireAutoSaveOn(panel, panelId);
+}
+
+// Wire change/input (and canvas mouseup/touchend) autosave listeners onto
+// every relevant field inside root. Guarded with _autoSaveWired so calling
+// this repeatedly (e.g. attachAutoSave on every panel open, plus addDrRow
+// on every new row) never stacks duplicate listeners on the same element.
+function wireAutoSaveOn(root, panelId) {
+  if (!root) return;
+  var inputs = root.querySelectorAll('input[type="text"], input[type="date"], textarea, select');
   for (var i = 0; i < inputs.length; i++) {
-    (function(el) {
-      el.addEventListener('change', function() { scheduleAutoSave(panelId); });
-      el.addEventListener('input', function() { scheduleAutoSave(panelId); });
-    })(inputs[i]);
+    var el = inputs[i];
+    if (el._autoSaveWired) continue;
+    el._autoSaveWired = true;
+    el.addEventListener('change', function() { scheduleAutoSave(panelId); });
+    el.addEventListener('input', function() { scheduleAutoSave(panelId); });
   }
   // Canvas changes (signatures) — save immediately, no debounce
-  var canvases = panel.querySelectorAll('canvas');
+  var canvases = root.querySelectorAll('canvas');
   for (var ci = 0; ci < canvases.length; ci++) {
-    (function(canvas) {
-      canvas.addEventListener('mouseup', function() { scheduleAutoSave(panelId, true); });
-      canvas.addEventListener('touchend', function() { scheduleAutoSave(panelId, true); });
-    })(canvases[ci]);
+    var canvas = canvases[ci];
+    if (canvas._autoSaveWired) continue;
+    canvas._autoSaveWired = true;
+    canvas.addEventListener('mouseup', function() { scheduleAutoSave(panelId, true); });
+    canvas.addEventListener('touchend', function() { scheduleAutoSave(panelId, true); });
   }
 }
 
