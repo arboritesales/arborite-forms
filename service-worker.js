@@ -1,9 +1,9 @@
-const CACHE_NAME = 'arborite-field-forms-v65';
+const CACHE_NAME = 'arborite-field-forms-v66';
 const APP_SHELL = [
   './',
   './index.html',
-  './css/app.css',
-  './js/app.js',
+  './css/app.css?v=90',
+  './js/app.js?v=90',
   './manifest.json',
   './arborite-logo-192.png',
   './arborite-logo-512.png',
@@ -33,8 +33,8 @@ self.addEventListener('fetch', event => {
 
   // Always network-first for the main HTML and core app files so updates arrive immediately
   const isAppShell = event.request.mode === 'navigate'
-    || url.endsWith('/app.js')
-    || url.endsWith('/app.css')
+    || url.includes('/app.js')
+    || url.includes('/app.css')
     || url.includes('index.html');
 
   if (isAppShell) {
