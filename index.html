@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=96">
+  <link rel="stylesheet" href="css/app.css?v=97">
 </head>
 <body>
 
@@ -27,7 +27,7 @@
     <div style="margin-top:14px;font-size:12px;">
       <a href="#" id="lockModeLink" onclick="toggleManagerLogin();return false;" style="color:rgba(255,255,255,0.45);text-decoration:underline;cursor:pointer;">Manager login</a>
     </div>
-    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v96</div>
+    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v97</div>
   </div>
 </div>
 
@@ -38,7 +38,7 @@
   <div style="position:relative;z-index:1;">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v96</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v97</span></div>
     <div class="dash-header-actions"></div>
   </div>
   <div style="text-align:center;padding:50px 20px 30px;">
@@ -82,7 +82,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v96</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v97</span></div>
     <div class="dash-header-actions"></div>
   </div>
   
@@ -2755,6 +2755,10 @@
         <div class="dash-tile-icon">&#128197;</div>
         <div class="dash-tile-name">Schedule</div>
       </div>
+      <div class="dash-tile" data-checkstab="weeklyreport" id="weeklyReportTabBtn" style="display:none;text-align:center;padding:22px 16px;" onclick="switchChecksTab('weeklyreport')">
+        <div class="dash-tile-icon">&#128202;</div>
+        <div class="dash-tile-name">Weekly Report</div>
+      </div>
       <div class="dash-tile" data-checkstab="vehicle" style="text-align:center;padding:22px 16px;" onclick="switchChecksTab('vehicle')">
         <div class="dash-tile-icon">&#128661;</div>
         <div class="dash-tile-name">Vehicle Checks</div>
@@ -3024,6 +3028,15 @@
     </div>
   </div>
 
+  <div id="checksTab_weeklyreport" class="checks-tab-content" style="display:none;max-width:700px;margin:0 auto;padding:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <button onclick="shiftWeeklyReport(-1)" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:14px;">&#8249;</button>
+      <div id="weeklyReportRange" style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.5px;flex:1;text-align:center;"></div>
+      <button onclick="shiftWeeklyReport(1)" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:14px;">&#8250;</button>
+    </div>
+    <div id="weeklyReportBody"><div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading…</div></div>
+  </div>
+
 </div><!-- /checksView -->
 
 <!-- PASSWORD MODAL for viewing inspection records -->
@@ -3074,7 +3087,7 @@
 </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=96"></script>
+  <script src="js/app.js?v=97"></script>
 </body>
 </html>
 

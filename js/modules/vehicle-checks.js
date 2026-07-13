@@ -23,6 +23,7 @@ function switchChecksTab(tab) {
   if (tab === 'vehicle') { fetchVehList(); }
   else if (tab === 'defects') { fetchDefects(); }
   else if (tab === 'schedule') { openScheduleView(); }
+  else if (tab === 'weeklyreport') { openWeeklyReportView(); }
   else if (typeof CHECK_CATEGORIES !== 'undefined' && CHECK_CATEGORIES[tab]) { fetchCatList(tab); }
 }
 
@@ -43,6 +44,8 @@ function openChecksView() {
   if (defectsBtn) defectsBtn.style.display = managerUnlocked ? '' : 'none';
   var scheduleBtn = document.getElementById('scheduleTabBtn');
   if (scheduleBtn) scheduleBtn.style.display = managerUnlocked ? '' : 'none';
+  var weeklyBtn = document.getElementById('weeklyReportTabBtn');
+  if (weeklyBtn) weeklyBtn.style.display = managerUnlocked ? '' : 'none';
   showChecksHome();
 }
 
