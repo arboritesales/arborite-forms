@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=92">
+  <link rel="stylesheet" href="css/app.css?v=95">
 </head>
 <body>
 
@@ -27,7 +27,7 @@
     <div style="margin-top:14px;font-size:12px;">
       <a href="#" id="lockModeLink" onclick="toggleManagerLogin();return false;" style="color:rgba(255,255,255,0.45);text-decoration:underline;cursor:pointer;">Manager login</a>
     </div>
-    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v92</div>
+    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v95</div>
   </div>
 </div>
 
@@ -38,7 +38,7 @@
   <div style="position:relative;z-index:1;">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v92</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v95</span></div>
     <div class="dash-header-actions"></div>
   </div>
   <div style="text-align:center;padding:50px 20px 30px;">
@@ -82,7 +82,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v92</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v95</span></div>
     <div class="dash-header-actions"></div>
   </div>
   
@@ -2751,6 +2751,10 @@
         <div class="dash-tile-icon">&#9888;&#65039;</div>
         <div class="dash-tile-name">Defects</div>
       </div>
+      <div class="dash-tile" data-checkstab="schedule" id="scheduleTabBtn" style="display:none;text-align:center;padding:22px 16px;" onclick="switchChecksTab('schedule')">
+        <div class="dash-tile-icon">&#128197;</div>
+        <div class="dash-tile-name">Schedule</div>
+      </div>
       <div class="dash-tile" data-checkstab="vehicle" style="text-align:center;padding:22px 16px;" onclick="switchChecksTab('vehicle')">
         <div class="dash-tile-icon">&#128661;</div>
         <div class="dash-tile-name">Vehicle Checks</div>
@@ -2914,6 +2918,22 @@
         </div>
       </div>
 
+      <!-- Defects -->
+      <div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">
+        <div style="background:#2d5218;padding:10px 16px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9888;&#65039; Defects</div>
+        <div class="field-row lw"><div class="fc lbl">Are there any defects?</div><div class="fc veh-opts" id="veh_defect">
+          <button class="veh-btn" onclick="defectSel('veh',this,'Yes')">Yes</button>
+          <button class="veh-btn" onclick="defectSel('veh',this,'No')">No</button>
+        </div></div>
+        <div id="veh_defectPanel" style="display:none;padding:0 14px 14px;">
+          <div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:6px;">Photos of the defect (up to 3)</div>
+          <div id="veh_defectPhotos" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+          <input type="file" id="veh_defectPhotoInput" accept="image/*" style="display:none;" onchange="defectPhotoUpload('veh',this)">
+          <div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:6px;">Comment</div>
+          <textarea id="veh_defectComment" rows="2" placeholder="Describe the defect..." style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-size:13px;font-family:'Barlow',sans-serif;outline:none;resize:vertical;" oninput="defectCommentInput('veh')"></textarea>
+        </div>
+      </div>
+
       <!-- Save status + buttons -->
       <div id="vehSaveStatus" style="text-align:center;font-size:12px;color:rgba(255,255,255,.4);padding:6px 0;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;min-height:22px;"></div>
       <div style="display:flex;gap:12px;justify-content:flex-end;padding-bottom:20px;">
@@ -2970,10 +2990,38 @@
   </div>
   <div id="checksTab_defects" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;">Flagged Across All Checks</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;">Logged Defects</div>
     </div>
-    <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:14px;">Recent vehicle and equipment checks with any item not marked top score.</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:14px;">Only checks where "Are there any defects?" was answered Yes.</div>
     <div id="defectsList"><div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading...</div></div>
+  </div>
+  <div id="checksTab_schedule" class="checks-tab-content" style="display:none;max-width:700px;margin:0 auto;padding:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div id="scheduleRange" style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:.5px;"></div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);">4 weeks from today</div>
+    </div>
+    <div style="background:white;border-radius:8px;padding:14px;">
+      <div id="scheduleGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;"></div>
+    </div>
+    <div style="font-size:12px;color:rgba(255,255,255,.45);margin-top:10px;">Tap a day to see everything scheduled on it and add or remove checks. Anything scheduled for today also shows crew-side under Today's Checks.</div>
+  </div>
+
+  <!-- Schedule day-detail modal -->
+  <div id="scheduleModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:1200;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:10px;max-width:420px;width:100%;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+      <div style="background:#1a3210;color:var(--lime);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;text-transform:uppercase;letter-spacing:.5px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <span id="scheduleModalTitle">Day</span>
+        <button onclick="closeScheduleModal()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:22px;cursor:pointer;line-height:1;">&times;</button>
+      </div>
+      <div id="scheduleModalList" style="overflow-y:auto;padding:6px 18px;flex:1;"></div>
+      <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;background:#fafaf7;">
+        <div style="display:flex;gap:8px;">
+          <select id="scheduleTypeSel" onchange="scheduleTypeChange()" style="flex:1;font-size:13px;padding:8px;border-radius:4px;border:1px solid var(--border);"></select>
+          <select id="scheduleAssetSel" style="flex:1;font-size:13px;padding:8px;border-radius:4px;border:1px solid var(--border);"></select>
+        </div>
+        <button onclick="addScheduledCheck()" style="background:var(--lime);border:none;color:#1a3210;padding:10px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">+ Add to this day</button>
+      </div>
+    </div>
   </div>
 
 </div><!-- /checksView -->
@@ -3026,7 +3074,7 @@
 </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=92"></script>
+  <script src="js/app.js?v=95"></script>
 </body>
 </html>
 

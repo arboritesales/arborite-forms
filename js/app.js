@@ -2784,6 +2784,7 @@ function switchChecksTab(tab) {
   });
   if (tab === 'vehicle') { fetchVehList(); }
   else if (tab === 'defects') { fetchDefects(); }
+  else if (tab === 'schedule') { openScheduleView(); }
   else if (typeof CHECK_CATEGORIES !== 'undefined' && CHECK_CATEGORIES[tab]) { fetchCatList(tab); }
 }
 
@@ -2802,6 +2803,8 @@ function openChecksView() {
   document.getElementById('checksView').style.display = 'block';
   var defectsBtn = document.getElementById('defectsTabBtn');
   if (defectsBtn) defectsBtn.style.display = managerUnlocked ? '' : 'none';
+  var scheduleBtn = document.getElementById('scheduleTabBtn');
+  if (scheduleBtn) scheduleBtn.style.display = managerUnlocked ? '' : 'none';
   showChecksHome();
 }
 
@@ -2867,6 +2870,7 @@ function vehClearForm() {
   document.querySelectorAll('.veh-opts .veh-btn').forEach(function(b){ b.className = b.classList.contains('veh-multi') ? 'veh-btn veh-multi' : 'veh-btn'; });
   document.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
   document.getElementById('vehSaveStatus').textContent = '';
+  resetDefectState('veh');
 }
 
 function vehSel(groupId, btn, val) {
@@ -2951,6 +2955,10 @@ function saveVehCheck(isAuto) {
     overall_rating: rating,
     remedial_notes: document.getElementById('veh_notes').value
   };
+  var _defPayload = getDefectPayload('veh');
+  payload.has_defect = _defPayload.has_defect;
+  payload.defect_comment = _defPayload.defect_comment;
+  payload.defect_images = _defPayload.defect_images;
 
   var method = 'POST';
   var url = SUPA_URL + '/rest/v1/vehicle_checks';
@@ -3217,6 +3225,162 @@ function deleteVehRecord() {
   .catch(function(err) {
     alert('Could not delete record — ' + (err && err.message ? err.message : 'check connection and try again.'));
   });
+}
+
+// ── DEFECTS (shared "Are there any defects?" block used by the vehicle form
+// and every equipment category form — one prefix per form instance, e.g.
+// 'veh' or 'cat_stump') ──
+var DEFECT_BUCKET = 'defect-photos';
+var DEFECT_STATE = {};
+function defectState(prefix) {
+  if (!DEFECT_STATE[prefix]) DEFECT_STATE[prefix] = { flag: '', comment: '', photos: [] };
+  return DEFECT_STATE[prefix];
+}
+function resetDefectState(prefix) {
+  DEFECT_STATE[prefix] = { flag: '', comment: '', photos: [] };
+  var panel = document.getElementById(prefix + '_defectPanel');
+  if (panel) panel.style.display = 'none';
+  var photoInput = document.getElementById(prefix + '_defectPhotoInput');
+  if (photoInput) photoInput.value = '';
+  renderDefectPhotos(prefix);
+}
+function defectAutoSaveHook(prefix) {
+  if (prefix === 'veh') vehAutoSave();
+  else if (prefix.indexOf('cat_') === 0) catAutoSave(prefix.substring(4));
+}
+function defectBlockHtml(prefix) {
+  return '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
+    + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9888;&#65039; Defects</div>'
+    + '<div class="field-row lw"><div class="fc lbl">Are there any defects?</div><div class="fc veh-opts" id="' + prefix + '_defect">'
+    + '<button class="veh-btn" onclick="defectSel(\'' + prefix + '\',this,\'Yes\')">Yes</button>'
+    + '<button class="veh-btn" onclick="defectSel(\'' + prefix + '\',this,\'No\')">No</button>'
+    + '</div></div>'
+    + '<div id="' + prefix + '_defectPanel" style="display:none;padding:0 14px 14px;">'
+    + '<div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:6px;">Photos of the defect (up to 3)</div>'
+    + '<div id="' + prefix + '_defectPhotos" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>'
+    + '<input type="file" id="' + prefix + '_defectPhotoInput" accept="image/*" style="display:none;" onchange="defectPhotoUpload(\'' + prefix + '\',this)">'
+    + '<div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:6px;">Comment</div>'
+    + '<textarea id="' + prefix + '_defectComment" rows="2" placeholder="Describe the defect..." style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-size:13px;font-family:\'Barlow\',sans-serif;outline:none;resize:vertical;" oninput="defectCommentInput(\'' + prefix + '\')"></textarea>'
+    + '</div></div>';
+}
+function defectSel(prefix, btn, val) {
+  var group = document.getElementById(prefix + '_defect');
+  group.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
+  btn.classList.add(val === 'Yes' ? 'active-poor' : 'active-good');
+  defectState(prefix).flag = val;
+  var panel = document.getElementById(prefix + '_defectPanel');
+  if (panel) panel.style.display = (val === 'Yes') ? 'block' : 'none';
+  renderDefectPhotos(prefix);
+  defectAutoSaveHook(prefix);
+}
+function defectCommentInput(prefix) {
+  var el = document.getElementById(prefix + '_defectComment');
+  defectState(prefix).comment = el ? el.value : '';
+  defectAutoSaveHook(prefix);
+}
+function renderDefectPhotos(prefix) {
+  var wrap = document.getElementById(prefix + '_defectPhotos');
+  if (!wrap) return;
+  var photos = defectState(prefix).photos;
+  wrap.innerHTML = '';
+  for (var i = 0; i < 3; i++) {
+    var tile = document.createElement('div');
+    if (photos[i]) {
+      var p = photos[i];
+      tile.style.cssText = 'width:64px;height:64px;border-radius:6px;border:2px solid var(--green);cursor:pointer;overflow:hidden;background:#fafafa;position:relative;';
+      if (p.previewUrl) {
+        var img = document.createElement('img');
+        img.src = p.previewUrl;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        tile.appendChild(img);
+      } else {
+        tile.textContent = '…';
+        tile.style.display = 'flex'; tile.style.alignItems = 'center'; tile.style.justifyContent = 'center'; tile.style.color = '#999';
+      }
+      if (p.status === 'error') tile.style.borderColor = '#c62828';
+      (function(idx){
+        tile.onclick = function(){
+          if (!confirm('Remove this photo?')) return;
+          photos.splice(idx, 1);
+          renderDefectPhotos(prefix);
+          defectAutoSaveHook(prefix);
+        };
+      })(i);
+    } else if (i === photos.length) {
+      tile.style.cssText = 'width:64px;height:64px;border-radius:6px;border:2px dashed var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#999;background:#fafafa;';
+      tile.textContent = '+';
+      tile.onclick = function(){
+        var inp = document.getElementById(prefix + '_defectPhotoInput');
+        if (inp) inp.click();
+      };
+    } else {
+      continue; // no placeholder beyond the very next open slot
+    }
+    wrap.appendChild(tile);
+  }
+}
+// Downscale to a max dimension + JPEG compress before upload — phone camera
+// photos are several MB each and up to 3 per defect would otherwise be a
+// heavy, slow upload on a site with poor signal.
+function _resizeImageToJpeg(file, maxDim, quality, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      var scale = Math.min(1, maxDim / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+      cb(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function(){ cb(e.target.result); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function(){ cb(null); };
+  reader.readAsDataURL(file);
+}
+function _uploadDefectPhoto(path, dataUrl, mimeType) {
+  var base64 = dataUrl.split(',')[1];
+  var chars = atob(base64), bytes = new Uint8Array(chars.length);
+  for (var i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
+  return fetch(SUPA_URL + '/storage/v1/object/' + DEFECT_BUCKET + '/' + path, {
+    method: 'POST',
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':mimeType||'image/jpeg','x-upsert':'true'},
+    body: bytes, credentials: 'omit', mode: 'cors'
+  });
+}
+function defectPhotoUpload(prefix, input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  var photos = defectState(prefix).photos;
+  if (photos.length >= 3) return;
+  var slot = {previewUrl: '', storagePath: '', status: 'processing'};
+  photos.push(slot);
+  renderDefectPhotos(prefix);
+  _resizeImageToJpeg(file, 1600, 0.8, function(dataUrl) {
+    if (!dataUrl) { slot.status = 'error'; renderDefectPhotos(prefix); return; }
+    slot.previewUrl = dataUrl;
+    renderDefectPhotos(prefix);
+    var path = prefix + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.jpg';
+    _uploadDefectPhoto(path, dataUrl, 'image/jpeg').then(function(r) {
+      if (r.ok) { slot.storagePath = path; slot.status = 'saved'; }
+      else { slot.status = 'error'; }
+      renderDefectPhotos(prefix);
+      defectAutoSaveHook(prefix);
+    }).catch(function(){ slot.status = 'error'; renderDefectPhotos(prefix); });
+  });
+}
+// What actually gets merged into the check's save payload
+function getDefectPayload(prefix) {
+  var st = defectState(prefix);
+  return {
+    has_defect: st.flag === 'Yes',
+    defect_comment: st.flag === 'Yes' ? (st.comment || null) : null,
+    defect_images: st.flag === 'Yes' ? st.photos.map(function(p){ return p.storagePath; }).filter(Boolean) : []
+  };
 }
 
 // ── EQUIPMENT CHECKS (generic engine for stump grinder, woodchippers, diggers, green climber, hand held tools, etc.) ──
@@ -3522,6 +3686,7 @@ function renderCategoryPanel(cat) {
     + '<div style="padding:0 14px 14px;"><div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:6px;">Remedial maintenance / actions taken:</div>'
     + '<textarea id="catNotes_' + cat + '" rows="3" placeholder="Describe any remedial work or actions needed..." style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-size:13px;font-family:\'Barlow\',sans-serif;outline:none;resize:vertical;" oninput="catAutoSave(\'' + cat + '\')"></textarea></div>'
     + '</div>'
+    + defectBlockHtml('cat_' + cat)
     + '<div id="catSaveStatus_' + cat + '" style="text-align:center;font-size:12px;color:rgba(255,255,255,.4);padding:6px 0;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;min-height:22px;"></div>'
     + '<div style="display:flex;gap:12px;justify-content:flex-end;padding-bottom:20px;">'
     + '<button onclick="showCatList(\'' + cat + '\')" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:10px 20px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#8592; Back</button>'
@@ -3608,6 +3773,7 @@ function catClearForm(cat) {
   root.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
   root.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
   document.getElementById('catSaveStatus_' + cat).textContent = '';
+  resetDefectState('cat_' + cat);
 }
 
 function catAutoSave(cat) {
@@ -3634,6 +3800,10 @@ function saveCatCheck(cat, isAuto) {
     payload.mileage = (mEl && mEl.value) ? parseFloat(mEl.value) : null;
   }
   cfg.fields.forEach(function(f) { payload[f.key] = catGetFieldVal(cat, f.key); });
+  var _defPayload = getDefectPayload('cat_' + cat);
+  payload.has_defect = _defPayload.has_defect;
+  payload.defect_comment = _defPayload.defect_comment;
+  payload.defect_images = _defPayload.defect_images;
 
   var method = 'POST';
   var url = SUPA_URL + '/rest/v1/' + cfg.table;
@@ -4001,7 +4171,7 @@ function fetchDefects() {
 
   Promise.all(jobs).then(function(results) {
     var all = [].concat.apply([], results);
-    var defects = all.filter(function(e){ return e.flaggedCount > 0; });
+    var defects = all.filter(function(e){ return e.hasDefect; });
     defects.sort(function(a,b){ return (b.createdAt || '').localeCompare(a.createdAt || ''); });
     renderDefectsList(defects);
   });
@@ -4023,26 +4193,73 @@ function _defectEntry(kind, cat, d) {
     kind: kind, cat: cat, id: d.id, name: name, categoryLabel: categoryLabel,
     inspector: d.inspector_name || '', createdAt: d.created_at || '',
     dateStr: d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '',
-    flaggedCount: scored.flagged.length
+    flaggedCount: scored.flagged.length,
+    hasDefect: !!d.has_defect,
+    defectComment: d.defect_comment || '',
+    defectImages: Array.isArray(d.defect_images) ? d.defect_images : [],
+    defectStatus: d.defect_status || '',
+    officeNote: d.office_note || ''
   };
+}
+function _defectPhotoPublicUrl(path) {
+  return SUPA_URL + '/storage/v1/object/public/' + DEFECT_BUCKET + '/' + path;
+}
+function _defectTableFor(kind, cat) {
+  return kind === 'vehicle' ? 'vehicle_checks' : CHECK_CATEGORIES[cat].table;
+}
+function setDefectStatus(kind, cat, id, status, btn) {
+  var wrap = btn.parentElement;
+  wrap.querySelectorAll('button').forEach(function(b){ b.style.background = 'rgba(255,255,255,.08)'; b.style.color = 'rgba(255,255,255,.6)'; });
+  if (status === 'fixed') { btn.style.background = '#7ec820'; btn.style.color = '#1a3210'; }
+  else { btn.style.background = '#c62828'; btn.style.color = 'white'; }
+  fetch(SUPA_URL + '/rest/v1/' + _defectTableFor(kind, cat) + '?id=eq.' + id, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Prefer':'return=minimal'},
+    body: JSON.stringify({defect_status: status})
+  }).catch(function(){});
+}
+var _defectNoteTimers = {};
+function scheduleDefectNoteSave(kind, cat, id, textarea) {
+  var key = kind + '_' + cat + '_' + id;
+  clearTimeout(_defectNoteTimers[key]);
+  var val = textarea.value;
+  _defectNoteTimers[key] = setTimeout(function() {
+    fetch(SUPA_URL + '/rest/v1/' + _defectTableFor(kind, cat) + '?id=eq.' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Prefer':'return=minimal'},
+      body: JSON.stringify({office_note: val})
+    }).catch(function(){});
+  }, 800);
 }
 
 function renderDefectsList(defects) {
   var listEl = document.getElementById('defectsList');
   if (!listEl) return;
   if (!defects.length) {
-    listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">&#10003; No defects found in recent checks.</div>';
+    listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">&#10003; No defects logged.</div>';
     return;
   }
   listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px;">' + defects.map(function(e) {
-    return '<div style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')">'
+    var isFixed = e.defectStatus === 'fixed';
+    var thumbs = (e.defectImages || []).map(function(p) {
+      return '<img src="' + _defectPhotoPublicUrl(p) + '" style="width:42px;height:42px;border-radius:5px;object-fit:cover;">';
+    }).join('');
+    return '<div style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;-webkit-tap-highlight-color:transparent;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')">'
       + '<div style="flex:1;min-width:0;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:white;letter-spacing:.5px;">' + e.name + '</div>'
       + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + e.categoryLabel + (e.inspector ? ' &middot; ' + e.inspector : '') + ' &middot; ' + e.dateStr + '</div>'
+      + (e.defectComment ? '<div style="font-size:12.5px;color:rgba(255,255,255,.85);margin-top:8px;line-height:1.5;">' + e.defectComment + '</div>' : '')
+      + (thumbs ? '<div style="display:flex;gap:6px;margin-top:8px;">' + thumbs + '</div>' : '')
       + '</div>'
-      + '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">'
-      + '<span style="background:rgba(198,40,40,.25);border:1px solid rgba(198,40,40,.6);color:#ff8888;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;padding:4px 10px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px;">' + e.flaggedCount + ' flagged</span>'
-      + '<div style="font-size:22px;color:rgba(255,255,255,.4);">&#8250;</div>'
+      + '<div style="font-size:22px;color:rgba(255,255,255,.4);flex-shrink:0;">&#8250;</div>'
+      + '</div>'
+      + '<div style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.15);" onclick="event.stopPropagation()">'
+      + '<div style="display:flex;border-radius:4px;overflow:hidden;border:1px solid rgba(255,255,255,.2);width:fit-content;margin-bottom:8px;">'
+      + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (isFixed ? 'background:#7ec820;color:#1a3210;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Fixed</button>'
+      + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'not_fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (!isFixed ? 'background:#c62828;color:white;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Not Fixed</button>'
+      + '</div>'
+      + '<textarea placeholder="Office note — e.g. what was done to fix it" oninput="scheduleDefectNoteSave(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',this)" style="width:100%;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:7px 9px;font-size:12.5px;font-family:\'Barlow\',sans-serif;background:rgba(255,255,255,.05);color:white;resize:vertical;min-height:36px;">' + e.officeNote + '</textarea>'
       + '</div>'
       + '</div>';
   }).join('') + '</div>';
@@ -4075,6 +4292,13 @@ Object.keys(CHECK_CATEGORIES).forEach(renderCategoryPanel);
 
 // ── TODAY'S CHECKS (manager-curated list of what needs checking) ──
 var _todayManageUnlocked = false;
+
+// 'YYYY-MM-DD' in local time (not UTC — toISOString() would shift the date
+// near midnight for any timezone ahead of UTC, e.g. British Summer Time)
+function _isoDate(d) {
+  var m = d.getMonth() + 1, day = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+}
 
 function checksCategoryMeta(key) {
   if (key === 'vehicle') return { label: 'Vehicle Checks', icon: '🚗' };
@@ -4126,7 +4350,7 @@ function renderTodayChecks() {
   var listEl = document.getElementById('todayChecksList');
   if (!listEl) return;
   listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading…</div>';
-  fetch(SUPA_URL + '/rest/v1/todays_checks?order=created_at.asc', {
+  fetch(SUPA_URL + '/rest/v1/todays_checks?scheduled_date=eq.' + _isoDate(new Date()) + '&order=created_at.asc', {
     headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + _authToken() }
   })
   .then(function(r){ return r.json(); })
@@ -4195,7 +4419,7 @@ function addTodayCheck() {
       'Authorization': 'Bearer ' + _authToken(),
       'Prefer': 'return=minimal'
     },
-    body: JSON.stringify({ category: catSel.value, machine: machSel.value })
+    body: JSON.stringify({ category: catSel.value, machine: machSel.value, scheduled_date: _isoDate(new Date()) })
   })
   .then(function(r) { if (!r.ok) throw new Error('add failed'); renderTodayChecks(); })
   .catch(function() { alert('Could not add item — check connection and try again.'); });
@@ -4208,6 +4432,157 @@ function removeTodayCheck(id) {
     headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + _authToken() }
   })
   .then(function(r) { if (!r.ok) throw new Error('delete failed'); renderTodayChecks(); })
+  .catch(function() { alert('Could not remove item — check connection and try again.'); });
+}
+
+// ── SCHEDULING CALENDAR (Manager Access) — assign checks to specific days up
+// to 4 weeks ahead. Built on the same todays_checks table/list as above: this
+// is just the view that lets a manager populate it for days beyond today. ──
+var _scheduleWeekStart = null; // Date — Monday of the first visible week
+var _scheduleData = {};        // 'YYYY-MM-DD' -> array of todays_checks rows
+var _scheduleModalDate = null;
+
+function _mondayOf(d) {
+  var day = d.getDay(); // 0=Sun..6=Sat
+  var diff = (day === 0 ? -6 : 1 - day);
+  var m = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+  return m;
+}
+
+function openScheduleView() {
+  _scheduleWeekStart = _mondayOf(new Date());
+  fetchScheduleData();
+}
+
+function fetchScheduleData() {
+  var start = _isoDate(_scheduleWeekStart);
+  var endDate = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + 27);
+  var end = _isoDate(endDate);
+  fetch(SUPA_URL + '/rest/v1/todays_checks?scheduled_date=gte.' + start + '&scheduled_date=lte.' + end + '&order=scheduled_date.asc', {
+    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) {
+    _scheduleData = {};
+    (Array.isArray(rows) ? rows : []).forEach(function(r) {
+      if (!_scheduleData[r.scheduled_date]) _scheduleData[r.scheduled_date] = [];
+      _scheduleData[r.scheduled_date].push(r);
+    });
+    renderScheduleGrid();
+  })
+  .catch(function() {
+    var grid = document.getElementById('scheduleGrid');
+    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;color:#c62828;padding:20px;text-align:center;font-size:13px;">Could not load schedule — check connection and try again.</div>';
+  });
+}
+
+function renderScheduleGrid() {
+  var grid = document.getElementById('scheduleGrid');
+  if (!grid) return;
+  var endDate = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + 27);
+  var rangeEl = document.getElementById('scheduleRange');
+  if (rangeEl) {
+    rangeEl.textContent = _scheduleWeekStart.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' – ' + endDate.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  }
+  var today = _isoDate(new Date());
+  var html = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d) {
+    return '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(0,0,0,.4);text-align:center;padding-bottom:4px;">' + d + '</div>';
+  }).join('');
+  for (var i = 0; i < 28; i++) {
+    var d = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + i);
+    var iso = _isoDate(d);
+    var items = _scheduleData[iso] || [];
+    var isToday = iso === today;
+    html += '<div style="background:' + (isToday ? '#eef7e2' : '#fafaf8') + ';border-radius:6px;min-height:90px;padding:6px;display:flex;flex-direction:column;gap:4px;' + (isToday ? 'box-shadow:0 0 0 2px var(--green) inset;' : '') + '">'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:13px;color:var(--mid);">' + d.getDate() + '</div>'
+      + items.slice(0, 3).map(function(it) {
+          var meta = checksCategoryMeta(it.category);
+          return '<div style="font-size:10px;font-weight:700;padding:3px 5px;border-radius:3px;background:#e8f2e3;color:#2d5a1b;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + meta.icon + ' ' + (it.machine || '') + '</div>';
+        }).join('')
+      + '<button onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10px;font-weight:700;border-radius:4px;padding:4px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (items.length === 0 ? '+ Add' : 'View (' + items.length + ') ›') + '</button>'
+      + '</div>';
+  }
+  grid.innerHTML = html;
+}
+
+function openScheduleDayModal(iso) {
+  _scheduleModalDate = iso;
+  var d = new Date(iso + 'T00:00:00');
+  document.getElementById('scheduleModalTitle').textContent = d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  var typeSel = document.getElementById('scheduleTypeSel');
+  typeSel.innerHTML = ['vehicle'].concat(Object.keys(CHECK_CATEGORIES)).map(function(k) {
+    var meta = checksCategoryMeta(k);
+    return '<option value="' + k + '">' + meta.icon + ' ' + meta.label + '</option>';
+  }).join('');
+  scheduleTypeChange();
+  renderScheduleModalList();
+  document.getElementById('scheduleModal').style.display = 'flex';
+}
+
+function closeScheduleModal() {
+  document.getElementById('scheduleModal').style.display = 'none';
+  renderScheduleGrid();
+}
+
+function scheduleTypeChange() {
+  var typeSel = document.getElementById('scheduleTypeSel');
+  var assetSel = document.getElementById('scheduleAssetSel');
+  var opts = todayMachineOptions(typeSel.value);
+  assetSel.innerHTML = opts.map(function(m){ return '<option>' + m + '</option>'; }).join('');
+}
+
+function renderScheduleModalList() {
+  var wrap = document.getElementById('scheduleModalList');
+  var items = _scheduleData[_scheduleModalDate] || [];
+  if (!items.length) {
+    wrap.innerHTML = '<div style="color:#9a9a90;font-size:12.5px;padding:14px 0;text-align:center;">Nothing scheduled yet for this day.</div>';
+    return;
+  }
+  wrap.innerHTML = items.map(function(it) {
+    var meta = checksCategoryMeta(it.category);
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e0e0d8;font-size:12.5px;">'
+      + '<span style="font-size:16px;">' + meta.icon + '</span>'
+      + '<span style="flex:1;">' + meta.label + ' — ' + (it.machine || '') + '</span>'
+      + '<button onclick="removeScheduledCheck(\'' + it.id + '\')" style="background:none;border:none;color:#a02020;font-size:16px;cursor:pointer;padding:2px 8px;" aria-label="Remove">&#10005;</button>'
+      + '</div>';
+  }).join('');
+}
+
+function addScheduledCheck() {
+  var typeSel = document.getElementById('scheduleTypeSel');
+  var assetSel = document.getElementById('scheduleAssetSel');
+  if (!typeSel.value || !assetSel.value) return;
+  fetch(SUPA_URL + '/rest/v1/todays_checks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPA_KEY,
+      'Authorization': 'Bearer ' + _authToken(),
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify({ category: typeSel.value, machine: assetSel.value, scheduled_date: _scheduleModalDate })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) {
+    var row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('add failed');
+    if (!_scheduleData[_scheduleModalDate]) _scheduleData[_scheduleModalDate] = [];
+    _scheduleData[_scheduleModalDate].push(row);
+    renderScheduleModalList();
+  })
+  .catch(function() { alert('Could not add item — check connection and try again.'); });
+}
+
+function removeScheduledCheck(id) {
+  fetch(SUPA_URL + '/rest/v1/todays_checks?id=eq.' + id, {
+    method: 'DELETE',
+    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('delete failed');
+    _scheduleData[_scheduleModalDate] = (_scheduleData[_scheduleModalDate] || []).filter(function(it){ return String(it.id) !== String(id); });
+    renderScheduleModalList();
+  })
   .catch(function() { alert('Could not remove item — check connection and try again.'); });
 }
 
