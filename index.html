@@ -3074,7 +3074,24 @@
 </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=95"></script>
+  <!-- app.js split into feature modules for easier maintenance — order matters, must match original file's top-to-bottom sequence -->
+  <script src="js/modules/core-shared.js?v=95"></script>
+  <script src="js/modules/signatures.js?v=95"></script>
+  <script src="js/modules/jobs-storage.js?v=95"></script>
+  <script src="js/modules/jobs-save-load.js?v=95"></script>
+  <script src="js/modules/forms-collect-restore.js?v=95"></script>
+  <script src="js/modules/navigation.js?v=95"></script>
+  <script src="js/modules/documents.js?v=95"></script>
+  <script src="js/modules/office-permdocs.js?v=95"></script>
+  <script src="js/modules/autosave.js?v=95"></script>
+  <script src="js/modules/vehicle-checks.js?v=95"></script>
+  <script src="js/modules/defects-shared.js?v=95"></script>
+  <script src="js/modules/equipment-checks.js?v=95"></script>
+  <script src="js/modules/survey-reports.js?v=95"></script>
+  <script src="js/modules/defects-dashboard.js?v=95"></script>
+  <script src="js/modules/todays-checks-schedule.js?v=95"></script>
+  <script src="js/modules/toolbox-talks.js?v=95"></script>
+  <script src="js/modules/audits.js?v=95"></script>
 </body>
 </html>
 
