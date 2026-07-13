@@ -1,4 +1,10 @@
-﻿
+// ============================================================================
+// GENERATED FILE — this is js/app.js, built from js/modules/*.js
+// Do NOT edit js/app.js directly — your changes will be overwritten next
+// build. Edit the relevant file in js/modules/ instead, then run
+// ./build-app-js.sh from the project root to regenerate this file.
+// ============================================================================
+
 // ── AUTO-UPDATE: when a new service worker takes over, reload to get latest files ──
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.ready.then(function(reg) {
