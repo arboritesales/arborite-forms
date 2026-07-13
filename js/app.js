@@ -186,19 +186,37 @@ function makeMachineOpts() {
   o += '<option value="__new__">+ Add new...</option>';
   return o;
 }
+// Rebuild every name/machine dropdown's <option> list from the current
+// STAFF/MACHINES + CUSTOM_STAFF/CUSTOM_MACHINES, preserving each select's
+// current value. Must run after CUSTOM_STAFF/CUSTOM_MACHINES changes (a new
+// name is added, a job is loaded, or forms are cleared for a new job) —
+// otherwise a select's option list still reflects whatever was current when
+// the page first loaded, and setting .value to a name not in that list
+// silently fails (the field just appears blank).
+function refreshStaffSelects() {
+  var all = document.querySelectorAll('.staff-sel');
+  for (var i = 0; i < all.length; i++) {
+    var cur = all[i].value;
+    var ph = (all[i].options[0] ? all[i].options[0].text.replace('-- ','').replace(' --','') : 'Select name');
+    all[i].innerHTML = makeStaffOpts(ph);
+    all[i].value = cur;
+  }
+}
+function refreshMachineSelects() {
+  var all = document.querySelectorAll('.machine-sel');
+  for (var i = 0; i < all.length; i++) {
+    var cur = all[i].value;
+    all[i].innerHTML = makeMachineOpts();
+    all[i].value = cur;
+  }
+}
 function handleStaffSel(sel) {
   if (sel.value !== '__new__') return;
   var name = prompt('Enter new name:');
   if (!name || !name.trim()) { sel.value = ''; return; }
   name = name.trim();
   CUSTOM_STAFF.push(name);
-  var all = document.querySelectorAll('.staff-sel');
-  for (var i = 0; i < all.length; i++) {
-    var cur = all[i].value;
-    var ph = (all[i].options[0] ? all[i].options[0].text.replace('-- ','').replace(' --','') : 'Select');
-    all[i].innerHTML = makeStaffOpts(ph);
-    all[i].value = (cur === '__new__') ? name : cur;
-  }
+  refreshStaffSelects();
   sel.value = name;
   buildAiderChecks();
 }
@@ -208,12 +226,7 @@ function handleMachineSel(sel) {
   if (!name || !name.trim()) { sel.value = ''; return; }
   name = name.trim();
   CUSTOM_MACHINES.push(name);
-  var all = document.querySelectorAll('.machine-sel');
-  for (var i = 0; i < all.length; i++) {
-    var cur = all[i].value;
-    all[i].innerHTML = makeMachineOpts();
-    all[i].value = (cur === '__new__') ? name : cur;
-  }
+  refreshMachineSelects();
   sel.value = name;
 }
 function toggleAllComms(cb) {
@@ -607,6 +620,11 @@ function clearAllForms() {
     if (pd && pd.ctx && pd.sized) pd.ctx.clearRect(0, 0, pd.canvas.width, pd.canvas.height);
   }
   CUSTOM_STAFF = []; CUSTOM_MACHINES = [];
+  // Wipe any custom names added during the previous job's session — without
+  // this, a name typed into "+ Add new name..." for one job stays selectable
+  // in every name dropdown for whichever job is opened next.
+  refreshStaffSelects();
+  refreshMachineSelects();
   // Reset the Daily Task Register so switching jobs doesn't leave stale
   // rows from the previous job lying around (or an out-of-sync drCount) —
   // ensureDailyRowsFor() rebuilds exactly what the newly loaded job needs.
@@ -804,7 +822,7 @@ function _uploadDocFile(path, dataUrl, mimeType) {
     body: bytes, credentials: 'omit', mode: 'cors'
   });
 }
-var DOC_CATEGORIES = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
+var DOC_CATEGORIES = ['method_statement','plans','reports','tree_survey','tpo_approval','additional'];
 
 function uploadDocsToStorage(formData, done) {
   var docs = formData._documents || {};
@@ -1614,7 +1632,7 @@ function _finishSaveAndClose(formData, savedRef) {
   // Strip only large base64 docs (>500KB) to keep payload manageable.
   // Small ones are kept as fallback if Storage upload failed.
   if (formData._documents) {
-    var DC2 = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
+    var DC2 = ['method_statement','plans','reports','tree_survey','tpo_approval','additional'];
     DC2.forEach(function(cat) {
       if (!formData._documents[cat]) return;
       formData._documents[cat] = formData._documents[cat].filter(function(doc) {
@@ -1724,7 +1742,7 @@ function collectFormData() {
   // Save documents — only keep storage refs, strip base64 to keep payload small
   data._documents = {};
   if (typeof docStore !== 'undefined') {
-    var DOC_CATS_SAVE = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
+    var DOC_CATS_SAVE = ['method_statement','plans','reports','tree_survey','tpo_approval','additional'];
     for (var dc = 0; dc < DOC_CATS_SAVE.length; dc++) {
       var cat = DOC_CATS_SAVE[dc];
       if (docStore[cat] && docStore[cat].length) {
@@ -1743,6 +1761,12 @@ function restoreFormData(data) {
   if (!data) return;
   if (data._custom_staff)    CUSTOM_STAFF    = data._custom_staff;
   if (data._custom_machines) CUSTOM_MACHINES = data._custom_machines;
+  // Rebuild every name/machine dropdown's options to include this job's own
+  // custom names BEFORE the restore loop below sets .value — otherwise a
+  // saved custom name has no matching <option> yet and the assignment is
+  // silently dropped, so the field reads as blank even though it saved fine.
+  refreshStaffSelects();
+  refreshMachineSelects();
   var SKIP = {signatures:1,id:1,created_at:1,updated_at:1,_custom_staff:1,_custom_machines:1,p_w3w:1};
   for (var key in data) {
     if (SKIP[key]) continue;
@@ -2111,8 +2135,8 @@ function printCurrentForm() {
 
 // ── DOCUMENT STORE ──
 var docStore = {};
-var DOC_CATS = ['method_statement','risk_assessment','plans','reports','tree_survey','tpo_approval','additional'];
-var MAX_DOCS_PER_CAT = 2;
+var DOC_CATS = ['method_statement','plans','reports','tree_survey','tpo_approval','additional'];
+var MAX_DOCS_PER_CAT = 10;
 var _docBlobCache = {}; // key: storage path → blob URL (pre-fetched)
 
 function _prefetchStorageDocs() {
