@@ -350,9 +350,16 @@ function viewDoc(categoryId, idx) {
     var isBlobUrl = url && url.indexOf('blob:') === 0;
 
     if (isImg) {
+      // Multi-page PDFs get compressed into one tall composited image (see
+      // _compressPdfToImage) — constraining that to the modal's height like a
+      // normal photo would squeeze it down to an unreadably thin strip. Fill
+      // the width instead and let the container scroll vertically, same as
+      // scrolling down a long document.
+      content.style.display = 'block';
+      content.style.textAlign = 'center';
       var img = document.createElement('img');
       img.src = url;
-      img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
+      img.style.cssText = 'width:100%;height:auto;display:block;margin:0 auto;';
       content.innerHTML = '';
       content.appendChild(img);
 
