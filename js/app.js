@@ -1818,9 +1818,19 @@ function restoreFormData(data) {
       }
     }, 300);
   }
-  // Restore w3w link buttons
-  if (data.so_w3w) updateW3WLink('so_w3w_link', data.so_w3w);
-  if (data.ms_w3w) updateW3WLink('ms_w3w_link', data.ms_w3w);
+  // Cross-fill so_w3w/ms_w3w if only one was saved (e.g. a job saved before
+  // the What3Words field existed on both tabs, or before either tab had been
+  // opened to trigger the live oninput sync) — otherwise the missing side
+  // stays blank on restore even though the other tab has the location.
+  var w3wVal = data.so_w3w || data.ms_w3w;
+  if (w3wVal) {
+    var soW3wEl = document.getElementById('so_w3w');
+    var msW3wEl = document.getElementById('ms_w3w');
+    if (soW3wEl && !soW3wEl.value) soW3wEl.value = w3wVal;
+    if (msW3wEl && !msW3wEl.value) msW3wEl.value = w3wVal;
+    updateW3WLink('so_w3w_link', w3wVal);
+    updateW3WLink('ms_w3w_link', w3wVal);
+  }
   // Restore documents
   if (data._documents && typeof docStore !== 'undefined') {
     docStore = {};
