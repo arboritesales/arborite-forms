@@ -57,8 +57,17 @@ function _defectEntry(kind, cat, d) {
     officeNote: d.office_note || ''
   };
 }
-function _defectPhotoPublicUrl(path) {
-  return SUPA_URL + '/storage/v1/object/public/' + DEFECT_BUCKET + '/' + path;
+function _defectPhotoAuthUrl(path) {
+  return SUPA_URL + '/storage/v1/object/authenticated/' + DEFECT_BUCKET + '/' + path;
+}
+function _loadDefectThumbs(container) {
+  container.querySelectorAll('img[data-defect-path]').forEach(function(img) {
+    var path = img.getAttribute('data-defect-path');
+    fetch(_defectPhotoAuthUrl(path), {headers: {apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken()}})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
+      .then(function(blob) { img.src = URL.createObjectURL(blob); })
+      .catch(function() {});
+  });
 }
 function _defectTableFor(kind, cat) {
   return kind === 'vehicle' ? 'vehicle_checks' : CHECK_CATEGORIES[cat].table;
@@ -98,7 +107,7 @@ function renderDefectsList(defects) {
   listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px;">' + defects.map(function(e) {
     var isFixed = e.defectStatus === 'fixed';
     var thumbs = (e.defectImages || []).map(function(p) {
-      return '<img src="' + _defectPhotoPublicUrl(p) + '" style="width:42px;height:42px;border-radius:5px;object-fit:cover;">';
+      return '<img data-defect-path="' + p.replace(/"/g,'&quot;') + '" style="width:42px;height:42px;border-radius:5px;object-fit:cover;background:rgba(255,255,255,.08);">';
     }).join('');
     return '<div style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;-webkit-tap-highlight-color:transparent;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')">'
@@ -119,6 +128,7 @@ function renderDefectsList(defects) {
       + '</div>'
       + '</div>';
   }).join('') + '</div>';
+  _loadDefectThumbs(listEl);
 }
 
 function openDefectRecord(kind, cat, id) {

@@ -172,13 +172,13 @@ function restoreSig(id, dataUrl) {
   // Storage reference — fetch the image then treat like a normal base64 sig
   if (dataUrl.indexOf('storage:') === 0) {
     var path = dataUrl.substring(8);
-    var url = _storagePublicUrl(path);
+    var url = _storageAuthUrl(path);
     // Keep the storage ref in pads so collectFormData can preserve it
     // if the user saves without redrawing
     if (!pads[id]) pads[id] = {canvas:null, ctx:null, sized:false, dataUrl:dataUrl};
     else pads[id].dataUrl = dataUrl;
-    fetch(url, {credentials:'omit', mode:'cors'})
-      .then(function(r) { return r.blob(); })
+    fetch(url, {credentials:'omit', mode:'cors', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()}})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
       .then(function(blob) {
         var reader = new FileReader();
         reader.onload = function(e) {

@@ -11,8 +11,8 @@ function _prefetchStorageDocs() {
       if (!doc.data || doc.data.indexOf('storage:') !== 0) return;
       var path = doc.data.substring(8);
       if (_docBlobCache[path]) return; // already cached
-      var url = _docPublicUrl(path);
-      fetch(url, {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}})
+      var url = _docAuthUrl(path);
+      fetch(url, {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()}})
         .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
         .then(function(blob) { _docBlobCache[path] = URL.createObjectURL(blob); })
         .catch(function() {}); // silently fail — will fall back to direct URL on tap
@@ -320,11 +320,13 @@ function viewDoc(categoryId, idx) {
   var btns = document.createElement('div');
   btns.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
 
-  // Fallback direct URL for the Open button (always works, even before blob cache ready)
-  var directUrl = storagePath ? _docPublicUrl(storagePath) : displayUrl;
+  // Storage reads need an auth header, which a plain link can't send — so the
+  // Open button has nothing to point at until the authenticated blob fetch resolves
+  var directUrl = storagePath ? null : displayUrl;
 
   var openBtn = document.createElement('a');
   openBtn.href = directUrl || '#'; openBtn.target = '_blank'; openBtn.rel = 'noopener';
+  if (!directUrl) openBtn.style.opacity = '0.5';
   if (!isImg && !isPdf) openBtn.setAttribute('download', doc.name);
   openBtn.style.cssText = 'background:#4a7a2a;color:white;padding:7px 14px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;text-decoration:none;text-transform:uppercase;white-space:nowrap;display:inline-flex;align-items:center;';
   openBtn.textContent = '↗ Open';
@@ -347,6 +349,7 @@ function viewDoc(categoryId, idx) {
   function _renderContent(url) {
     // Update Open button href now that we have the final URL
     openBtn.href = url;
+    openBtn.style.opacity = '';
     var isBlobUrl = url && url.indexOf('blob:') === 0;
 
     if (isImg) {
@@ -402,7 +405,7 @@ function viewDoc(categoryId, idx) {
       + '<div style="font-size:36px;margin-bottom:16px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>'
       + '<div style="font-size:15px;opacity:.8;margin-top:8px;">Loading document…</div>'
       + '</div>';
-    fetch(_docPublicUrl(storagePath), {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}})
+    fetch(_docAuthUrl(storagePath), {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()}})
       .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
       .then(function(blob) {
         var blobUrl = URL.createObjectURL(blob);
@@ -410,8 +413,11 @@ function viewDoc(categoryId, idx) {
         if (document.getElementById('docViewerModal')) _renderContent(blobUrl);
       })
       .catch(function() {
-        // Fallback to direct URL if fetch fails
-        if (document.getElementById('docViewerModal')) _renderContent(_docPublicUrl(storagePath));
+        if (!document.getElementById('docViewerModal')) return;
+        content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
+          + '<div style="font-size:52px;margin-bottom:18px;">&#9888;</div>'
+          + '<div style="font-size:16px;opacity:.85;">Could not load document — check connection and try again.</div>'
+          + '</div>';
       });
   }
 

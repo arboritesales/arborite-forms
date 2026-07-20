@@ -814,8 +814,8 @@ var DOC_BUCKET = 'documents';
 function _docPath(quoteRef, categoryId, filename) {
   return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + categoryId + '/' + filename.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
-function _docPublicUrl(path) {
-  return SUPA_URL + '/storage/v1/object/public/' + DOC_BUCKET + '/' + path;
+function _docAuthUrl(path) {
+  return SUPA_URL + '/storage/v1/object/authenticated/' + DOC_BUCKET + '/' + path;
 }
 function _uploadDocFile(path, dataUrl, mimeType) {
   var base64 = dataUrl.split(',')[1];
@@ -866,8 +866,8 @@ function uploadDocsToStorage(formData, done) {
 function _storagePath(quoteRef, sigId) {
   return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + sigId + '.jpg';
 }
-function _storagePublicUrl(path) {
-  return SUPA_URL + '/storage/v1/object/public/' + SIG_BUCKET + '/' + path;
+function _storageAuthUrl(path) {
+  return SUPA_URL + '/storage/v1/object/authenticated/' + SIG_BUCKET + '/' + path;
 }
 function _uploadSig(path, jpegDataUrl) {
   var base64 = jpegDataUrl.split(',')[1];
@@ -1847,13 +1847,13 @@ function restoreSig(id, dataUrl) {
   // Storage reference — fetch the image then treat like a normal base64 sig
   if (dataUrl.indexOf('storage:') === 0) {
     var path = dataUrl.substring(8);
-    var url = _storagePublicUrl(path);
+    var url = _storageAuthUrl(path);
     // Keep the storage ref in pads so collectFormData can preserve it
     // if the user saves without redrawing
     if (!pads[id]) pads[id] = {canvas:null, ctx:null, sized:false, dataUrl:dataUrl};
     else pads[id].dataUrl = dataUrl;
-    fetch(url, {credentials:'omit', mode:'cors'})
-      .then(function(r) { return r.blob(); })
+    fetch(url, {credentials:'omit', mode:'cors', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()}})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
       .then(function(blob) {
         var reader = new FileReader();
         reader.onload = function(e) {
@@ -2162,8 +2162,8 @@ function _prefetchStorageDocs() {
       if (!doc.data || doc.data.indexOf('storage:') !== 0) return;
       var path = doc.data.substring(8);
       if (_docBlobCache[path]) return; // already cached
-      var url = _docPublicUrl(path);
-      fetch(url, {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}})
+      var url = _docAuthUrl(path);
+      fetch(url, {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()}})
         .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
         .then(function(blob) { _docBlobCache[path] = URL.createObjectURL(blob); })
         .catch(function() {}); // silently fail — will fall back to direct URL on tap
@@ -2471,11 +2471,13 @@ function viewDoc(categoryId, idx) {
   var btns = document.createElement('div');
   btns.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
 
-  // Fallback direct URL for the Open button (always works, even before blob cache ready)
-  var directUrl = storagePath ? _docPublicUrl(storagePath) : displayUrl;
+  // Storage reads need an auth header, which a plain link can't send — so the
+  // Open button has nothing to point at until the authenticated blob fetch resolves
+  var directUrl = storagePath ? null : displayUrl;
 
   var openBtn = document.createElement('a');
   openBtn.href = directUrl || '#'; openBtn.target = '_blank'; openBtn.rel = 'noopener';
+  if (!directUrl) openBtn.style.opacity = '0.5';
   if (!isImg && !isPdf) openBtn.setAttribute('download', doc.name);
   openBtn.style.cssText = 'background:#4a7a2a;color:white;padding:7px 14px;border-radius:3px;font-family:Barlow Condensed,sans-serif;font-size:12px;font-weight:700;text-decoration:none;text-transform:uppercase;white-space:nowrap;display:inline-flex;align-items:center;';
   openBtn.textContent = '↗ Open';
@@ -2498,6 +2500,7 @@ function viewDoc(categoryId, idx) {
   function _renderContent(url) {
     // Update Open button href now that we have the final URL
     openBtn.href = url;
+    openBtn.style.opacity = '';
     var isBlobUrl = url && url.indexOf('blob:') === 0;
 
     if (isImg) {
@@ -2553,7 +2556,7 @@ function viewDoc(categoryId, idx) {
       + '<div style="font-size:36px;margin-bottom:16px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>'
       + '<div style="font-size:15px;opacity:.8;margin-top:8px;">Loading document…</div>'
       + '</div>';
-    fetch(_docPublicUrl(storagePath), {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}})
+    fetch(_docAuthUrl(storagePath), {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()}})
       .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
       .then(function(blob) {
         var blobUrl = URL.createObjectURL(blob);
@@ -2561,8 +2564,11 @@ function viewDoc(categoryId, idx) {
         if (document.getElementById('docViewerModal')) _renderContent(blobUrl);
       })
       .catch(function() {
-        // Fallback to direct URL if fetch fails
-        if (document.getElementById('docViewerModal')) _renderContent(_docPublicUrl(storagePath));
+        if (!document.getElementById('docViewerModal')) return;
+        content.innerHTML = '<div style="color:white;text-align:center;padding:40px 20px;font-family:Barlow Condensed,sans-serif;">'
+          + '<div style="font-size:52px;margin-bottom:18px;">&#9888;</div>'
+          + '<div style="font-size:16px;opacity:.85;">Could not load document — check connection and try again.</div>'
+          + '</div>';
       });
   }
 
@@ -4227,8 +4233,17 @@ function _defectEntry(kind, cat, d) {
     officeNote: d.office_note || ''
   };
 }
-function _defectPhotoPublicUrl(path) {
-  return SUPA_URL + '/storage/v1/object/public/' + DEFECT_BUCKET + '/' + path;
+function _defectPhotoAuthUrl(path) {
+  return SUPA_URL + '/storage/v1/object/authenticated/' + DEFECT_BUCKET + '/' + path;
+}
+function _loadDefectThumbs(container) {
+  container.querySelectorAll('img[data-defect-path]').forEach(function(img) {
+    var path = img.getAttribute('data-defect-path');
+    fetch(_defectPhotoAuthUrl(path), {headers: {apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken()}})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
+      .then(function(blob) { img.src = URL.createObjectURL(blob); })
+      .catch(function() {});
+  });
 }
 function _defectTableFor(kind, cat) {
   return kind === 'vehicle' ? 'vehicle_checks' : CHECK_CATEGORIES[cat].table;
@@ -4268,7 +4283,7 @@ function renderDefectsList(defects) {
   listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px;">' + defects.map(function(e) {
     var isFixed = e.defectStatus === 'fixed';
     var thumbs = (e.defectImages || []).map(function(p) {
-      return '<img src="' + _defectPhotoPublicUrl(p) + '" style="width:42px;height:42px;border-radius:5px;object-fit:cover;">';
+      return '<img data-defect-path="' + p.replace(/"/g,'&quot;') + '" style="width:42px;height:42px;border-radius:5px;object-fit:cover;background:rgba(255,255,255,.08);">';
     }).join('');
     return '<div style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;-webkit-tap-highlight-color:transparent;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')">'
@@ -4289,6 +4304,7 @@ function renderDefectsList(defects) {
       + '</div>'
       + '</div>';
   }).join('') + '</div>';
+  _loadDefectThumbs(listEl);
 }
 
 function openDefectRecord(kind, cat, id) {

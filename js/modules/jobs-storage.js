@@ -283,8 +283,8 @@ var DOC_BUCKET = 'documents';
 function _docPath(quoteRef, categoryId, filename) {
   return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + categoryId + '/' + filename.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
-function _docPublicUrl(path) {
-  return SUPA_URL + '/storage/v1/object/public/' + DOC_BUCKET + '/' + path;
+function _docAuthUrl(path) {
+  return SUPA_URL + '/storage/v1/object/authenticated/' + DOC_BUCKET + '/' + path;
 }
 function _uploadDocFile(path, dataUrl, mimeType) {
   var base64 = dataUrl.split(',')[1];
@@ -335,8 +335,8 @@ function uploadDocsToStorage(formData, done) {
 function _storagePath(quoteRef, sigId) {
   return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + sigId + '.jpg';
 }
-function _storagePublicUrl(path) {
-  return SUPA_URL + '/storage/v1/object/public/' + SIG_BUCKET + '/' + path;
+function _storageAuthUrl(path) {
+  return SUPA_URL + '/storage/v1/object/authenticated/' + SIG_BUCKET + '/' + path;
 }
 function _uploadSig(path, jpegDataUrl) {
   var base64 = jpegDataUrl.split(',')[1];
