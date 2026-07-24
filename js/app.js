@@ -676,7 +676,7 @@ function showLoadModal() {
         list.innerHTML = '<div class="job-empty" style="color:#e67e22;">Server is waking up, please wait… <span style="text-decoration:underline;cursor:pointer;" onclick="fetchJobList()">Retry</span></div>';
       }
     }, 15000);
-    supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=not.like.TBT-*&order=updated_at.desc&limit=200')
+    supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=not.like.TBT-*&quote_ref=not.like.AUD-*&order=updated_at.desc&limit=200')
       .then(function(r) {
         clearTimeout(refreshTimeout);
         if (!r.ok) return r.text().then(function(t){ throw new Error('HTTP ' + r.status + ': ' + t); });
@@ -1165,7 +1165,7 @@ function fetchJobList() {
     allJobs = cached;
     renderJobList(allJobs);
   }
-  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=not.like.TBT-*&order=updated_at.desc&limit=200')
+  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at&quote_ref=not.like.TBT-*&quote_ref=not.like.AUD-*&order=updated_at.desc&limit=200')
     .then(function(r) {
       if (!r.ok) return r.text().then(function(t){ throw new Error('HTTP ' + r.status + ' ' + t.substring(0,80)); });
       return r.json();
