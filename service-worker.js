@@ -26,6 +26,32 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+const APP_SHELL_TIMEOUT_MS = 3000;
+
+// Network-first, but don't let a slow/flaky connection (common out on site)
+// block the app from opening — race the network against a short timeout and
+// fall back to the cached copy if it hasn't answered yet. The network fetch
+// keeps running in the background and still refreshes the cache when it lands.
+function networkFirstWithTimeout(request) {
+  return caches.open(CACHE_NAME).then(cache => {
+    const networkFetch = fetch(request)
+      .then(response => {
+        cache.put(request, response.clone());
+        return response;
+      })
+      .catch(() => null);
+
+    const timeout = new Promise(resolve => setTimeout(() => resolve(null), APP_SHELL_TIMEOUT_MS));
+
+    return Promise.race([networkFetch, timeout]).then(winner => {
+      if (winner) return winner;
+      return cache.match(request)
+        .then(cached => cached || networkFetch)
+        .then(result => result || Response.error());
+    });
+  });
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
@@ -38,15 +64,7 @@ self.addEventListener('fetch', event => {
     || url.includes('index.html');
 
   if (isAppShell) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
+    event.respondWith(networkFirstWithTimeout(event.request));
     return;
   }
 
