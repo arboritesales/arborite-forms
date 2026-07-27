@@ -87,6 +87,13 @@ function openScheduleView() {
   fetchScheduleData();
 }
 
+// Managers only — pages the 4-week window forward/back a month at a time so
+// checks can be booked in further ahead than the current window.
+function shiftSchedule(deltaWeeks) {
+  _scheduleWeekStart = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + deltaWeeks * 7);
+  fetchScheduleData();
+}
+
 function fetchScheduleData() {
   var start = _isoDate(_scheduleWeekStart);
   var endDate = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + 27);
@@ -112,6 +119,14 @@ function fetchScheduleData() {
 function renderScheduleGrid() {
   var grid = document.getElementById('scheduleGrid');
   if (!grid) return;
+  var prevBtn = document.getElementById('schedulePrevBtn');
+  var nextBtn = document.getElementById('scheduleNextBtn');
+  var hint = document.getElementById('scheduleHint');
+  var allCatBtn = document.getElementById('checksAllCategoriesBtn');
+  if (prevBtn) prevBtn.style.display = managerUnlocked ? '' : 'none';
+  if (nextBtn) nextBtn.style.display = managerUnlocked ? '' : 'none';
+  if (hint) hint.style.display = managerUnlocked ? 'none' : '';
+  if (allCatBtn) allCatBtn.style.display = managerUnlocked ? '' : 'none';
   var endDate = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + 27);
   var rangeEl = document.getElementById('scheduleRange');
   if (rangeEl) {
