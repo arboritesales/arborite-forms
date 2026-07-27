@@ -142,16 +142,16 @@ function renderScheduleGrid() {
     var items = _scheduleData[iso] || [];
     var isToday = iso === today;
     var weekdayShort = d.toLocaleDateString('en-GB',{weekday:'short'});
-    html += '<div class="sched-day-cell" style="background:' + (isToday ? '#eef7e2' : '#fafaf8') + ';border-radius:6px;min-height:90px;padding:6px;display:flex;flex-direction:column;gap:4px;' + (isToday ? 'box-shadow:0 0 0 2px var(--green) inset;' : '') + '">'
-      + '<div class="sched-day-date" style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:13px;color:var(--mid);"><span class="sched-day-weekday" style="display:none;">' + weekdayShort + ' </span>' + d.getDate() + '</div>'
+    html += '<div class="sched-day-cell" style="background:' + (isToday ? '#eef7e2' : '#fafaf8') + ';border-radius:6px;min-height:120px;padding:8px;display:flex;flex-direction:column;gap:6px;' + (isToday ? 'box-shadow:0 0 0 2px var(--green) inset;' : '') + '">'
+      + '<div class="sched-day-date" style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:14px;color:var(--mid);"><span class="sched-day-weekday" style="display:none;">' + weekdayShort + ' </span>' + d.getDate() + '</div>'
       + '<div class="sched-day-pills" style="display:flex;flex-direction:column;gap:4px;flex:1;">'
-      + items.slice(0, 3).map(function(it) {
+      + items.slice(0, 5).map(function(it) {
           var meta = checksCategoryMeta(it.category);
           var doneMark = it.completed ? '&#10003; ' : '';
-          return '<div style="font-size:10px;font-weight:700;padding:3px 5px;border-radius:3px;background:' + (it.completed ? '#d7ecc9' : '#e8f2e3') + ';color:#2d5a1b;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + doneMark + meta.icon + ' ' + (it.machine || '') + '</div>';
+          return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + (it.completed ? '#d7ecc9' : '#e8f2e3') + ';color:#2d5a1b;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + doneMark + meta.icon + ' ' + (it.machine || '') + '</div>';
         }).join('')
       + '</div>'
-      + '<button class="sched-day-action" onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10px;font-weight:700;border-radius:4px;padding:4px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (items.length === 0 ? (managerUnlocked ? '+ Add' : 'Nothing') : 'View (' + items.length + ') ›') + '</button>'
+      + '<button class="sched-day-action" onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10.5px;font-weight:700;border-radius:4px;padding:5px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (items.length === 0 ? (managerUnlocked ? '+ Add' : 'Nothing') : 'View (' + items.length + ') ›') + '</button>'
       + '</div>';
   }
   grid.innerHTML = html;
