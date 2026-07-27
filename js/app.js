@@ -2078,6 +2078,7 @@ function showJobSelectScreen() {
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.style.display = '';
   refreshChecksBadge();
+  refreshDefectsBadge();
 }
 
 function showNewJobFromSelect() {
@@ -2866,11 +2867,13 @@ function openChecksView() {
   var weeklyBtn = document.getElementById('weeklyReportTabBtn');
   if (weeklyBtn) weeklyBtn.style.display = managerUnlocked ? '' : 'none';
   switchChecksTab('schedule');
+  refreshDefectsBadge();
 }
 
 function closeChecksView() {
   document.getElementById('checksView').style.display = 'none';
   refreshChecksBadge();
+  refreshDefectsBadge();
 }
 
 function showVehList() {
@@ -4226,6 +4229,55 @@ function exportSurveyExcel() {
   exportFieldsToExcel(filename, 'Survey Report — ' + data.title, meta, rows);
 }
 
+// ── DEFECTS BADGE — surfaces unresolved defects to a manager without having
+// to open Checks → All Check Categories → Defects. Manager-only: skipped
+// entirely (no network calls, badges hidden) when managerUnlocked is false,
+// per the requirement that this stays out of the employee view. "Unresolved"
+// mirrors renderDefectsList's own isFixed check — anything whose
+// defect_status isn't exactly 'fixed' (including unset/null) counts. ──
+function refreshDefectsBadge() {
+  var welcomeBadge = document.getElementById('checksDefectTileBadge');
+  var tileBadge = document.getElementById('defectsTileBadge');
+  var banner = document.getElementById('checksDefectBanner');
+  if (!managerUnlocked) {
+    if (welcomeBadge) welcomeBadge.style.display = 'none';
+    if (tileBadge) tileBadge.style.display = 'none';
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+  var jobs = [
+    fetch(SUPA_URL + '/rest/v1/vehicle_checks?select=id,defect_status&has_defect=eq.true', {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+    }).then(function(r){ return r.json(); }).catch(function(){ return []; })
+  ];
+  Object.keys(CHECK_CATEGORIES).forEach(function(cat) {
+    var cfg = CHECK_CATEGORIES[cat];
+    jobs.push(
+      fetch(SUPA_URL + '/rest/v1/' + cfg.table + '?select=id,defect_status&has_defect=eq.true', {
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+      }).then(function(r){ return r.json(); }).catch(function(){ return []; })
+    );
+  });
+  Promise.all(jobs).then(function(results) {
+    var all = [].concat.apply([], results.map(function(r){ return Array.isArray(r) ? r : []; }));
+    var count = all.filter(function(d){ return d.defect_status !== 'fixed'; }).length;
+    [welcomeBadge, tileBadge].forEach(function(b) {
+      if (!b) return;
+      if (count > 0) { b.textContent = '⚠ ' + count; b.style.display = ''; }
+      else b.style.display = 'none';
+    });
+    if (banner) {
+      var countEl = document.getElementById('checksDefectBannerCount');
+      if (count > 0) {
+        if (countEl) countEl.textContent = count;
+        banner.style.display = '';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+  });
+}
+
 // ── DEFECTS DASHBOARD (Manager Access) ──
 // Scans recent completed checks across every category and surfaces any with
 // flagged (non-top-score) items, so a manager can triage without opening each
@@ -4323,7 +4375,7 @@ function setDefectStatus(kind, cat, id, status, btn) {
     method: 'PATCH',
     headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Prefer':'return=minimal'},
     body: JSON.stringify({defect_status: status})
-  }).catch(function(){});
+  }).then(function(){ refreshDefectsBadge(); }).catch(function(){});
 }
 var _defectNoteTimers = {};
 function scheduleDefectNoteSave(kind, cat, id, textarea) {

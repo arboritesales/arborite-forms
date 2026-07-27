@@ -47,11 +47,13 @@ function openChecksView() {
   var weeklyBtn = document.getElementById('weeklyReportTabBtn');
   if (weeklyBtn) weeklyBtn.style.display = managerUnlocked ? '' : 'none';
   switchChecksTab('schedule');
+  refreshDefectsBadge();
 }
 
 function closeChecksView() {
   document.getElementById('checksView').style.display = 'none';
   refreshChecksBadge();
+  refreshDefectsBadge();
 }
 
 function showVehList() {

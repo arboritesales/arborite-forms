@@ -15,6 +15,7 @@ function showJobSelectScreen() {
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.style.display = '';
   refreshChecksBadge();
+  refreshDefectsBadge();
 }
 
 function showNewJobFromSelect() {

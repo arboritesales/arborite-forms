@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=108">
+  <link rel="stylesheet" href="css/app.css?v=1.1">
 </head>
 <body>
 
@@ -27,7 +27,7 @@
     <div style="margin-top:14px;font-size:12px;">
       <a href="#" id="lockModeLink" onclick="toggleManagerLogin();return false;" style="color:rgba(255,255,255,0.45);text-decoration:underline;cursor:pointer;">Manager login</a>
     </div>
-    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v108</div>
+    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.1</div>
   </div>
 </div>
 
@@ -38,7 +38,7 @@
   <div style="position:relative;z-index:1;">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v108</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.1</span></div>
     <div class="dash-header-actions">
       <button id="logoutBtn" onclick="logoutToTeamLogin()" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">&#128274; Log Out</button>
     </div>
@@ -67,6 +67,7 @@
     </div>
     <div class="dash-tile" onclick="openChecksView()" style="text-align:center;padding:20px 16px;">
       <span id="checksTileBadge" style="display:none;position:absolute;top:10px;right:10px;background:#c62828;color:white;font-size:11px;font-weight:800;padding:2px 7px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.3px;">0</span>
+      <span id="checksDefectTileBadge" style="display:none;position:absolute;top:10px;left:10px;background:#c62828;color:white;font-size:11px;font-weight:800;padding:2px 7px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.3px;" title="Unresolved defects">&#9888; 0</span>
       <div class="dash-tile-icon">&#9989;</div>
       <div class="dash-tile-name">Checks</div>
       <div class="dash-tile-sub">Equipment and machinery inspections</div>
@@ -85,7 +86,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v108</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.1</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -2772,12 +2773,14 @@
   <div class="veh-no-print" style="background:#1a3210;padding:14px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,.4);">
     <button onclick="checksBack()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8592; Back</button>
     <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;flex:1;">&#9989; Checks</div>
+    <div id="checksDefectBanner" onclick="switchChecksTab('defects')" style="display:none;background:#c62828;color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#9888;&#65039; <span id="checksDefectBannerCount">0</span> Unresolved Defect(s)</div>
   </div>
 
   <!-- Checks home — category tiles, same layout as the welcome screen / Office -->
   <div class="veh-no-print" id="checksHome" style="padding:20px;">
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;max-width:700px;margin:0 auto;">
       <div class="dash-tile emergency-tile" data-checkstab="defects" id="defectsTabBtn" style="display:none;text-align:center;padding:22px 16px;" onclick="switchChecksTab('defects')">
+        <span id="defectsTileBadge" style="display:none;position:absolute;top:10px;right:10px;background:white;color:#c62828;font-size:11px;font-weight:800;padding:2px 7px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.3px;">0</span>
         <div class="dash-tile-icon">&#9888;&#65039;</div>
         <div class="dash-tile-name">Defects</div>
       </div>
@@ -3130,7 +3133,7 @@
 </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=108"></script>
+  <script src="js/app.js?v=1.1"></script>
 </body>
 </html>
 
