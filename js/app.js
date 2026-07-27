@@ -63,9 +63,10 @@ function toggleManagerLogin() {
   if (err) err.textContent = '';
 }
 
-// Manager logging out back to the team login — the session var is never
-// persisted (no localStorage), so this just resets in-memory state and
-// re-shows the lock screen in team mode; a page reload would do the same.
+// Log Out button on the Welcome screen — used by both team and manager
+// sessions. The session var is never persisted (no localStorage), so this
+// just resets in-memory state and re-shows the lock screen in team mode;
+// a page reload would do the same.
 function logoutToTeamLogin() {
   if (!confirm('Log out and return to the employee login screen?')) return;
   managerUnlocked = false;
@@ -2074,8 +2075,8 @@ function showJobSelectScreen() {
   if (off)  off.style.display  = 'none';
   var officeTile = document.getElementById('officeTile');
   if (officeTile) officeTile.style.display = managerUnlocked ? '' : 'none';
-  var logoutBtn = document.getElementById('managerLogoutBtn');
-  if (logoutBtn) logoutBtn.style.display = managerUnlocked ? '' : 'none';
+  var logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) logoutBtn.style.display = '';
   refreshChecksBadge();
 }
 

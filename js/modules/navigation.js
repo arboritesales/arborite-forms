@@ -12,8 +12,8 @@ function showJobSelectScreen() {
   if (off)  off.style.display  = 'none';
   var officeTile = document.getElementById('officeTile');
   if (officeTile) officeTile.style.display = managerUnlocked ? '' : 'none';
-  var logoutBtn = document.getElementById('managerLogoutBtn');
-  if (logoutBtn) logoutBtn.style.display = managerUnlocked ? '' : 'none';
+  var logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) logoutBtn.style.display = '';
   refreshChecksBadge();
 }
 
