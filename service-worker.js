@@ -1,15 +1,17 @@
-const CACHE_NAME = 'arborite-field-forms-v75';
+const CACHE_NAME = 'arborite-field-forms-v76';
 const APP_SHELL = [
   './',
   './index.html',
-  './css/app.css?v=106',
-  './js/app.js?v=106',
+  './css/app.css?v=107',
+  './js/app.js?v=107',
   './manifest.json',
   './arborite-logo-192.png',
   './arborite-logo-512.png',
   './arborite-leaf.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js'
 ];
 
 self.addEventListener('install', event => {
