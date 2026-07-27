@@ -214,3 +214,16 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
 .fc-with-note{display:flex;align-items:flex-start;gap:8px;width:100%;justify-content:center;}
 .fc-contacts{display:grid;grid-template-columns:1fr 1fr;gap:0;}
 @media(max-width:600px){.fc-contacts{grid-template-columns:1fr;}.fc-branch{flex-direction:column;align-items:center;}.fc-with-note{flex-direction:column;}.fc-side-note{margin-left:0;margin-top:4px;}}
+
+/* Checks schedule calendar — a 7-column grid works down to tablet width, but
+   on a phone (iPhone included) the columns get too narrow to read, so switch
+   to a single vertical list of days instead. */
+@media(max-width:600px){
+  #scheduleGrid{grid-template-columns:1fr!important;gap:8px!important;}
+  #scheduleGrid .sched-weekday-hdr{display:none!important;}
+  #scheduleGrid .sched-day-cell{min-height:0!important;flex-direction:row!important;align-items:center!important;gap:10px!important;padding:10px 12px!important;}
+  #scheduleGrid .sched-day-cell .sched-day-date{flex-shrink:0;width:60px;font-size:14px!important;}
+  #scheduleGrid .sched-day-cell .sched-day-weekday{display:inline!important;font-size:10.5px;color:rgba(0,0,0,.4);}
+  #scheduleGrid .sched-day-cell .sched-day-pills{flex-direction:row!important;flex-wrap:wrap;flex:1;}
+  #scheduleGrid .sched-day-cell .sched-day-action{margin-top:0!important;flex-shrink:0;white-space:nowrap;}
+}

@@ -51,6 +51,7 @@ function openChecksView() {
 
 function closeChecksView() {
   document.getElementById('checksView').style.display = 'none';
+  refreshChecksBadge();
 }
 
 function showVehList() {
@@ -61,6 +62,8 @@ function showVehList() {
 }
 
 function showVehPinPanel() {
+  _activeScheduledCheckId = null;
+  _activeScheduledMachine = null;
   document.getElementById('vehListPanel').style.display = 'none';
   document.getElementById('vehPinPanel').style.display = 'block';
   document.getElementById('vehFormPanel').style.display = 'none';
@@ -102,6 +105,7 @@ function confirmVehPin() {
   document.getElementById('vehFormPanel').style.display = 'block';
   document.getElementById('checksView').scrollTop = 0;
   vehClearForm();
+  if (_activeScheduledMachine) { document.getElementById('veh_reg').value = _activeScheduledMachine; }
 }
 
 function vehClearForm() {
@@ -235,7 +239,10 @@ function saveVehCheck(isAuto) {
     if (s) {
       s.style.color = 'var(--lime)';
       s.textContent = '✓ ' + (isAuto ? 'Auto-saved' : 'Saved successfully!');
-      if (!isAuto) { setTimeout(function(){ showVehList(); fetchVehList(); }, 1000); }
+      if (!isAuto) {
+        if (_activeScheduledCheckId) { _markScheduledComplete(_activeScheduledCheckId); _activeScheduledCheckId = null; }
+        setTimeout(function(){ showVehList(); fetchVehList(); }, 1000);
+      }
       else { setTimeout(function(){ if(s) s.textContent = ''; }, 2000); }
     }
   })

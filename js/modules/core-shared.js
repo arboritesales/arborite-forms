@@ -63,6 +63,30 @@ function toggleManagerLogin() {
   if (err) err.textContent = '';
 }
 
+// Manager logging out back to the team login — the session var is never
+// persisted (no localStorage), so this just resets in-memory state and
+// re-shows the lock screen in team mode; a page reload would do the same.
+function logoutToTeamLogin() {
+  if (!confirm('Log out and return to the employee login screen?')) return;
+  managerUnlocked = false;
+  _clearSession();
+  lockScreenMode = 'team';
+  var sub = document.getElementById('lockSubtitle');
+  var link = document.getElementById('lockModeLink');
+  var pass = document.getElementById('lockPass');
+  var err = document.getElementById('lockErr');
+  if (sub) sub.textContent = 'Enter the team password to continue';
+  if (link) link.textContent = 'Manager login';
+  if (pass) pass.value = '';
+  if (err) err.textContent = '';
+  var jss = document.getElementById('jobSelectScreen');
+  var dash = document.getElementById('dashboard');
+  if (jss) jss.style.display = 'none';
+  if (dash) dash.style.display = 'none';
+  var ls = document.getElementById('lockScreen');
+  if (ls) ls.style.display = '';
+}
+
 function checkPass() {
   var inp = document.getElementById('lockPass');
   var err = document.getElementById('lockErr');

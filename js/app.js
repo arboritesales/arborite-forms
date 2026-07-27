@@ -63,6 +63,30 @@ function toggleManagerLogin() {
   if (err) err.textContent = '';
 }
 
+// Manager logging out back to the team login — the session var is never
+// persisted (no localStorage), so this just resets in-memory state and
+// re-shows the lock screen in team mode; a page reload would do the same.
+function logoutToTeamLogin() {
+  if (!confirm('Log out and return to the employee login screen?')) return;
+  managerUnlocked = false;
+  _clearSession();
+  lockScreenMode = 'team';
+  var sub = document.getElementById('lockSubtitle');
+  var link = document.getElementById('lockModeLink');
+  var pass = document.getElementById('lockPass');
+  var err = document.getElementById('lockErr');
+  if (sub) sub.textContent = 'Enter the team password to continue';
+  if (link) link.textContent = 'Manager login';
+  if (pass) pass.value = '';
+  if (err) err.textContent = '';
+  var jss = document.getElementById('jobSelectScreen');
+  var dash = document.getElementById('dashboard');
+  if (jss) jss.style.display = 'none';
+  if (dash) dash.style.display = 'none';
+  var ls = document.getElementById('lockScreen');
+  if (ls) ls.style.display = '';
+}
+
 function checkPass() {
   var inp = document.getElementById('lockPass');
   var err = document.getElementById('lockErr');
@@ -2050,6 +2074,9 @@ function showJobSelectScreen() {
   if (off)  off.style.display  = 'none';
   var officeTile = document.getElementById('officeTile');
   if (officeTile) officeTile.style.display = managerUnlocked ? '' : 'none';
+  var logoutBtn = document.getElementById('managerLogoutBtn');
+  if (logoutBtn) logoutBtn.style.display = managerUnlocked ? '' : 'none';
+  refreshChecksBadge();
 }
 
 function showNewJobFromSelect() {
@@ -2842,6 +2869,7 @@ function openChecksView() {
 
 function closeChecksView() {
   document.getElementById('checksView').style.display = 'none';
+  refreshChecksBadge();
 }
 
 function showVehList() {
@@ -2852,6 +2880,8 @@ function showVehList() {
 }
 
 function showVehPinPanel() {
+  _activeScheduledCheckId = null;
+  _activeScheduledMachine = null;
   document.getElementById('vehListPanel').style.display = 'none';
   document.getElementById('vehPinPanel').style.display = 'block';
   document.getElementById('vehFormPanel').style.display = 'none';
@@ -2893,6 +2923,7 @@ function confirmVehPin() {
   document.getElementById('vehFormPanel').style.display = 'block';
   document.getElementById('checksView').scrollTop = 0;
   vehClearForm();
+  if (_activeScheduledMachine) { document.getElementById('veh_reg').value = _activeScheduledMachine; }
 }
 
 function vehClearForm() {
@@ -3026,7 +3057,10 @@ function saveVehCheck(isAuto) {
     if (s) {
       s.style.color = 'var(--lime)';
       s.textContent = '✓ ' + (isAuto ? 'Auto-saved' : 'Saved successfully!');
-      if (!isAuto) { setTimeout(function(){ showVehList(); fetchVehList(); }, 1000); }
+      if (!isAuto) {
+        if (_activeScheduledCheckId) { _markScheduledComplete(_activeScheduledCheckId); _activeScheduledCheckId = null; }
+        setTimeout(function(){ showVehList(); fetchVehList(); }, 1000);
+      }
       else { setTimeout(function(){ if(s) s.textContent = ''; }, 2000); }
     }
   })
@@ -3747,6 +3781,8 @@ function showCatList(cat) {
 }
 
 function showCatPinPanel(cat) {
+  _activeScheduledCheckId = null;
+  _activeScheduledMachine = null;
   document.getElementById('catListPanel_' + cat).style.display = 'none';
   document.getElementById('catPinPanel_' + cat).style.display = 'block';
   document.getElementById('catFormPanel_' + cat).style.display = 'none';
@@ -3789,6 +3825,19 @@ function confirmCatPin(cat) {
   document.getElementById('catFormPanel_' + cat).style.display = 'block';
   document.getElementById('checksView').scrollTop = 0;
   catClearForm(cat);
+  if (_activeScheduledMachine) {
+    var sel = document.getElementById('catMachine_' + cat);
+    if (sel) {
+      var hasOpt = Array.prototype.some.call(sel.options, function(o){ return o.value === _activeScheduledMachine; });
+      if (hasOpt) {
+        sel.value = _activeScheduledMachine;
+      } else {
+        sel.value = '__other__';
+        var other = document.getElementById('catMachineOther_' + cat);
+        if (other) { other.value = _activeScheduledMachine; other.style.display = 'block'; }
+      }
+    }
+  }
 }
 
 function catClearForm(cat) {
@@ -3865,7 +3914,10 @@ function saveCatCheck(cat, isAuto) {
     if (s) {
       s.style.color = 'var(--lime)';
       s.textContent = '✓ ' + (isAuto ? 'Auto-saved' : 'Saved successfully!');
-      if (!isAuto) { setTimeout(function(){ showCatList(cat); fetchCatList(cat); }, 1000); }
+      if (!isAuto) {
+        if (_activeScheduledCheckId) { _markScheduledComplete(_activeScheduledCheckId); _activeScheduledCheckId = null; }
+        setTimeout(function(){ showCatList(cat); fetchCatList(cat); }, 1000);
+      }
       else { setTimeout(function(){ if (s) s.textContent = ''; }, 2000); }
     }
   })
@@ -4369,10 +4421,50 @@ function todayMachineOptions(catKey) {
   return cfg ? cfg.machines : [];
 }
 
-function startScheduledCheck(cat) {
+// Carries the originating todays_checks row through the PIN sign-in step so
+// the form can be pre-filled with the machine the manager already scheduled,
+// and so the row can be flagged completed once the check is actually saved.
+var _activeScheduledCheckId = null;
+var _activeScheduledMachine = null;
+
+function startScheduledCheck(cat, id, machine) {
   closeScheduleModal();
   switchChecksTab(cat);
   if (cat === 'vehicle') showVehPinPanel(); else showCatPinPanel(cat);
+  _activeScheduledCheckId = id;
+  _activeScheduledMachine = machine || '';
+}
+
+function _markScheduledComplete(id) {
+  fetch(SUPA_URL + '/rest/v1/todays_checks?id=eq.' + id, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Prefer':'return=minimal'},
+    body: JSON.stringify({ completed: true })
+  }).catch(function(){});
+}
+
+// ── CHECKS NOTIFICATION BADGE — shown on the Checks tile on the Welcome
+// screen so employees see at a glance how many checks are outstanding today,
+// without having to open the calendar first. Not filtered server-side by
+// `completed` so this still degrades gracefully (shows today's total) before
+// supabase_schedule_completed.sql has been run. ──
+function refreshChecksBadge() {
+  var badge = document.getElementById('checksTileBadge');
+  if (!badge) return;
+  fetch(SUPA_URL + '/rest/v1/todays_checks?scheduled_date=eq.' + _isoDate(new Date()), {
+    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) {
+    var outstanding = (Array.isArray(rows) ? rows : []).filter(function(r){ return !r.completed; }).length;
+    if (outstanding > 0) {
+      badge.textContent = outstanding;
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+  })
+  .catch(function() { badge.style.display = 'none'; });
 }
 
 // ── SCHEDULING CALENDAR — the landing view for the Checks tab. Managers can
@@ -4426,20 +4518,24 @@ function renderScheduleGrid() {
   }
   var today = _isoDate(new Date());
   var html = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d) {
-    return '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(0,0,0,.4);text-align:center;padding-bottom:4px;">' + d + '</div>';
+    return '<div class="sched-weekday-hdr" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(0,0,0,.4);text-align:center;padding-bottom:4px;">' + d + '</div>';
   }).join('');
   for (var i = 0; i < 28; i++) {
     var d = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + i);
     var iso = _isoDate(d);
     var items = _scheduleData[iso] || [];
     var isToday = iso === today;
-    html += '<div style="background:' + (isToday ? '#eef7e2' : '#fafaf8') + ';border-radius:6px;min-height:90px;padding:6px;display:flex;flex-direction:column;gap:4px;' + (isToday ? 'box-shadow:0 0 0 2px var(--green) inset;' : '') + '">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:13px;color:var(--mid);">' + d.getDate() + '</div>'
+    var weekdayShort = d.toLocaleDateString('en-GB',{weekday:'short'});
+    html += '<div class="sched-day-cell" style="background:' + (isToday ? '#eef7e2' : '#fafaf8') + ';border-radius:6px;min-height:90px;padding:6px;display:flex;flex-direction:column;gap:4px;' + (isToday ? 'box-shadow:0 0 0 2px var(--green) inset;' : '') + '">'
+      + '<div class="sched-day-date" style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:13px;color:var(--mid);"><span class="sched-day-weekday" style="display:none;">' + weekdayShort + ' </span>' + d.getDate() + '</div>'
+      + '<div class="sched-day-pills" style="display:flex;flex-direction:column;gap:4px;flex:1;">'
       + items.slice(0, 3).map(function(it) {
           var meta = checksCategoryMeta(it.category);
-          return '<div style="font-size:10px;font-weight:700;padding:3px 5px;border-radius:3px;background:#e8f2e3;color:#2d5a1b;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + meta.icon + ' ' + (it.machine || '') + '</div>';
+          var doneMark = it.completed ? '&#10003; ' : '';
+          return '<div style="font-size:10px;font-weight:700;padding:3px 5px;border-radius:3px;background:' + (it.completed ? '#d7ecc9' : '#e8f2e3') + ';color:#2d5a1b;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + doneMark + meta.icon + ' ' + (it.machine || '') + '</div>';
         }).join('')
-      + '<button onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10px;font-weight:700;border-radius:4px;padding:4px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (items.length === 0 ? (managerUnlocked ? '+ Add' : 'Nothing') : 'View (' + items.length + ') ›') + '</button>'
+      + '</div>'
+      + '<button class="sched-day-action" onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10px;font-weight:700;border-radius:4px;padding:4px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (items.length === 0 ? (managerUnlocked ? '+ Add' : 'Nothing') : 'View (' + items.length + ') ›') + '</button>'
       + '</div>';
   }
   grid.innerHTML = html;
@@ -4484,12 +4580,21 @@ function renderScheduleModalList() {
   }
   wrap.innerHTML = items.map(function(it) {
     var meta = checksCategoryMeta(it.category);
+    var machineEsc = (it.machine || '').replace(/'/g, "\\'");
+    var doneBadge = '<span style="font-size:10.5px;font-weight:800;color:#2d5a1b;background:#e8f2e3;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10003; Completed</span>';
+    var actionHtml;
+    if (managerUnlocked) {
+      actionHtml = (it.completed ? doneBadge : '')
+        + '<button onclick="removeScheduledCheck(\'' + it.id + '\')" style="background:none;border:none;color:#a02020;font-size:16px;cursor:pointer;padding:2px 8px;" aria-label="Remove">&#10005;</button>';
+    } else {
+      actionHtml = it.completed
+        ? doneBadge
+        : '<button onclick="startScheduledCheck(\'' + it.category + '\',\'' + it.id + '\',\'' + machineEsc + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Start &#8594;</button>';
+    }
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e0e0d8;font-size:12.5px;">'
       + '<span style="font-size:16px;">' + meta.icon + '</span>'
       + '<span style="flex:1;">' + meta.label + ' — ' + (it.machine || '') + '</span>'
-      + (managerUnlocked
-          ? '<button onclick="removeScheduledCheck(\'' + it.id + '\')" style="background:none;border:none;color:#a02020;font-size:16px;cursor:pointer;padding:2px 8px;" aria-label="Remove">&#10005;</button>'
-          : '<button onclick="startScheduledCheck(\'' + it.category + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Start &#8594;</button>')
+      + actionHtml
       + '</div>';
   }).join('');
 }

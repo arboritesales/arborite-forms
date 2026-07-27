@@ -39,7 +39,9 @@
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
     <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v102</span></div>
-    <div class="dash-header-actions"></div>
+    <div class="dash-header-actions">
+      <button id="managerLogoutBtn" onclick="logoutToTeamLogin()" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">&#128274; Log Out</button>
+    </div>
   </div>
   <div style="text-align:center;padding:50px 20px 30px;">
     <div style="font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:800;color:white;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Welcome</div>
@@ -64,6 +66,7 @@
       <div class="dash-tile-sub">TBT report forms</div>
     </div>
     <div class="dash-tile" onclick="openChecksView()" style="text-align:center;padding:20px 16px;">
+      <span id="checksTileBadge" style="display:none;position:absolute;top:10px;right:10px;background:#c62828;color:white;font-size:11px;font-weight:800;padding:2px 7px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.3px;">0</span>
       <div class="dash-tile-icon">&#9989;</div>
       <div class="dash-tile-name">Checks</div>
       <div class="dash-tile-sub">Equipment and machinery inspections</div>

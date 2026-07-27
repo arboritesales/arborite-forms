@@ -331,6 +331,8 @@ function showCatList(cat) {
 }
 
 function showCatPinPanel(cat) {
+  _activeScheduledCheckId = null;
+  _activeScheduledMachine = null;
   document.getElementById('catListPanel_' + cat).style.display = 'none';
   document.getElementById('catPinPanel_' + cat).style.display = 'block';
   document.getElementById('catFormPanel_' + cat).style.display = 'none';
@@ -373,6 +375,19 @@ function confirmCatPin(cat) {
   document.getElementById('catFormPanel_' + cat).style.display = 'block';
   document.getElementById('checksView').scrollTop = 0;
   catClearForm(cat);
+  if (_activeScheduledMachine) {
+    var sel = document.getElementById('catMachine_' + cat);
+    if (sel) {
+      var hasOpt = Array.prototype.some.call(sel.options, function(o){ return o.value === _activeScheduledMachine; });
+      if (hasOpt) {
+        sel.value = _activeScheduledMachine;
+      } else {
+        sel.value = '__other__';
+        var other = document.getElementById('catMachineOther_' + cat);
+        if (other) { other.value = _activeScheduledMachine; other.style.display = 'block'; }
+      }
+    }
+  }
 }
 
 function catClearForm(cat) {
@@ -449,7 +464,10 @@ function saveCatCheck(cat, isAuto) {
     if (s) {
       s.style.color = 'var(--lime)';
       s.textContent = '✓ ' + (isAuto ? 'Auto-saved' : 'Saved successfully!');
-      if (!isAuto) { setTimeout(function(){ showCatList(cat); fetchCatList(cat); }, 1000); }
+      if (!isAuto) {
+        if (_activeScheduledCheckId) { _markScheduledComplete(_activeScheduledCheckId); _activeScheduledCheckId = null; }
+        setTimeout(function(){ showCatList(cat); fetchCatList(cat); }, 1000);
+      }
       else { setTimeout(function(){ if (s) s.textContent = ''; }, 2000); }
     }
   })
