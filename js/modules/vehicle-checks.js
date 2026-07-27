@@ -34,19 +34,19 @@ function showChecksHome() {
 
 function checksBack() {
   var home = document.getElementById('checksHome');
-  if (home && home.style.display !== 'none') { closeChecksView(); }
-  else { showChecksHome(); }
+  if (home && home.style.display !== 'none') { switchChecksTab('schedule'); return; }
+  var scheduleTab = document.getElementById('checksTab_schedule');
+  if (scheduleTab && scheduleTab.style.display !== 'none') { closeChecksView(); return; }
+  showChecksHome();
 }
 
 function openChecksView() {
   document.getElementById('checksView').style.display = 'block';
   var defectsBtn = document.getElementById('defectsTabBtn');
   if (defectsBtn) defectsBtn.style.display = managerUnlocked ? '' : 'none';
-  var scheduleBtn = document.getElementById('scheduleTabBtn');
-  if (scheduleBtn) scheduleBtn.style.display = managerUnlocked ? '' : 'none';
   var weeklyBtn = document.getElementById('weeklyReportTabBtn');
   if (weeklyBtn) weeklyBtn.style.display = managerUnlocked ? '' : 'none';
-  showChecksHome();
+  switchChecksTab('schedule');
 }
 
 function closeChecksView() {
@@ -312,7 +312,6 @@ function confirmVehPass() {
     closeVehPassModal();
     if (!pending) return;
     if (pending.kind === 'cat') loadCatRecord(pending.cat, pending.id);
-    else if (pending.kind === 'todayManage') { _todayManageUnlocked = true; renderTodayChecks(); }
     else loadVehRecord(pending.id);
   } else {
     err.textContent = 'Incorrect password — try again';

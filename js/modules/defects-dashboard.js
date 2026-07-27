@@ -69,6 +69,18 @@ function _loadDefectThumbs(container) {
       .catch(function() {});
   });
 }
+function openDefectLightbox(imgEl) {
+  if (!imgEl || !imgEl.src) return;
+  var modal = document.getElementById('defectLightbox');
+  var img = document.getElementById('defectLightboxImg');
+  if (!modal || !img) return;
+  img.src = imgEl.src;
+  modal.style.display = 'flex';
+}
+function closeDefectLightbox() {
+  var modal = document.getElementById('defectLightbox');
+  if (modal) modal.style.display = 'none';
+}
 function _defectTableFor(kind, cat) {
   return kind === 'vehicle' ? 'vehicle_checks' : CHECK_CATEGORIES[cat].table;
 }
@@ -77,6 +89,8 @@ function setDefectStatus(kind, cat, id, status, btn) {
   wrap.querySelectorAll('button').forEach(function(b){ b.style.background = 'rgba(255,255,255,.08)'; b.style.color = 'rgba(255,255,255,.6)'; });
   if (status === 'fixed') { btn.style.background = '#7ec820'; btn.style.color = '#1a3210'; }
   else { btn.style.background = '#c62828'; btn.style.color = 'white'; }
+  // 'fixed'/'not_fixed' are the stored values (unchanged, existing records
+  // already use them) — only the button labels read "Resolved" to the manager.
   fetch(SUPA_URL + '/rest/v1/' + _defectTableFor(kind, cat) + '?id=eq.' + id, {
     method: 'PATCH',
     headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Prefer':'return=minimal'},
@@ -107,7 +121,7 @@ function renderDefectsList(defects) {
   listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px;">' + defects.map(function(e) {
     var isFixed = e.defectStatus === 'fixed';
     var thumbs = (e.defectImages || []).map(function(p) {
-      return '<img data-defect-path="' + p.replace(/"/g,'&quot;') + '" style="width:42px;height:42px;border-radius:5px;object-fit:cover;background:rgba(255,255,255,.08);">';
+      return '<img data-defect-path="' + p.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();openDefectLightbox(this)" style="width:42px;height:42px;border-radius:5px;object-fit:cover;background:rgba(255,255,255,.08);cursor:pointer;">';
     }).join('');
     return '<div style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;-webkit-tap-highlight-color:transparent;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')">'
@@ -121,8 +135,8 @@ function renderDefectsList(defects) {
       + '</div>'
       + '<div style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.15);" onclick="event.stopPropagation()">'
       + '<div style="display:flex;border-radius:4px;overflow:hidden;border:1px solid rgba(255,255,255,.2);width:fit-content;margin-bottom:8px;">'
-      + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (isFixed ? 'background:#7ec820;color:#1a3210;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Fixed</button>'
-      + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'not_fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (!isFixed ? 'background:#c62828;color:white;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Not Fixed</button>'
+      + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (isFixed ? 'background:#7ec820;color:#1a3210;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Resolved</button>'
+      + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'not_fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (!isFixed ? 'background:#c62828;color:white;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Not Resolved</button>'
       + '</div>'
       + '<textarea placeholder="Office note — e.g. what was done to fix it" oninput="scheduleDefectNoteSave(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',this)" style="width:100%;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:7px 9px;font-size:12.5px;font-family:\'Barlow\',sans-serif;background:rgba(255,255,255,.05);color:white;resize:vertical;min-height:36px;">' + e.officeNote + '</textarea>'
       + '</div>'
