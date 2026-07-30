@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.2">
+  <link rel="stylesheet" href="css/app.css?v=1.3">
 </head>
 <body>
 
@@ -27,9 +27,211 @@
     <div style="margin-top:14px;font-size:12px;">
       <a href="#" id="lockModeLink" onclick="toggleManagerLogin();return false;" style="color:rgba(255,255,255,0.45);text-decoration:underline;cursor:pointer;">Manager login</a>
     </div>
-    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.2</div>
+    <div style="margin-top:10px;font-size:12px;">
+      <a href="#" onclick="spOpen('spPortalLogin');return false;" style="color:rgba(126,200,32,0.85);text-decoration:none;font-weight:600;cursor:pointer;">&#128336; Staff Portal &mdash; clock in / my leave</a>
+    </div>
+    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.3</div>
   </div>
 </div>
+
+<!-- ═══ STAFF PORTAL — per-employee login, clock in/out, leave & team calendar.
+     Reached only via the link above or the Staff Dashboards tile inside
+     Office — no separate URL. Scoped under #spRoot / sp* so it can never
+     collide with the rest of the app's CSS or globals. Real Supabase calls
+     (see js/modules/staff-portal.js + supabase_staff_portal.sql) — NOT a
+     mockup. Currently Phase 1 only: login + clock in/out. ═══ -->
+<style>
+#spRoot{display:none;}
+#spRoot .sp-view{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#e0ddd6;z-index:10000;overflow-y:auto;font-family:'Barlow',sans-serif;font-size:13px;color:#1a1a1a;}
+#spRoot .sp-view.active{display:block;}
+#spRoot .sp-lock-screen{min-height:100vh;background:linear-gradient(160deg,var(--green) 0%,#16300c 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;}
+#spRoot .sp-lock-box{width:100%;max-width:320px;text-align:center;}
+#spRoot .sp-lock-box h2{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:1px;margin:0 0 6px;}
+#spRoot .sp-lock-box p{color:rgba(255,255,255,.6);font-size:12.5px;margin:0 0 18px;}
+#spRoot .sp-select,#spRoot .sp-pass{width:100%;padding:12px 14px;border:1px solid rgba(255,255,255,.2);border-radius:4px;background:rgba(255,255,255,.08);color:#fff;font-size:15px;font-family:'Barlow',sans-serif;outline:none;margin-bottom:12px;}
+#spRoot .sp-pass{text-align:center;letter-spacing:2px;}
+#spRoot .sp-select option{color:#1a1a1a;}
+#spRoot .sp-lock-box .sp-btn-unlock{width:100%;padding:12px;background:var(--lime);color:#1a2e10;border:none;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
+#spRoot .sp-btn-unlock:disabled{opacity:.5;cursor:not-allowed;}
+#spRoot .sp-lock-links{margin-top:16px;font-size:12px;}
+#spRoot .sp-lock-links a{color:rgba(255,255,255,.45);text-decoration:underline;cursor:pointer;}
+#spRoot .sp-err{color:#ffb0b0;font-size:12px;margin-top:6px;min-height:16px;}
+#spRoot .sp-hint{color:rgba(255,255,255,.5);font-size:11px;margin:-6px 0 12px;text-align:left;}
+#spRoot .sp-session-bar{background:#16300c;color:rgba(255,255,255,.85);font-size:11.5px;padding:7px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+#spRoot .sp-session-bar b{color:var(--lime);}
+#spRoot .sp-session-bar .sp-timer.low{color:#ffb84d;font-weight:700;}
+#spRoot .sp-session-bar button{background:none;border:none;color:rgba(255,255,255,.6);text-decoration:underline;cursor:pointer;font-size:11.5px;padding:0;}
+#spRoot .sp-header{background:var(--green);color:#fff;padding:16px 18px;display:flex;align-items:center;gap:12px;}
+#spRoot .sp-header .sp-back{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;padding:7px 12px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;}
+#spRoot .sp-header h1{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.5px;flex:1;margin:0;}
+#spRoot .sp-header .sp-sub{font-size:11.5px;color:rgba(255,255,255,.55);font-weight:400;text-transform:none;letter-spacing:0;display:block;margin-top:1px;}
+#spRoot .sp-body{padding:18px;max-width:640px;margin:0 auto;}
+#spRoot .sp-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
+#spRoot .sp-tile{background:#fff;border:1px solid var(--border);border-radius:8px;padding:22px 14px;text-align:center;cursor:pointer;}
+#spRoot .sp-tile:hover{border-color:var(--green-mid);}
+#spRoot .sp-tile-icon{font-size:28px;margin-bottom:8px;}
+#spRoot .sp-tile-name{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;color:var(--green);text-transform:uppercase;letter-spacing:.5px;}
+#spRoot .sp-tile-sub{font-size:11.5px;color:var(--mid);margin-top:3px;}
+#spRoot .sp-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:14px;}
+#spRoot .sp-card h3{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--green);margin:0 0 12px;}
+#spRoot .sp-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#spRoot .sp-btn{padding:11px 20px;border:none;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;width:100%;}
+#spRoot .sp-btn-lime{background:var(--lime);color:#1a2e10;}
+#spRoot .sp-btn-out{background:#fff;color:#a02020;border:1.5px solid #a02020;}
+#spRoot .sp-btn:disabled{opacity:.5;cursor:not-allowed;}
+#spRoot .sp-gps-note{font-size:11px;color:var(--mid);background:var(--green-light);border-left:3px solid var(--green-mid);padding:8px 10px;border-radius:3px;margin-top:10px;line-height:1.5;}
+#spRoot .sp-gps-note.err{background:#fff3d6;border-left-color:#a86a00;color:#5c3d00;}
+#spRoot .sp-pill{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 9px;border-radius:20px;}
+#spRoot .sp-pill.on,#spRoot .sp-pill.approved{background:var(--green-light);color:var(--green);}
+#spRoot .sp-pill.off{background:#eee;color:var(--mid);}
+#spRoot .sp-pill.pending{background:#fff3d6;color:#a86a00;}
+#spRoot .sp-pill.declined{background:#fdeaea;color:#a02020;}
+#spRoot .sp-onsite-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--row-alt);}
+#spRoot .sp-onsite-row:last-child{border-bottom:none;}
+#spRoot .sp-onsite-time{color:var(--mid);font-size:11.5px;}
+#spRoot .sp-field{margin-bottom:12px;}
+#spRoot .sp-field label{display:block;font-size:11px;font-weight:600;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+#spRoot .sp-field select,#spRoot .sp-field input,#spRoot .sp-field textarea{width:100%;border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-family:'Barlow',sans-serif;font-size:14px;outline:none;background:#fafaf8;}
+#spRoot .sp-btn-primary{background:var(--green);color:#fff;}
+#spRoot .sp-bal-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+#spRoot .sp-bal-box{text-align:center;background:var(--row-alt);border-radius:6px;padding:12px 4px;}
+#spRoot .sp-bal-num{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:800;color:var(--green);}
+#spRoot .sp-bal-lbl{font-size:10.5px;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+#spRoot .sp-req-item{padding:10px 0;border-bottom:1px solid var(--row-alt);}
+#spRoot .sp-req-item:last-child{border-bottom:none;}
+#spRoot .sp-req-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;gap:8px;}
+#spRoot .sp-req-dates{font-weight:700;font-size:13px;}
+#spRoot .sp-req-note{font-size:11.5px;color:var(--mid);}
+#spRoot .sp-req-actions{display:flex;gap:8px;margin-top:8px;}
+#spRoot .sp-req-actions button{flex:1;padding:7px;font-size:11px;border-radius:4px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+#spRoot .sp-btn-approve{background:var(--green-light);color:var(--green);border:1px solid var(--green-mid);}
+#spRoot .sp-btn-decline{background:#fdeaea;color:#a02020;border:1px solid #a02020;}
+#spRoot .sp-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+#spRoot .sp-cal-head button{background:var(--row-alt);border:none;width:32px;height:32px;border-radius:4px;font-size:16px;cursor:pointer;color:var(--green);}
+#spRoot .sp-cal-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;color:var(--green);text-transform:uppercase;}
+#spRoot .sp-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+#spRoot .sp-cal-dow{text-align:center;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;padding-bottom:4px;}
+#spRoot .sp-cal-day{aspect-ratio:1;background:var(--row-alt);border-radius:4px;font-size:11px;padding:4px;position:relative;color:var(--mid);}
+#spRoot .sp-cal-day.sp-blank{background:transparent;}
+#spRoot .sp-cal-day.sp-is-bh{background:var(--green-light);}
+#spRoot .sp-cal-day .sp-dnum{font-weight:600;}
+#spRoot .sp-cal-day .sp-dot{position:absolute;bottom:4px;left:4px;right:4px;height:5px;border-radius:3px;background:var(--lime);}
+#spRoot .sp-cal-day .sp-bh-tag{position:absolute;top:3px;right:3px;background:var(--green);color:#fff;font-size:7.5px;font-weight:800;letter-spacing:.3px;padding:1.5px 4px;border-radius:3px;}
+#spRoot .sp-legend{display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--mid);flex-wrap:wrap;}
+#spRoot .sp-legend span{display:inline-flex;align-items:center;gap:5px;}
+#spRoot .sp-legend .sp-sw{width:10px;height:10px;border-radius:3px;display:inline-block;}
+#spRoot .sp-dash-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+#spRoot .sp-dash-table th{background:var(--green);color:#fff;padding:8px 10px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:.4px;}
+#spRoot .sp-dash-table td{padding:8px 10px;border-bottom:1px solid var(--row-alt);}
+#spRoot .sp-dash-table tr:nth-child(even) td{background:var(--row-alt);}
+#spRoot .sp-err-inline{color:#a02020;font-size:12px;margin-top:6px;min-height:16px;}
+#spRoot .sp-toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 18px;border-radius:6px;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:10001;display:none;}
+</style>
+
+<div id="spRoot">
+
+  <div class="sp-view" id="spPortalLogin">
+    <div class="sp-lock-screen">
+      <div class="sp-lock-box">
+        <h2>Staff Portal</h2>
+        <p>Sign in once to clock in/out, check your leave &amp; the team calendar</p>
+        <select class="sp-select" id="spName" onchange="spOnNameChange()">
+          <option value="">&mdash; Select your name &mdash;</option>
+        </select>
+        <div id="spPassWrap" style="display:none;">
+          <input class="sp-pass" type="password" id="spPass" placeholder="Password" onkeydown="if(event.key==='Enter')spSubmitLogin()">
+        </div>
+        <div id="spSetupWrap" style="display:none;">
+          <div class="sp-hint">First time signing in &mdash; choose a password you'll use every time.</div>
+          <input class="sp-pass" type="password" id="spNewPass" placeholder="New password">
+          <input class="sp-pass" type="password" id="spNewPass2" placeholder="Confirm password" onkeydown="if(event.key==='Enter')spSubmitLogin()">
+        </div>
+        <button class="sp-btn-unlock" id="spLoginBtn" onclick="spSubmitLogin()" disabled>Sign In</button>
+        <div class="sp-err" id="spLoginErr"></div>
+        <div class="sp-lock-links"><a onclick="spOpen('spClose');return false;">&larr; Back to main login</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sp-view" id="spPortalHome">
+    <div class="sp-session-bar"><span>Signed in as <b id="spSessName1"></b></span><span><span class="sp-timer" id="spTimer1"></span> &middot; <button onclick="spLogout('You signed out.')">Sign out</button></span></div>
+    <div class="sp-header"><button class="sp-back" onclick="spLogout()">&larr; Exit portal</button><h1>Staff Portal<span class="sp-sub">Clock in/out, leave &amp; the team calendar</span></h1></div>
+    <div class="sp-body">
+      <div class="sp-tiles">
+        <div class="sp-tile" onclick="spOpen('spClock')"><div class="sp-tile-icon">&#128336;</div><div class="sp-tile-name">Clock In/Out</div><div class="sp-tile-sub">You're already signed in</div></div>
+        <div class="sp-tile" onclick="spOpen('spLeave')"><div class="sp-tile-icon">&#127796;</div><div class="sp-tile-name">My Leave</div><div class="sp-tile-sub">Balance &amp; request time off</div></div>
+        <div class="sp-tile" onclick="spOpen('spCalendar')"><div class="sp-tile-icon">&#128197;</div><div class="sp-tile-name">Team Calendar</div><div class="sp-tile-sub">Who's off, and when</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sp-view" id="spClock">
+    <div class="sp-session-bar"><span>Signed in as <b id="spSessName2"></b></span><span><span class="sp-timer" id="spTimer2"></span> &middot; <button onclick="spLogout('You signed out.')">Sign out</button></span></div>
+    <div class="sp-header"><button class="sp-back" onclick="spOpen('spPortalHome')">&larr; Back</button><h1>Clock In / Out</h1></div>
+    <div class="sp-body">
+      <div class="sp-card">
+        <h3 id="spClockWho"></h3>
+        <div style="margin-bottom:12px;"><span id="spClockPill" class="sp-pill off">Clocked out</span></div>
+        <div class="sp-row2"><button class="sp-btn sp-btn-lime" onclick="spDoClock('in')">&#10004; Clock In</button><button class="sp-btn sp-btn-out" onclick="spDoClock('out')">&larr; Clock Out</button></div>
+        <div class="sp-gps-note" id="spGpsNote">&#128205; Checking your location for the record&hellip;</div>
+      </div>
+      <div class="sp-card"><h3>On site now</h3><div id="spOnsiteList"></div></div>
+    </div>
+  </div>
+
+  <div class="sp-view" id="spLeave">
+    <div class="sp-session-bar"><span>Signed in as <b id="spSessName3"></b></span><span><span class="sp-timer" id="spTimer3"></span> &middot; <button onclick="spLogout('You signed out.')">Sign out</button></span></div>
+    <div class="sp-header"><button class="sp-back" onclick="spOpen('spPortalHome')">&larr; Back</button><h1>My Leave</h1></div>
+    <div class="sp-body">
+      <div class="sp-card">
+        <h3 id="spBalWho">Holiday balance</h3>
+        <div class="sp-bal-grid">
+          <div class="sp-bal-box"><div class="sp-bal-num" id="spBalTotal">&mdash;</div><div class="sp-bal-lbl">Total days</div></div>
+          <div class="sp-bal-box"><div class="sp-bal-num" id="spBalUsed">&mdash;</div><div class="sp-bal-lbl">Used</div></div>
+          <div class="sp-bal-box"><div class="sp-bal-num" id="spBalRemaining">&mdash;</div><div class="sp-bal-lbl">Remaining</div></div>
+        </div>
+      </div>
+      <div class="sp-card">
+        <h3>Request time off</h3>
+        <div class="sp-row2">
+          <div class="sp-field"><label>Start date</label><input type="date" id="spReqStart" onchange="spRecalcReqDays()"></div>
+          <div class="sp-field"><label>End date</label><input type="date" id="spReqEnd" onchange="spRecalcReqDays()"></div>
+        </div>
+        <div class="sp-field"><label>Days (weekdays auto-calculated &mdash; adjust if it spans a bank holiday)</label><input type="number" step="0.5" min="0.5" id="spReqDays"></div>
+        <div class="sp-field"><label>Type</label><select id="spReqType"><option value="holiday">Holiday</option><option value="sick">Sick</option><option value="other">Other</option></select></div>
+        <div class="sp-field"><label>Note (optional)</label><textarea id="spReqNote" rows="2" placeholder="e.g. family holiday"></textarea></div>
+        <button class="sp-btn sp-btn-primary" onclick="spSubmitRequest()">Submit request</button>
+        <div class="sp-err-inline" id="spReqErr"></div>
+      </div>
+      <div class="sp-card"><h3>My requests</h3><div id="spMyRequests"></div></div>
+    </div>
+  </div>
+
+  <div class="sp-view" id="spCalendar">
+    <div class="sp-session-bar"><span>Signed in as <b id="spSessName4"></b></span><span><span class="sp-timer" id="spTimer4"></span> &middot; <button onclick="spLogout('You signed out.')">Sign out</button></span></div>
+    <div class="sp-header"><button class="sp-back" onclick="spOpen('spPortalHome')">&larr; Back</button><h1>Team Calendar<span class="sp-sub">Approved leave &amp; UK bank holidays &mdash; pending requests stay private</span></h1></div>
+    <div class="sp-body">
+      <div class="sp-card">
+        <div class="sp-cal-head"><button onclick="spShiftMonth(-1)">&lsaquo;</button><div class="sp-cal-title" id="spCalTitle"></div><button onclick="spShiftMonth(1)">&rsaquo;</button></div>
+        <div class="sp-cal-grid" id="spCalGrid"></div>
+        <div class="sp-legend"><span><i class="sp-sw" style="background:var(--lime)"></i> Approved leave</span><span><i class="sp-sw" style="background:var(--green)"></i> UK bank holiday / shutdown</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Staff Dashboards (manager) — reached via the Office tile below, which is
+       already gated by the real manager password; no separate check needed here. -->
+  <div class="sp-view" id="spManagerDash">
+    <div class="sp-header"><button class="sp-back" onclick="spOpen('spClose')">&larr; Back to Office</button><h1>Staff Dashboards<span class="sp-sub">Manager-only &mdash; reached through Office</span></h1></div>
+    <div class="sp-body">
+      <div class="sp-card"><h3>Who's on site now</h3><div id="spMgrOnsite"></div></div>
+      <div class="sp-card"><h3>Team summary</h3><div style="overflow-x:auto;" id="spTeamSummary"></div></div>
+      <div class="sp-card"><h3>Pending requests</h3><div id="spMgrPending"></div></div>
+    </div>
+  </div>
+
+</div>
+<div class="sp-toast" id="spToast"></div>
 
 <!-- JOB SELECT SCREEN -->
 <div id="jobSelectScreen" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#2d5218;overflow-y:auto;z-index:900;padding:0 0 60px;">
@@ -37,7 +239,7 @@
   <div style="position:relative;z-index:1;">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.2</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.3</span></div>
     <div class="dash-header-actions">
       <button id="logoutBtn" onclick="logoutToTeamLogin()" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">&#128274; Log Out</button>
     </div>
@@ -85,7 +287,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.2</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.3</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -2563,6 +2765,15 @@
         <div style="font-size:12px;color:rgba(200,255,100,.7);letter-spacing:.3px;margin-top:2px;">Sales &amp; leads CRM</div>
       </div>
 
+      <div style="background:#305818;border:1px solid rgba(126,200,32,.5);border-radius:10px;padding:26px 20px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px;-webkit-tap-highlight-color:transparent;"
+           onmouseover="this.style.background='#3d6a1b';this.style.transform='translateY(-2px)'"
+           onmouseout="this.style.background='#305818';this.style.transform=''"
+           onclick="spOpenManagerDash()">
+        <div style="font-size:40px;line-height:1;margin-bottom:4px;">&#128295;</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:white;line-height:1.2;">Staff Dashboards</div>
+        <div style="font-size:12px;color:rgba(200,255,100,.7);letter-spacing:.3px;margin-top:2px;">Team leave, sick days &amp; who's on site</div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -3150,7 +3361,7 @@
 </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=1.2"></script>
+  <script src="js/app.js?v=1.3"></script>
 </body>
 </html>
 

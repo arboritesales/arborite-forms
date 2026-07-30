@@ -16,3 +16,4 @@ todays-checks-schedule.js
 toolbox-talks.js
 audits.js
 method-statement-builder.js
+staff-portal.js
