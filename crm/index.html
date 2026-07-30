@@ -44,7 +44,7 @@
     --font-mono:'JetBrains Mono',monospace;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0;overflow-x:hidden;}
   body{
     background:var(--paper);
     color:var(--ink);
@@ -57,11 +57,12 @@
   ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:5px;}
 
   header.topbar{
-    display:flex;align-items:center;justify-content:space-between;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
     padding:16px 28px;background:var(--charcoal);
     box-shadow:0 2px 12px rgba(36,42,46,.18);
   }
-  .brand{display:flex;align-items:center;gap:14px;}
+  header.topbar .topbar-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
   .brand .mark{height:34px;width:auto;display:block;}
   .brand h1{font-family:var(--font-display);font-size:19px;margin:0;letter-spacing:.2px;color:#fff;}
   .brand p{margin:0;font-size:12px;color:rgba(255,255,255,.62);font-family:var(--font-mono);}
@@ -201,13 +202,23 @@
   @media (max-width:760px){
     .stats{grid-template-columns:repeat(2,1fr);}
     .form-grid{grid-template-columns:1fr;}
+    .view-grid{grid-template-columns:1fr;}
     main{padding:16px;}
     header.topbar{padding:14px 16px;}
+    .brand h1{font-size:17px;}
     table{font-size:12px;}
     thead th:nth-child(2), tbody td:nth-child(2),
     thead th:nth-child(4), tbody td:nth-child(4),
     thead th:nth-child(6), tbody td:nth-child(6),
     thead th:nth-child(8), tbody td:nth-child(8){display:none;}
+    .icon-btn{width:32px;height:32px;font-size:15px;}
+  }
+  @media (max-width:480px){
+    .topbar-actions{width:100%;}
+    .topbar-actions .btn{flex:1 1 auto;}
+    .stats{grid-template-columns:1fr 1fr;gap:10px;}
+    .stat{padding:12px 14px;}
+    .stat .value{font-size:22px;}
   }
 </style>
 </head>
@@ -223,7 +234,7 @@
       <p>client pipeline · outreach tracker</p>
     </div>
   </div>
-  <div style="display:flex;gap:8px;">
+  <div class="topbar-actions">
     <button class="btn ghost" id="btnExportJson">Export data.json</button>
     <button class="btn ghost" id="btnExportCsv">Export CSV</button>
     <button class="btn primary" id="btnAdd">+ Add lead</button>
@@ -267,6 +278,7 @@
     <span id="periodSummary" style="font-size:12px;color:var(--ink-soft);font-family:var(--font-mono);"></span>
   </div>
 
+  <div style="overflow-x:auto;border-radius:12px;">
   <table id="table">
     <thead>
       <tr>
@@ -283,6 +295,7 @@
     </thead>
     <tbody id="tbody"></tbody>
   </table>
+  </div>
   <div class="empty" id="emptyState" style="display:none;">
     <h3>No leads yet</h3>
     <p>Add one manually, or import a CSV export from Glenigan or your spreadsheet.</p>
@@ -390,10 +403,12 @@
       <input type="file" id="csvFile" accept=".csv,text/csv">
     </div>
     <div id="csvStep2" style="display:none;">
+      <div style="overflow-x:auto;">
       <table class="csv-map">
         <thead><tr><th>Your column</th><th>Sample</th><th>Maps to</th></tr></thead>
         <tbody id="csvMapBody"></tbody>
       </table>
+      </div>
     </div>
     <div class="modal-footer">
       <span class="spacer"></span>
