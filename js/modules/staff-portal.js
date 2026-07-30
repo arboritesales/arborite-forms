@@ -184,10 +184,12 @@ function spToast(msg) {
 }
 
 // ── CLOCK IN/OUT ──
-var spLastGPS = null;
-
+// GPS is fetched FRESH at the moment Clock In/Out is pressed (not reused from
+// whenever the screen happened to open) — a stale/never-resolved reading was
+// why location wasn't showing up. spAttemptGPS on screen-open is just an
+// early preview so the permission prompt appears sooner; spGetFreshGPS is
+// what's actually used for the clock event.
 function spAttemptGPS() {
-  spLastGPS = null;
   var note = document.getElementById('spGpsNote');
   if (!navigator.geolocation) {
     note.className = 'sp-gps-note err';
@@ -195,31 +197,57 @@ function spAttemptGPS() {
     return;
   }
   navigator.geolocation.getCurrentPosition(function(pos) {
-    spLastGPS = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy_m: pos.coords.accuracy };
     note.className = 'sp-gps-note';
-    note.textContent = '📍 Location captured (±' + Math.round(pos.coords.accuracy) + 'm) for the record. Clocking in/out never depends on this.';
+    note.textContent = '📍 Location ready (±' + Math.round(pos.coords.accuracy) + 'm) — captured fresh each time you clock in/out.';
   }, function() {
     note.className = 'sp-gps-note err';
     note.textContent = '📍 Location permission not granted — clocking in/out still works without it.';
-  }, { timeout: 4000 });
+  }, { timeout: 4000, maximumAge: 0 });
+}
+
+function spGetFreshGPS(cb) {
+  if (!navigator.geolocation) { cb(null); return; }
+  var done = false;
+  var timer = setTimeout(function() { if (!done) { done = true; cb(null); } }, 6000);
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    if (done) return; done = true; clearTimeout(timer);
+    cb({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy_m: pos.coords.accuracy });
+  }, function() {
+    if (done) return; done = true; clearTimeout(timer);
+    cb(null);
+  }, { timeout: 6000, maximumAge: 0, enableHighAccuracy: true });
 }
 
 function spDoClock(action) {
   var btn1 = document.querySelector('#spClock .sp-btn-lime'), btn2 = document.querySelector('#spClock .sp-btn-out');
+  var note = document.getElementById('spGpsNote');
   btn1.disabled = true; btn2.disabled = true;
-  var body = { p_token: spSessionToken, p_action: action };
-  if (spLastGPS) { body.p_lat = spLastGPS.lat; body.p_lng = spLastGPS.lng; body.p_accuracy_m = spLastGPS.accuracy_m; }
-  spRpc('sp_clock_event', body).then(function(res) {
-    btn1.disabled = false; btn2.disabled = false;
-    if (!res.ok) {
-      var msg = (res.data && res.data.message) || ('Could not clock ' + action + ' — check your connection and try again.');
-      if (/session expired/i.test(msg)) { spLogout(msg); return; }
-      spToast(msg);
-      return;
+  note.className = 'sp-gps-note';
+  note.textContent = '📍 Getting your location…';
+  spGetFreshGPS(function(gps) {
+    var body = { p_token: spSessionToken, p_action: action };
+    if (gps) {
+      body.p_lat = gps.lat; body.p_lng = gps.lng; body.p_accuracy_m = gps.accuracy_m;
     }
-    spRenderClockStatus(action === 'in');
-    spRenderOnsite();
-  }).catch(function() { btn1.disabled = false; btn2.disabled = false; spToast('Connection error — try again.'); });
+    spRpc('sp_clock_event', body).then(function(res) {
+      btn1.disabled = false; btn2.disabled = false;
+      if (!res.ok) {
+        var msg = (res.data && res.data.message) || ('Could not clock ' + action + ' — check your connection and try again.');
+        if (/session expired/i.test(msg)) { spLogout(msg); return; }
+        spToast(msg);
+        return;
+      }
+      if (gps) {
+        note.className = 'sp-gps-note';
+        note.textContent = '📍 Location captured (±' + Math.round(gps.accuracy_m) + 'm) for this ' + (action === 'in' ? 'clock-in' : 'clock-out') + '.';
+      } else {
+        note.className = 'sp-gps-note err';
+        note.textContent = '📍 Clocked ' + (action === 'in' ? 'in' : 'out') + ' without a location — permission wasn\'t granted or it timed out.';
+      }
+      spRenderClockStatus(action === 'in');
+      spRenderOnsite();
+    }).catch(function() { btn1.disabled = false; btn2.disabled = false; spToast('Connection error — try again.'); });
+  });
 }
 
 function spRenderClockStatus(isOn) {
@@ -258,6 +286,7 @@ function spRenderLeave() {
     document.getElementById('spBalTotal').textContent = b.entitlement;
     document.getElementById('spBalUsed').textContent = b.days_used;
     document.getElementById('spBalRemaining').textContent = b.days_remaining;
+    document.getElementById('spBalSick').textContent = b.sick_days;
   });
   spRenderMyRequests();
 }
@@ -334,18 +363,23 @@ function spShiftMonth(delta) {
   spRenderCalendar();
 }
 
+function spFirstName(fullName) { return (fullName || '').split(' ')[0]; }
+
 function spRenderCalendar() {
   var y = spCalMonth.getFullYear(), m = spCalMonth.getMonth(); // JS month is 0-based
   document.getElementById('spCalTitle').textContent = spCalMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
   spRpc('sp_calendar_days', { p_year: y, p_month: m + 1 }).then(function(res) {
     var rows = res.ok && Array.isArray(res.data) ? res.data : [];
-    var marks = {}; // day-of-month -> {approved:true, bh:true}
+    var marks = {}; // day-of-month -> {names:[...], bh:true}
     rows.forEach(function(r) {
       var s = new Date(r.start_date + 'T00:00:00'), e = new Date(r.end_date + 'T00:00:00');
       for (var d = new Date(Math.max(s, new Date(y, m, 1))); d <= e && d <= new Date(y, m + 1, 0); d.setDate(d.getDate() + 1)) {
         var day = d.getDate();
-        if (!marks[day]) marks[day] = {};
-        if (r.type === 'holiday') marks[day].approved = true;
+        if (!marks[day]) marks[day] = { names: [] };
+        // Bank holidays/shutdown apply to literally everyone — a "BH" tag says
+        // that better than listing all 15 names. Personal holiday lists who,
+        // since that's the actually useful info on a shared calendar.
+        if (r.type === 'holiday') marks[day].names.push(spFirstName(r.staff_name));
         else if (r.type === 'bank_holiday' || r.type === 'shutdown') marks[day].bh = true;
       }
     });
@@ -356,10 +390,11 @@ function spRenderCalendar() {
     var html = dows.map(function(d) { return '<div class="sp-cal-dow">' + d + '</div>'; }).join('');
     for (var i = 0; i < startOffset; i++) html += '<div class="sp-cal-day sp-blank"></div>';
     for (var d2 = 1; d2 <= daysInMonth; d2++) {
-      var mk = marks[d2] || {};
+      var mk = marks[d2] || { names: [] };
       html += '<div class="sp-cal-day' + (mk.bh ? ' sp-is-bh' : '') + '"><span class="sp-dnum">' + d2 + '</span>'
         + (mk.bh ? '<span class="sp-bh-tag">BH</span>' : '')
-        + (mk.approved ? '<span class="sp-dot"></span>' : '') + '</div>';
+        + (mk.names.length ? '<div class="sp-cal-names">' + mk.names.map(function(n) { return '<span class="sp-cal-name">' + spEsc(n) + '</span>'; }).join('') + '</div>' : '')
+        + '</div>';
     }
     document.getElementById('spCalGrid').innerHTML = html;
   });
@@ -371,6 +406,57 @@ function spRenderMgr() {
   spSyncBankHolidaysAndShutdowns();
   spRenderTeamSummary();
   spRenderPendingRequests();
+  spRenderClockActivity();
+  spRenderClockReport();
+  spLoadEditStaffList();
+}
+
+// ── MANAGER: MONTHLY CLOCK REPORT ──
+var spReportMonth = new Date();
+
+function spShiftReportMonth(delta) {
+  spReportMonth = new Date(spReportMonth.getFullYear(), spReportMonth.getMonth() + delta, 1);
+  spRenderClockReport();
+}
+
+function spRenderClockReport() {
+  var el = document.getElementById('spClockReport');
+  if (!el) return;
+  var y = spReportMonth.getFullYear(), m = spReportMonth.getMonth();
+  document.getElementById('spReportTitle').textContent = spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+  spRpc('sp_clock_report', { p_year: y, p_month: m + 1 }).then(function(res) {
+    var rows = res.ok && Array.isArray(res.data) ? res.data : [];
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No clock activity this month.</div>'; return; }
+    var body = rows.map(function(r) {
+      var dateStr = new Date(r.work_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td></tr>';
+    }).join('');
+    el.innerHTML = '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th></tr>' + body + '</table>';
+  });
+}
+
+function spMapLink(lat, lng) {
+  if (lat == null || lng == null) return '';
+  return ' &middot; <a href="https://maps.google.com/?q=' + lat + ',' + lng + '" target="_blank" rel="noopener" style="color:var(--green);text-decoration:underline;">view on map</a>';
+}
+
+// Manager-only: every recent clock in/out event with location — separate from
+// the quick "who's on site now" summary above, since that one (shared with
+// the employee-facing Clock screen) deliberately never shows location.
+function spRenderClockActivity() {
+  var el = document.getElementById('spClockActivity');
+  if (!el) return;
+  spRpc('sp_clock_activity', { p_limit: 100 }).then(function(res) {
+    var rows = res.ok && Array.isArray(res.data) ? res.data : [];
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No clock activity yet.</div>'; return; }
+    el.innerHTML = rows.map(function(r) {
+      var t = new Date(r.ts);
+      var when = t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+      var label = r.action === 'in' ? 'Clocked in' : 'Clocked out';
+      return '<div class="sp-onsite-row"><span>' + spEsc(r.name) + ' — ' + label
+        + '<br><span class="sp-onsite-time">' + when + (r.lat != null ? spMapLink(r.lat, r.lng) : ' &middot; no location') + '</span></span></div>';
+    }).join('');
+  });
 }
 
 // Fetches the UK bank holiday list client-side (Postgres has no outbound
@@ -395,6 +481,117 @@ function spSyncBankHolidaysAndShutdowns() {
     return spRpc('sp_sync_bank_holidays', { p_dates: dates });
   }).catch(function() { /* best-effort — Staff Dashboards still works without it */ });
   spRpc('sp_sync_shutdown_days', {}).catch(function() {});
+}
+
+// ── MANAGER: EDIT STAFF RECORDS (full edit/delete access to any entry) ──
+var spHistoryRows = {}; // id -> row data, so Edit can pre-fill without a re-fetch
+var spCurrentEditStaff = null;
+
+function spLoadEditStaffList() {
+  var sel = document.getElementById('spEditStaffSelect');
+  if (!sel || sel.dataset.loaded) return;
+  spRpc('sp_list_staff_names', {}).then(function(res) {
+    sel.dataset.loaded = '1';
+    (res.data || []).forEach(function(row) {
+      var opt = document.createElement('option');
+      opt.textContent = row.name;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function spOnEditStaffChange() {
+  spCurrentEditStaff = document.getElementById('spEditStaffSelect').value;
+  document.getElementById('spEditStaffHistory').style.display = spCurrentEditStaff ? 'block' : 'none';
+  if (spCurrentEditStaff) spRenderStaffHistory();
+}
+
+function spRenderStaffHistory() {
+  var el = document.getElementById('spEditHistoryList');
+  if (!spCurrentEditStaff) return;
+  spRpc('sp_staff_leave_history', { p_staff_name: spCurrentEditStaff }).then(function(res) {
+    var rows = res.ok && Array.isArray(res.data) ? res.data : [];
+    spHistoryRows = {};
+    rows.forEach(function(r) { spHistoryRows[r.id] = r; });
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No entries yet.</div>'; return; }
+    el.innerHTML = rows.map(spHistoryRowHtml).join('');
+  });
+}
+
+function spHistoryRowHtml(r) {
+  return '<div class="sp-req-item" id="sp-hist-' + r.id + '">'
+    + '<div class="sp-req-top"><span class="sp-req-dates">' + spFmtDateRange(r.start_date, r.end_date) + ' &mdash; ' + r.days + ' ' + spEsc(r.type) + '</span><span class="sp-pill ' + r.status + '">' + r.status + '</span></div>'
+    + (r.note ? '<div class="sp-req-note">' + spEsc(r.note) + '</div>' : '')
+    + '<div class="sp-req-actions"><button class="sp-btn-approve" onclick="spStartEditRow(\'' + r.id + '\')">Edit</button><button class="sp-btn-decline" onclick="spDeleteHistoryRow(\'' + r.id + '\')">Delete</button></div>'
+    + '</div>';
+}
+
+var SP_LEAVE_TYPES = ['holiday', 'sick', 'other', 'bank_holiday', 'shutdown'];
+var SP_LEAVE_STATUSES = ['pending', 'approved', 'declined'];
+
+function spOptions(values, selected) {
+  return values.map(function(v) { return '<option value="' + v + '"' + (v === selected ? ' selected' : '') + '>' + v + '</option>'; }).join('');
+}
+
+function spStartEditRow(id) {
+  var r = spHistoryRows[id];
+  var el = document.getElementById('sp-hist-' + id);
+  el.innerHTML = ''
+    + '<div class="sp-row2"><div class="sp-field"><label>Start</label><input type="date" id="sp-edit-start-' + id + '" value="' + r.start_date + '"></div><div class="sp-field"><label>End</label><input type="date" id="sp-edit-end-' + id + '" value="' + r.end_date + '"></div></div>'
+    + '<div class="sp-row2"><div class="sp-field"><label>Days</label><input type="number" step="0.5" id="sp-edit-days-' + id + '" value="' + r.days + '"></div><div class="sp-field"><label>Type</label><select id="sp-edit-type-' + id + '">' + spOptions(SP_LEAVE_TYPES, r.type) + '</select></div></div>'
+    + '<div class="sp-field"><label>Status</label><select id="sp-edit-status-' + id + '">' + spOptions(SP_LEAVE_STATUSES, r.status) + '</select></div>'
+    + '<div class="sp-field"><label>Note</label><input type="text" id="sp-edit-note-' + id + '" value="' + spEsc(r.note || '') + '"></div>'
+    + '<div class="sp-req-actions"><button class="sp-btn-approve" onclick="spSaveEditRow(\'' + id + '\')">Save</button><button class="sp-btn-decline" onclick="spRenderStaffHistory()">Cancel</button></div>';
+}
+
+function spSaveEditRow(id) {
+  var body = {
+    p_id: id,
+    p_start_date: document.getElementById('sp-edit-start-' + id).value,
+    p_end_date: document.getElementById('sp-edit-end-' + id).value,
+    p_days: parseFloat(document.getElementById('sp-edit-days-' + id).value),
+    p_type: document.getElementById('sp-edit-type-' + id).value,
+    p_note: document.getElementById('sp-edit-note-' + id).value || null,
+    p_status: document.getElementById('sp-edit-status-' + id).value
+  };
+  spRpc('sp_manager_edit_leave_entry', body).then(function(res) {
+    if (!res.ok) { spToast((res.data && res.data.message) || 'Could not save.'); return; }
+    spToast('Saved.');
+    spRenderStaffHistory();
+    spRenderTeamSummary();
+  });
+}
+
+function spDeleteHistoryRow(id) {
+  if (!confirm('Delete this entry? This cannot be undone.')) return;
+  spRpc('sp_manager_delete_leave_entry', { p_id: id }).then(function(res) {
+    if (!res.ok) { spToast((res.data && res.data.message) || 'Could not delete.'); return; }
+    spToast('Deleted.');
+    spRenderStaffHistory();
+    spRenderTeamSummary();
+  });
+}
+
+function spSubmitManagerAddEntry() {
+  var err = document.getElementById('spAddEntryErr'); err.textContent = '';
+  var start = document.getElementById('spAddStart').value;
+  var end = document.getElementById('spAddEnd').value;
+  var days = parseFloat(document.getElementById('spAddDays').value);
+  var type = document.getElementById('spAddType').value;
+  var note = document.getElementById('spAddNote').value;
+  if (!spCurrentEditStaff) { err.textContent = 'Select a staff member first.'; return; }
+  if (!start || !end) { err.textContent = 'Pick a start and end date.'; return; }
+  if (!days) { err.textContent = 'Enter number of days.'; return; }
+  spRpc('sp_manager_add_leave_entry', { p_staff_name: spCurrentEditStaff, p_start_date: start, p_end_date: end, p_days: days, p_type: type, p_note: note || null }).then(function(res) {
+    if (!res.ok) { err.textContent = (res.data && res.data.message) || 'Could not add entry.'; return; }
+    document.getElementById('spAddStart').value = '';
+    document.getElementById('spAddEnd').value = '';
+    document.getElementById('spAddDays').value = '';
+    document.getElementById('spAddNote').value = '';
+    spRenderStaffHistory();
+    spRenderTeamSummary();
+    spToast('Entry added.');
+  });
 }
 
 function spRenderTeamSummary() {

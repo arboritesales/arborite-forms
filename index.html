@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.3">
+  <link rel="stylesheet" href="css/app.css?v=1.4">
 </head>
 <body>
 
@@ -30,7 +30,7 @@
     <div style="margin-top:10px;font-size:12px;">
       <a href="#" onclick="spOpen('spPortalLogin');return false;" style="color:rgba(126,200,32,0.85);text-decoration:none;font-weight:600;cursor:pointer;">&#128336; Staff Portal &mdash; clock in / my leave</a>
     </div>
-    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.3</div>
+    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.4</div>
   </div>
 </div>
 
@@ -111,12 +111,13 @@
 #spRoot .sp-cal-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;color:var(--green);text-transform:uppercase;}
 #spRoot .sp-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
 #spRoot .sp-cal-dow{text-align:center;font-size:10px;font-weight:700;color:var(--mid);text-transform:uppercase;padding-bottom:4px;}
-#spRoot .sp-cal-day{aspect-ratio:1;background:var(--row-alt);border-radius:4px;font-size:11px;padding:4px;position:relative;color:var(--mid);}
-#spRoot .sp-cal-day.sp-blank{background:transparent;}
+#spRoot .sp-cal-day{min-height:56px;background:var(--row-alt);border-radius:4px;font-size:11px;padding:4px;position:relative;color:var(--mid);display:flex;flex-direction:column;gap:2px;}
+#spRoot .sp-cal-day.sp-blank{background:transparent;min-height:0;}
 #spRoot .sp-cal-day.sp-is-bh{background:var(--green-light);}
 #spRoot .sp-cal-day .sp-dnum{font-weight:600;}
-#spRoot .sp-cal-day .sp-dot{position:absolute;bottom:4px;left:4px;right:4px;height:5px;border-radius:3px;background:var(--lime);}
 #spRoot .sp-cal-day .sp-bh-tag{position:absolute;top:3px;right:3px;background:var(--green);color:#fff;font-size:7.5px;font-weight:800;letter-spacing:.3px;padding:1.5px 4px;border-radius:3px;}
+#spRoot .sp-cal-names{display:flex;flex-direction:column;gap:1px;}
+#spRoot .sp-cal-name{background:var(--lime);color:#1a2e10;font-size:9px;font-weight:700;line-height:1.4;padding:0 3px;border-radius:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #spRoot .sp-legend{display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--mid);flex-wrap:wrap;}
 #spRoot .sp-legend span{display:inline-flex;align-items:center;gap:5px;}
 #spRoot .sp-legend .sp-sw{width:10px;height:10px;border-radius:3px;display:inline-block;}
@@ -190,6 +191,10 @@
           <div class="sp-bal-box"><div class="sp-bal-num" id="spBalUsed">&mdash;</div><div class="sp-bal-lbl">Used</div></div>
           <div class="sp-bal-box"><div class="sp-bal-num" id="spBalRemaining">&mdash;</div><div class="sp-bal-lbl">Remaining</div></div>
         </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--row-alt);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:11px;color:var(--mid);text-transform:uppercase;letter-spacing:.4px;">Sick days taken this year</span>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;color:var(--green);" id="spBalSick">&mdash;</span>
+        </div>
       </div>
       <div class="sp-card">
         <h3>Request time off</h3>
@@ -225,8 +230,36 @@
     <div class="sp-header"><button class="sp-back" onclick="spOpen('spClose')">&larr; Back to Office</button><h1>Staff Dashboards<span class="sp-sub">Manager-only &mdash; reached through Office</span></h1></div>
     <div class="sp-body">
       <div class="sp-card"><h3>Who's on site now</h3><div id="spMgrOnsite"></div></div>
+      <div class="sp-card"><h3>Recent clock activity</h3><div id="spClockActivity"></div></div>
+      <div class="sp-card">
+        <div class="sp-cal-head"><button onclick="spShiftReportMonth(-1)">&lsaquo;</button><div class="sp-cal-title" id="spReportTitle">Monthly Clock Report</div><button onclick="spShiftReportMonth(1)">&rsaquo;</button></div>
+        <div style="overflow-x:auto;" id="spClockReport"></div>
+      </div>
       <div class="sp-card"><h3>Team summary</h3><div style="overflow-x:auto;" id="spTeamSummary"></div></div>
       <div class="sp-card"><h3>Pending requests</h3><div id="spMgrPending"></div></div>
+      <div class="sp-card">
+        <h3>Edit staff records</h3>
+        <div class="sp-field"><label>Staff member</label>
+          <select id="spEditStaffSelect" onchange="spOnEditStaffChange()"><option value="">&mdash; Select staff member &mdash;</option></select>
+        </div>
+        <div id="spEditStaffHistory" style="display:none;">
+          <div id="spEditHistoryList" style="margin-bottom:14px;"></div>
+          <div style="border-top:1px solid var(--row-alt);padding-top:12px;">
+            <h3 style="margin-bottom:10px;">Add entry</h3>
+            <div class="sp-row2">
+              <div class="sp-field"><label>Start date</label><input type="date" id="spAddStart"></div>
+              <div class="sp-field"><label>End date</label><input type="date" id="spAddEnd"></div>
+            </div>
+            <div class="sp-row2">
+              <div class="sp-field"><label>Days</label><input type="number" step="0.5" id="spAddDays"></div>
+              <div class="sp-field"><label>Type</label><select id="spAddType"><option value="sick">Sick</option><option value="holiday">Holiday</option><option value="other">Other</option></select></div>
+            </div>
+            <div class="sp-field"><label>Note</label><input type="text" id="spAddNote" placeholder="e.g. sick pay for 12-13 Aug"></div>
+            <button class="sp-btn sp-btn-primary" onclick="spSubmitManagerAddEntry()">Add entry</button>
+            <div class="sp-err-inline" id="spAddEntryErr"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -239,7 +272,7 @@
   <div style="position:relative;z-index:1;">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.3</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.4</span></div>
     <div class="dash-header-actions">
       <button id="logoutBtn" onclick="logoutToTeamLogin()" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">&#128274; Log Out</button>
     </div>
@@ -287,7 +320,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.3</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.4</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -3361,7 +3394,7 @@
 </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=1.3"></script>
+  <script src="js/app.js?v=1.4"></script>
 </body>
 </html>
 

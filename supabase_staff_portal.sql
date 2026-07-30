@@ -328,6 +328,48 @@ as $$
   order by latest.ts asc;
 $$;
 
+-- Manager-only — one row per employee per day worked in the given month:
+-- first clock-in and last clock-out that day, and the hours between. A
+-- simple first-in/last-out timesheet, not a full break-by-break log (that's
+-- what "Recent clock activity" above is for if more detail is ever needed).
+create or replace function sp_clock_report(p_year int, p_month int)
+returns table(name text, work_date date, clock_in time, clock_out time, hours numeric)
+language sql
+security definer
+set search_path = public, extensions
+as $$
+  select
+    s.name,
+    (sce.ts at time zone 'Europe/London')::date as work_date,
+    min(case when sce.action = 'in' then (sce.ts at time zone 'Europe/London')::time end) as clock_in,
+    max(case when sce.action = 'out' then (sce.ts at time zone 'Europe/London')::time end) as clock_out,
+    round(extract(epoch from (
+      max(case when sce.action = 'out' then sce.ts end) - min(case when sce.action = 'in' then sce.ts end)
+    )) / 3600.0, 2) as hours
+  from staff_clock_events sce
+  join staff s on s.id = sce.staff_id
+  where date_trunc('month', sce.ts at time zone 'Europe/London') = make_date(p_year, p_month, 1)
+  group by s.name, work_date
+  order by s.name asc, work_date asc;
+$$;
+
+-- Manager-only (Staff Dashboards) — every recent clock in/out event with its
+-- location, not just who's currently on site. Employees only ever see each
+-- other's on-site status via sp_onsite_now above (name only, no location) —
+-- location is manager-visible only, hence authenticated-only grant below.
+create or replace function sp_clock_activity(p_limit int default 100)
+returns table(name text, action text, ts timestamptz, lat double precision, lng double precision, accuracy_m numeric)
+language sql
+security definer
+set search_path = public, extensions
+as $$
+  select s.name, sce.action, sce.ts, sce.lat, sce.lng, sce.accuracy_m
+  from staff_clock_events sce
+  join staff s on s.id = sce.staff_id
+  order by sce.ts desc
+  limit p_limit;
+$$;
+
 -- anon: Staff Portal doesn't use the shared team/manager login, so its own
 -- requests run as anon — these are the only functions it's allowed to call,
 -- and each one either requires a valid password/token or returns nothing
@@ -344,6 +386,8 @@ grant execute on function sp_onsite_now() to anon, authenticated;
 -- which is only reachable after the real manager Supabase Auth login — no
 -- reason for anon to ever be able to call this one.
 grant execute on function reset_staff_password(text) to authenticated;
+grant execute on function sp_clock_activity(int) to authenticated;
+grant execute on function sp_clock_report(int, int) to authenticated;
 
 -- ============================================================================
 -- SEED DATA — from Arborite Tree Services Holiday Chart 2026-2027.xlsx,
@@ -415,8 +459,10 @@ drop policy if exists "authenticated_all" on staff_leave_requests;
 -- shown on the calendar for reference but deliberately excluded here too —
 -- verified directly against the spreadsheet: employees with zero personal
 -- holiday in a month with bank holidays still show an unchanged balance.
+-- sick_days is informational only (doesn't affect days_remaining).
+drop function if exists sp_my_leave_balance(text);
 create or replace function sp_my_leave_balance(p_token text)
-returns table(entitlement numeric, days_used numeric, days_remaining numeric)
+returns table(entitlement numeric, days_used numeric, days_remaining numeric, sick_days numeric)
 language plpgsql
 security definer
 set search_path = public, extensions
@@ -424,12 +470,16 @@ as $$
 declare
   v_staff staff;
   v_used numeric;
+  v_sick numeric;
 begin
   v_staff := sp_staff_from_token(p_token);
   select coalesce(sum(days), 0) into v_used
     from staff_leave_requests
     where staff_id = v_staff.id and status = 'approved' and type in ('holiday','shutdown');
-  return query select v_staff.holiday_allowance_days, v_used, v_staff.holiday_allowance_days - v_used;
+  select coalesce(sum(days), 0) into v_sick
+    from staff_leave_requests
+    where staff_id = v_staff.id and status = 'approved' and type = 'sick';
+  return query select v_staff.holiday_allowance_days, v_used, v_staff.holiday_allowance_days - v_used, v_sick;
 end;
 $$;
 
@@ -553,12 +603,100 @@ begin
 end;
 $$;
 
+-- Manager-only — one employee's complete leave history, any status/type,
+-- including the historical-import row and any bank_holiday/shutdown entries.
+-- This is the manager's "full edit access" view — everything sp_my_leave_requests
+-- hides from the employee themselves (bank_holiday/shutdown rows, the import
+-- placeholder) is visible here so a manager can actually correct any of it.
+create or replace function sp_staff_leave_history(p_staff_name text)
+returns table(id uuid, start_date date, end_date date, days numeric, type text, note text, status text, requested_at timestamptz)
+language sql
+security definer
+set search_path = public, extensions
+as $$
+  select slr.id, slr.start_date, slr.end_date, slr.days, slr.type, slr.note, slr.status, slr.requested_at
+  from staff_leave_requests slr
+  join staff s on s.id = slr.staff_id
+  where s.name = p_staff_name
+  order by slr.start_date desc;
+$$;
+
+-- Manager-only — add a new entry directly (sick pay, a manual holiday
+-- correction, etc.), auto-approved rather than going through the pending
+-- workflow since a manager entering it is already a decision, not a request.
+create or replace function sp_manager_add_leave_entry(p_staff_name text, p_start_date date, p_end_date date, p_days numeric, p_type text, p_note text default null)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_staff_id uuid;
+begin
+  select id into v_staff_id from staff where name = p_staff_name and active = true;
+  if v_staff_id is null then
+    raise exception 'Unknown staff member';
+  end if;
+  if p_end_date < p_start_date then
+    raise exception 'End date is before start date';
+  end if;
+  insert into staff_leave_requests (staff_id, start_date, end_date, days, type, note, status, decided_at)
+    values (v_staff_id, p_start_date, p_end_date, p_days, p_type, p_note, 'approved', now());
+  return true;
+end;
+$$;
+
+-- Manager-only — edit any field of any existing entry directly. Deliberately
+-- unrestricted on which rows can be touched (including the historical-import
+-- and bank_holiday/shutdown rows) per "full edit access to every entry".
+create or replace function sp_manager_edit_leave_entry(p_id uuid, p_start_date date, p_end_date date, p_days numeric, p_type text, p_note text, p_status text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+begin
+  if p_end_date < p_start_date then
+    raise exception 'End date is before start date';
+  end if;
+  if p_status not in ('pending', 'approved', 'declined') then
+    raise exception 'Invalid status';
+  end if;
+  update staff_leave_requests
+    set start_date = p_start_date, end_date = p_end_date, days = p_days, type = p_type, note = p_note, status = p_status
+    where id = p_id;
+  if not found then
+    raise exception 'Entry not found';
+  end if;
+  return true;
+end;
+$$;
+
+-- Manager-only — remove an entry entirely (e.g. a mistaken sick-day log, or
+-- to "remove holiday" by deleting a previously-approved request).
+create or replace function sp_manager_delete_leave_entry(p_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, extensions
+as $$
+  delete from staff_leave_requests where id = p_id;
+  select true;
+$$;
+
 -- Manager-only — called whenever Staff Dashboards loads. p_dates is a plain
 -- JSON array of ISO date strings, fetched client-side from
--- https://www.gov.uk/bank-holidays.json (england-and-wales) since Postgres
--- itself has no outbound internet access here. ON CONFLICT DO NOTHING makes
--- repeat calls (every time a manager opens the screen) cheap no-ops once a
--- date's already applied to everyone.
+-- https://www.gov.uk/bank-holidays.json (england-and-wales, which spans
+-- 2019-2028) since Postgres itself has no outbound internet access here.
+-- ON CONFLICT DO NOTHING makes repeat calls (every time a manager opens the
+-- screen) cheap no-ops once a date's already applied to everyone.
+--
+-- Re-bounds to the current leave year SERVER-SIDE, not just trusting the
+-- client to have already filtered — a stale cached copy of the app (or any
+-- future bug) sending the full unfiltered decade of dates previously
+-- inflated everyone's "days used" by ~80 days. This is the actual fix;
+-- the client-side filter in spSyncBankHolidaysAndShutdowns() is now just a
+-- courtesy that avoids sending pointless data, not the safety mechanism.
 create or replace function sp_sync_bank_holidays(p_dates jsonb)
 returns integer
 language plpgsql
@@ -567,12 +705,19 @@ set search_path = public, extensions
 as $$
 declare
   v_count integer;
+  v_year_start date;
+  v_year_end date;
 begin
+  v_year_start := make_date(
+    (case when extract(month from current_date) >= 4 then extract(year from current_date) else extract(year from current_date) - 1 end)::int,
+    4, 1
+  );
+  v_year_end := (v_year_start + interval '1 year' - interval '1 day')::date;
   with dates as (select (jsonb_array_elements_text(p_dates))::date as d)
   insert into staff_leave_requests (staff_id, start_date, end_date, days, type, note, status, decided_at)
   select s.id, dates.d, dates.d, 1, 'bank_holiday', 'UK bank holiday (auto-applied)', 'approved', now()
   from staff s cross join dates
-  where s.active = true
+  where s.active = true and dates.d between v_year_start and v_year_end
   on conflict (staff_id, start_date) where type = 'bank_holiday' do nothing;
   get diagnostics v_count = row_count;
   return v_count;
@@ -616,5 +761,9 @@ grant execute on function sp_calendar_days(int, int) to anon, authenticated;
 grant execute on function sp_team_summary() to authenticated;
 grant execute on function sp_pending_requests() to authenticated;
 grant execute on function sp_decide_leave_request(uuid, text) to authenticated;
+grant execute on function sp_staff_leave_history(text) to authenticated;
+grant execute on function sp_manager_add_leave_entry(text, date, date, numeric, text, text) to authenticated;
+grant execute on function sp_manager_edit_leave_entry(uuid, date, date, numeric, text, text, text) to authenticated;
+grant execute on function sp_manager_delete_leave_entry(uuid) to authenticated;
 grant execute on function sp_sync_bank_holidays(jsonb) to authenticated;
 grant execute on function sp_sync_shutdown_days() to authenticated;
