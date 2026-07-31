@@ -136,7 +136,7 @@ var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads
 
 function init() {
   CUSTOM_STAFF = []; CUSTOM_MACHINES = []; allJobs = []; currentJobRef = ''; pads = {}; drCount = 0; docStore = {};
-  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware"];
+  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware", "Olly Key"];
   MACHINES = ["ARB Team", "Kubota 2.7", "CC145", "Cutter", "LV800", "Climber", "MEWP", "Hinowa 2010", "TPF", "FSID74", "Sub Contractor"];
 }
 
