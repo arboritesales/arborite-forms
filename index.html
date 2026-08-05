@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.8">
+  <link rel="stylesheet" href="css/app.css?v=1.9">
 </head>
 <body>
 
@@ -30,7 +30,7 @@
     <div style="margin-top:10px;font-size:12px;">
       <a href="#" onclick="spOpen('spPortalLogin');return false;" style="color:rgba(126,200,32,0.85);text-decoration:none;font-weight:600;cursor:pointer;">&#128336; Staff Portal &mdash; clock in / my leave</a>
     </div>
-    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.8</div>
+    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.9</div>
   </div>
 </div>
 
@@ -272,7 +272,7 @@
   <div style="position:relative;z-index:1;">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.8</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9</span></div>
     <div class="dash-header-actions">
       <button id="logoutBtn" onclick="logoutToTeamLogin()" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">&#128274; Log Out</button>
     </div>
@@ -320,7 +320,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.8</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -3393,8 +3393,26 @@
   </div>
 </div>
 
+<!-- JOB SHARE LINK MODAL -->
+<div class="modal-bg" id="jobLinkModal">
+  <div class="modal">
+    <h2>Share Job <span id="jobLinkModalRef" style="color:var(--lime);"></span></h2>
+    <p>Anyone with this link can fill in this job's forms — no login needed. It stays active until you revoke it.</p>
+    <div id="jobLinkModalNewUrl" style="display:none;margin-bottom:14px;">
+      <input type="text" readonly style="font-size:12px;" onclick="this.select()">
+      <button class="m-btn m-ok" style="margin-top:8px;width:100%;" onclick="copyJobLinkUrl()">Copy Link</button>
+    </div>
+    <input type="text" id="jobLinkLabelInput" placeholder="Label (e.g. subcontractor name)">
+    <button class="m-btn m-ok" style="width:100%;margin-bottom:14px;" onclick="createJobShareLink()">+ Create New Link</button>
+    <div class="job-list" id="jobLinkList"></div>
+    <div class="modal-btns">
+      <button class="m-btn m-cancel" onclick="closeJobLinkManager()">Close</button>
+    </div>
+  </div>
+</div>
+
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=1.8"></script>
+  <script src="js/app.js?v=1.9"></script>
 </body>
 </html>
 

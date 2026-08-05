@@ -202,10 +202,14 @@ function renderJobList(jobs) {
       var dt  = document.createElement('div'); dt.className  = 'job-item-date'; dt.textContent = saved;
       info.appendChild(ref); info.appendChild(det);
       info.addEventListener('click', function() { hideModals(); loadJobByRef(j.quote_ref); });
+      var link = document.createElement('button');
+      link.className = 'job-del-btn'; link.title = 'Get shareable link'; link.innerHTML = '&#128279;';
+      link.style.marginRight = '4px';
+      link.addEventListener('click', function(e) { e.stopPropagation(); openJobLinkManager(j.quote_ref); });
       var del = document.createElement('button');
       del.className = 'job-del-btn'; del.title = 'Delete'; del.innerHTML = '&#x1F5D1;';
       del.addEventListener('click', function(e) { e.stopPropagation(); deleteJob(j.quote_ref); });
-      row.appendChild(info); row.appendChild(dt); row.appendChild(del);
+      row.appendChild(info); row.appendChild(dt); row.appendChild(link); row.appendChild(del);
       list.appendChild(row);
     })(jobs[i]);
   }

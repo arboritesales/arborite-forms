@@ -134,6 +134,10 @@ var TABLE    = 'job_forms';
 var PANELS   = ['powa','signoff','method','daily','documents','emergency','safety'];
 var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads, drCount, docStore;
 
+// A subcontractor job link (?jobLink=<token> — see job-share-link.js) skips
+// the team login entirely and opens straight into that one job's forms.
+var JOB_LINK_TOKEN = null;
+
 function init() {
   CUSTOM_STAFF = []; CUSTOM_MACHINES = []; allJobs = []; currentJobRef = ''; pads = {}; drCount = 0; docStore = {};
   STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware", "Olly Key"];
@@ -304,8 +308,14 @@ window.addEventListener('load', function() {
   buildAll();
   setTimeout(initAllSigs, 400);
   setTimeout(renderAllDocLists, 500);
-  // Pre-load job list so Load Job modal shows jobs immediately
-  if (SUPA_URL !== 'YOUR_SUPABASE_URL') fetchJobList();
+  var jobLinkToken = new URLSearchParams(window.location.search).get('jobLink');
+  if (jobLinkToken) {
+    JOB_LINK_TOKEN = jobLinkToken;
+    bootstrapJobLink();
+  } else if (SUPA_URL !== 'YOUR_SUPABASE_URL') {
+    // Pre-load job list so Load Job modal shows jobs immediately
+    fetchJobList();
+  }
 });
 
 // ── BUILD ──
@@ -758,10 +768,14 @@ function renderJobList(jobs) {
       var dt  = document.createElement('div'); dt.className  = 'job-item-date'; dt.textContent = saved;
       info.appendChild(ref); info.appendChild(det);
       info.addEventListener('click', function() { hideModals(); loadJobByRef(j.quote_ref); });
+      var link = document.createElement('button');
+      link.className = 'job-del-btn'; link.title = 'Get shareable link'; link.innerHTML = '&#128279;';
+      link.style.marginRight = '4px';
+      link.addEventListener('click', function(e) { e.stopPropagation(); openJobLinkManager(j.quote_ref); });
       var del = document.createElement('button');
       del.className = 'job-del-btn'; del.title = 'Delete'; del.innerHTML = '&#x1F5D1;';
       del.addEventListener('click', function(e) { e.stopPropagation(); deleteJob(j.quote_ref); });
-      row.appendChild(info); row.appendChild(dt); row.appendChild(del);
+      row.appendChild(info); row.appendChild(dt); row.appendChild(link); row.appendChild(del);
       list.appendChild(row);
     })(jobs[i]);
   }
@@ -1315,6 +1329,83 @@ function _executeDelete(ref, isTBT, isAudit) {
     .catch(function(e){ alert('Delete failed: ' + e.message); });
 }
 
+// Applies a loaded job's data to the DOM — shared by the normal team-login
+// load path (loadJobByRef below) and the subcontractor job-link path
+// (bootstrapJobLink in job-share-link.js), so both stay in sync.
+function _applyLoadedJobData(loadedRef, fd_raw) {
+  clearAllForms();
+  // First rebuild dynamic selects so values can be set
+  initAllStaffSelects();
+  // form_data may be a JSONB object OR a JSON string depending on Supabase column type
+  var fd_parsed = (typeof fd_raw === 'string') ? JSON.parse(fd_raw) : fd_raw;
+  // Grow the Daily Task Register to fit however many rows this job
+  // actually has saved, BEFORE restoring — otherwise rows beyond the
+  // default 12 have no DOM element to restore into and get wiped by
+  // the next autosave (saves are a full overwrite, not a merge).
+  ensureDailyRowsFor(fd_parsed);
+  restoreFormData(fd_parsed);
+  // Re-sync shared fields and re-apply supervisor value after select is populated
+  setTimeout(function() { /* 50ms: enough for selects to populate */
+    syncShared();
+    var fd = fd_parsed;
+    if (fd) {
+      var superSels = ['p_completed_by']; // supervisor fields restored independently by their own IDs
+      for (var si = 0; si < superSels.length; si++) {
+        var sel = document.getElementById(superSels[si]);
+        if (sel && fd[superSels[si]]) {
+          // Make sure the value exists in options, if not add it
+          var found = false;
+          for (var oi = 0; oi < sel.options.length; oi++) {
+            if (sel.options[oi].value === fd[superSels[si]]) { found = true; break; }
+          }
+          if (!found && fd[superSels[si]]) {
+            var newOpt = document.createElement('option');
+            newOpt.value = fd[superSels[si]];
+            newOpt.textContent = fd[superSels[si]];
+            sel.appendChild(newOpt);
+          }
+          sel.value = fd[superSels[si]];
+        }
+      }
+      // Restore text override fields
+      if (fd.ms_supervisor_text) {
+        var mst = document.getElementById('ms_supervisor_text');
+        if (mst) mst.value = fd.ms_supervisor_text;
+      }
+      if (fd.ms_super_name_text) {
+        var msnt = document.getElementById('ms_super_name_text');
+        if (msnt) msnt.value = fd.ms_super_name_text;
+      }
+      // Also ensure shared text fields are properly restored
+      var sharedFields = ['so_client','ms_client','so_site','ms_site','p_address','so_quote','ms_jobno','p_quote','dr_quote','dr_site','so_w3w','ms_w3w'];
+      for (var sf = 0; sf < sharedFields.length; sf++) {
+        var fld = document.getElementById(sharedFields[sf]);
+        if (fld && fd[sharedFields[sf]]) fld.value = fd[sharedFields[sf]];
+      }
+      // Restore w3w link buttons
+      if (fd.so_w3w) updateW3WLink('so_w3w_link', fd.so_w3w);
+      if (fd.ms_w3w) updateW3WLink('ms_w3w_link', fd.ms_w3w);
+    }
+  }, 50);
+  setJobRef(loadedRef);
+  _saveJobLocalCache(loadedRef, fd_parsed);
+  syncShared();
+  setStatus('Loaded: ' + loadedRef, 'ok');
+  // Load documents from dedicated table
+  _docDbLoad(loadedRef, function(err, docs) {
+    docStore = {};
+    if (!err && docs.length) {
+      docs.forEach(function(row) {
+        if (!docStore[row.category]) docStore[row.category] = [];
+        // data is null — fetched on demand when user taps View
+        docStore[row.category].push({name:row.name, type:row.mime_type, data:null, status:'saved', dbId:row.id});
+      });
+    }
+    renderAllDocLists();
+    _mergeLocalDocs(loadedRef);
+  });
+}
+
 function loadJobByRef(ref) {
   if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Configure Supabase first', 'err'); return; }
   setStatus('Loading...', '');
@@ -1322,79 +1413,7 @@ function loadJobByRef(ref) {
     .then(function(r){ return r.json(); })
     .then(function(rows){
       if (!rows || rows.length === 0) { setStatus('Not found: ' + ref, 'err'); return; }
-      clearAllForms();
-      // First rebuild dynamic selects so values can be set
-      initAllStaffSelects();
-      // form_data may be a JSONB object OR a JSON string depending on Supabase column type
-      var fd_raw = rows[0].form_data;
-      var fd_parsed = (typeof fd_raw === 'string') ? JSON.parse(fd_raw) : fd_raw;
-      // Grow the Daily Task Register to fit however many rows this job
-      // actually has saved, BEFORE restoring — otherwise rows beyond the
-      // default 12 have no DOM element to restore into and get wiped by
-      // the next autosave (saves are a full overwrite, not a merge).
-      ensureDailyRowsFor(fd_parsed);
-      restoreFormData(fd_parsed);
-      // Re-sync shared fields and re-apply supervisor value after select is populated
-      setTimeout(function() { /* 50ms: enough for selects to populate */
-        syncShared();
-        var fd = fd_parsed;
-        if (fd) {
-          var superSels = ['p_completed_by']; // supervisor fields restored independently by their own IDs
-          for (var si = 0; si < superSels.length; si++) {
-            var sel = document.getElementById(superSels[si]);
-            if (sel && fd[superSels[si]]) {
-              // Make sure the value exists in options, if not add it
-              var found = false;
-              for (var oi = 0; oi < sel.options.length; oi++) {
-                if (sel.options[oi].value === fd[superSels[si]]) { found = true; break; }
-              }
-              if (!found && fd[superSels[si]]) {
-                var newOpt = document.createElement('option');
-                newOpt.value = fd[superSels[si]];
-                newOpt.textContent = fd[superSels[si]];
-                sel.appendChild(newOpt);
-              }
-              sel.value = fd[superSels[si]];
-            }
-          }
-          // Restore text override fields
-          if (fd.ms_supervisor_text) {
-            var mst = document.getElementById('ms_supervisor_text');
-            if (mst) mst.value = fd.ms_supervisor_text;
-          }
-          if (fd.ms_super_name_text) {
-            var msnt = document.getElementById('ms_super_name_text');
-            if (msnt) msnt.value = fd.ms_super_name_text;
-          }
-          // Also ensure shared text fields are properly restored
-          var sharedFields = ['so_client','ms_client','so_site','ms_site','p_address','so_quote','ms_jobno','p_quote','dr_quote','dr_site','so_w3w','ms_w3w'];
-          for (var sf = 0; sf < sharedFields.length; sf++) {
-            var fld = document.getElementById(sharedFields[sf]);
-            if (fld && fd[sharedFields[sf]]) fld.value = fd[sharedFields[sf]];
-          }
-          // Restore w3w link buttons
-          if (fd.so_w3w) updateW3WLink('so_w3w_link', fd.so_w3w);
-          if (fd.ms_w3w) updateW3WLink('ms_w3w_link', fd.ms_w3w);
-        }
-      }, 50);
-      var loadedRef = rows[0].quote_ref;
-      setJobRef(loadedRef);
-      _saveJobLocalCache(loadedRef, fd_parsed);
-      syncShared();
-      setStatus('Loaded: ' + loadedRef, 'ok');
-      // Load documents from dedicated table
-      _docDbLoad(loadedRef, function(err, docs) {
-        docStore = {};
-        if (!err && docs.length) {
-          docs.forEach(function(row) {
-            if (!docStore[row.category]) docStore[row.category] = [];
-            // data is null — fetched on demand when user taps View
-            docStore[row.category].push({name:row.name, type:row.mime_type, data:null, status:'saved', dbId:row.id});
-          });
-        }
-        renderAllDocLists();
-        _mergeLocalDocs(loadedRef);
-      });
+      _applyLoadedJobData(rows[0].quote_ref, rows[0].form_data);
       if (_fromJobSelect) {
         _fromJobSelect = false;
         hideModals();
@@ -1543,6 +1562,21 @@ function uploadSigsToStorage(formData) {
   uploadNext();
 }
 
+// Job-link mode (see job-share-link.js) has no team session, so it can't hit
+// job_forms directly under RLS — it goes through the job_share_link_save RPC
+// instead, which checks the link token itself. Same payload shape either way.
+function _jobFormsUpsert(payload) {
+  if (JOB_LINK_TOKEN) {
+    return fetch(SUPA_URL + '/rest/v1/rpc/job_share_link_save', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken()},
+      body: JSON.stringify({p_token: JOB_LINK_TOKEN, p_form_data: payload.form_data}),
+      credentials: 'omit', mode: 'cors'
+    });
+  }
+  return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload);
+}
+
 function sendSave(formData) {
   var payload = {quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
 
@@ -1552,14 +1586,14 @@ function sendSave(formData) {
     sendSaveRaw(payload);
   }, 15000);
 
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
+  _jobFormsUpsert(payload)
     .then(function(r){
       clearTimeout(saveTimeout);
       if (r.ok || r.status === 201 || r.status === 204) {
         _saveJobLocalCache(currentJobRef, payload.form_data);
         _clearOfflinePending();
         setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
-        fetchJobList();
+        if (!JOB_LINK_TOKEN) fetchJobList();
       } else {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
       }
@@ -1583,13 +1617,13 @@ function sendSave(formData) {
 
 function sendSaveRaw(payload) {
   // Retry without signatures if original save timed out
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
+  _jobFormsUpsert(payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
         _saveJobLocalCache(currentJobRef, payload.form_data);
         _clearOfflinePending();
         setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
-        fetchJobList();
+        if (!JOB_LINK_TOKEN) fetchJobList();
       } else {
         setStatus('Save error — check connection', 'err');
       }
@@ -6781,4 +6815,131 @@ function spDecideRequest(id, status) {
     spRenderPendingRequests();
     spRenderTeamSummary();
   });
+}
+// ── JOB SHARE LINKS ──
+// Lets the team turn a job into a link a subcontractor can open with no
+// login, landing straight on that one job's forms and nothing else. Backed
+// by supabase_job_share_links.sql — a token-checked RPC pattern, same idea
+// as Staff Portal's session tokens (staff-portal.js), not the shared team
+// login used everywhere else in the app.
+
+// ── SUBCONTRACTOR SIDE: bootstrapped from core-shared.js when ?jobLink=... is present ──
+function bootstrapJobLink() {
+  var ls = document.getElementById('lockScreen');
+  if (ls) ls.style.display = 'none';
+  fetch(SUPA_URL + '/rest/v1/rpc/job_share_link_load', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY},
+    body: JSON.stringify({p_token: JOB_LINK_TOKEN}),
+    credentials: 'omit', mode: 'cors'
+  })
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+    .then(function(res){
+      if (!res.ok || !res.data || !res.data.length) { _showJobLinkError(); return; }
+      _applyLoadedJobData(res.data[0].quote_ref, res.data[0].form_data);
+      showDashboard();
+      _applyJobLinkUiRestrictions();
+    })
+    .catch(function(){ _showJobLinkError(); });
+}
+
+function _showJobLinkError() {
+  document.body.innerHTML =
+    '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+    'background:#2d5218;color:white;font-family:\'Barlow Condensed\',sans-serif;text-align:center;padding:40px;">' +
+    '<div><div style="font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Link no longer active</div>' +
+    '<div style="font-size:14px;opacity:.8;font-family:\'Barlow\',sans-serif;">Contact Arborite Tree Services for a new link.</div></div></div>';
+}
+
+function _applyJobLinkUiRestrictions() {
+  var bar = document.querySelector('.dash-job-bar');
+  if (bar) {
+    var newBtn = bar.querySelector('.btn-new');
+    var loadBtn = bar.querySelector('.btn-load');
+    if (newBtn) newBtn.style.display = 'none';
+    if (loadBtn) loadBtn.style.display = 'none';
+  }
+  var saveBtn = document.getElementById('dashSaveBtn');
+  if (saveBtn) {
+    saveBtn.textContent = '💾 Save';
+    saveBtn.setAttribute('onclick', 'saveJob()');
+  }
+}
+
+// ── TEAM SIDE: "Get link" button on each row of the Load Job list (jobs-storage.js renderJobList) ──
+var _jobLinkManagerRef = null;
+
+function openJobLinkManager(quoteRef) {
+  _jobLinkManagerRef = quoteRef;
+  document.getElementById('jobLinkModalRef').textContent = quoteRef;
+  document.getElementById('jobLinkModalNewUrl').style.display = 'none';
+  document.getElementById('jobLinkLabelInput').value = '';
+  document.getElementById('jobLinkModal').className = 'modal-bg show';
+  _refreshJobLinkList();
+}
+
+function closeJobLinkManager() {
+  document.getElementById('jobLinkModal').className = 'modal-bg';
+}
+
+function _refreshJobLinkList() {
+  var listEl = document.getElementById('jobLinkList');
+  listEl.innerHTML = '<div class="job-empty">Loading…</div>';
+  supaFetch('POST', 'rpc/list_job_share_links', {p_quote_ref: _jobLinkManagerRef})
+    .then(function(r){ return r.json(); })
+    .then(function(rows){
+      if (!rows || !rows.length) { listEl.innerHTML = '<div class="job-empty">No links yet for this job.</div>'; return; }
+      listEl.innerHTML = '';
+      rows.forEach(function(row) {
+        var item = document.createElement('div');
+        item.className = 'job-item';
+        var info = document.createElement('div');
+        info.style.flex = '1';
+        var label = document.createElement('div');
+        label.className = 'job-item-ref';
+        label.textContent = row.label || '(no label)';
+        var sub = document.createElement('div');
+        sub.className = 'job-item-info';
+        sub.textContent = row.revoked ? 'Revoked' : 'Active — created ' + new Date(row.created_at).toLocaleDateString('en-GB');
+        info.appendChild(label); info.appendChild(sub);
+        item.appendChild(info);
+        if (!row.revoked) {
+          var revokeBtn = document.createElement('button');
+          revokeBtn.className = 'job-del-btn'; revokeBtn.title = 'Revoke';
+          revokeBtn.innerHTML = '&#x1F5D1;';
+          revokeBtn.addEventListener('click', function() {
+            if (!confirm('Revoke this link? The subcontractor will lose access immediately.')) return;
+            supaFetch('POST', 'rpc/revoke_job_share_link', {p_token: row.token}).then(_refreshJobLinkList);
+          });
+          item.appendChild(revokeBtn);
+        }
+        listEl.appendChild(item);
+      });
+    })
+    .catch(function(){ listEl.innerHTML = '<div class="job-empty" style="color:#c0392b;">Could not load links.</div>'; });
+}
+
+function createJobShareLink() {
+  var label = document.getElementById('jobLinkLabelInput').value.trim();
+  supaFetch('POST', 'rpc/create_job_share_link', {p_quote_ref: _jobLinkManagerRef, p_label: label || null})
+    .then(function(r){ return r.json(); })
+    .then(function(rows){
+      if (!rows || !rows[0]) throw new Error('no token returned');
+      var path = window.location.pathname.indexOf('index.html') !== -1
+        ? window.location.pathname
+        : window.location.pathname.replace(/\/?$/, '/index.html');
+      var url = window.location.origin + path + '?jobLink=' + rows[0].token;
+      var urlBox = document.getElementById('jobLinkModalNewUrl');
+      urlBox.style.display = 'block';
+      urlBox.querySelector('input').value = url;
+      document.getElementById('jobLinkLabelInput').value = '';
+      _refreshJobLinkList();
+    })
+    .catch(function(){ alert('Could not create link — check your connection and try again.'); });
+}
+
+function copyJobLinkUrl() {
+  var input = document.getElementById('jobLinkModalNewUrl').querySelector('input');
+  input.select();
+  if (navigator.clipboard) navigator.clipboard.writeText(input.value).catch(function(){});
 }

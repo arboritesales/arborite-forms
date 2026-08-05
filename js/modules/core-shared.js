@@ -134,6 +134,10 @@ var TABLE    = 'job_forms';
 var PANELS   = ['powa','signoff','method','daily','documents','emergency','safety'];
 var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads, drCount, docStore;
 
+// A subcontractor job link (?jobLink=<token> — see job-share-link.js) skips
+// the team login entirely and opens straight into that one job's forms.
+var JOB_LINK_TOKEN = null;
+
 function init() {
   CUSTOM_STAFF = []; CUSTOM_MACHINES = []; allJobs = []; currentJobRef = ''; pads = {}; drCount = 0; docStore = {};
   STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware", "Olly Key"];
@@ -304,8 +308,14 @@ window.addEventListener('load', function() {
   buildAll();
   setTimeout(initAllSigs, 400);
   setTimeout(renderAllDocLists, 500);
-  // Pre-load job list so Load Job modal shows jobs immediately
-  if (SUPA_URL !== 'YOUR_SUPABASE_URL') fetchJobList();
+  var jobLinkToken = new URLSearchParams(window.location.search).get('jobLink');
+  if (jobLinkToken) {
+    JOB_LINK_TOKEN = jobLinkToken;
+    bootstrapJobLink();
+  } else if (SUPA_URL !== 'YOUR_SUPABASE_URL') {
+    // Pre-load job list so Load Job modal shows jobs immediately
+    fetchJobList();
+  }
 });
 
 // ── BUILD ──

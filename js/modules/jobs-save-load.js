@@ -176,6 +176,83 @@ function _executeDelete(ref, isTBT, isAudit) {
     .catch(function(e){ alert('Delete failed: ' + e.message); });
 }
 
+// Applies a loaded job's data to the DOM — shared by the normal team-login
+// load path (loadJobByRef below) and the subcontractor job-link path
+// (bootstrapJobLink in job-share-link.js), so both stay in sync.
+function _applyLoadedJobData(loadedRef, fd_raw) {
+  clearAllForms();
+  // First rebuild dynamic selects so values can be set
+  initAllStaffSelects();
+  // form_data may be a JSONB object OR a JSON string depending on Supabase column type
+  var fd_parsed = (typeof fd_raw === 'string') ? JSON.parse(fd_raw) : fd_raw;
+  // Grow the Daily Task Register to fit however many rows this job
+  // actually has saved, BEFORE restoring — otherwise rows beyond the
+  // default 12 have no DOM element to restore into and get wiped by
+  // the next autosave (saves are a full overwrite, not a merge).
+  ensureDailyRowsFor(fd_parsed);
+  restoreFormData(fd_parsed);
+  // Re-sync shared fields and re-apply supervisor value after select is populated
+  setTimeout(function() { /* 50ms: enough for selects to populate */
+    syncShared();
+    var fd = fd_parsed;
+    if (fd) {
+      var superSels = ['p_completed_by']; // supervisor fields restored independently by their own IDs
+      for (var si = 0; si < superSels.length; si++) {
+        var sel = document.getElementById(superSels[si]);
+        if (sel && fd[superSels[si]]) {
+          // Make sure the value exists in options, if not add it
+          var found = false;
+          for (var oi = 0; oi < sel.options.length; oi++) {
+            if (sel.options[oi].value === fd[superSels[si]]) { found = true; break; }
+          }
+          if (!found && fd[superSels[si]]) {
+            var newOpt = document.createElement('option');
+            newOpt.value = fd[superSels[si]];
+            newOpt.textContent = fd[superSels[si]];
+            sel.appendChild(newOpt);
+          }
+          sel.value = fd[superSels[si]];
+        }
+      }
+      // Restore text override fields
+      if (fd.ms_supervisor_text) {
+        var mst = document.getElementById('ms_supervisor_text');
+        if (mst) mst.value = fd.ms_supervisor_text;
+      }
+      if (fd.ms_super_name_text) {
+        var msnt = document.getElementById('ms_super_name_text');
+        if (msnt) msnt.value = fd.ms_super_name_text;
+      }
+      // Also ensure shared text fields are properly restored
+      var sharedFields = ['so_client','ms_client','so_site','ms_site','p_address','so_quote','ms_jobno','p_quote','dr_quote','dr_site','so_w3w','ms_w3w'];
+      for (var sf = 0; sf < sharedFields.length; sf++) {
+        var fld = document.getElementById(sharedFields[sf]);
+        if (fld && fd[sharedFields[sf]]) fld.value = fd[sharedFields[sf]];
+      }
+      // Restore w3w link buttons
+      if (fd.so_w3w) updateW3WLink('so_w3w_link', fd.so_w3w);
+      if (fd.ms_w3w) updateW3WLink('ms_w3w_link', fd.ms_w3w);
+    }
+  }, 50);
+  setJobRef(loadedRef);
+  _saveJobLocalCache(loadedRef, fd_parsed);
+  syncShared();
+  setStatus('Loaded: ' + loadedRef, 'ok');
+  // Load documents from dedicated table
+  _docDbLoad(loadedRef, function(err, docs) {
+    docStore = {};
+    if (!err && docs.length) {
+      docs.forEach(function(row) {
+        if (!docStore[row.category]) docStore[row.category] = [];
+        // data is null — fetched on demand when user taps View
+        docStore[row.category].push({name:row.name, type:row.mime_type, data:null, status:'saved', dbId:row.id});
+      });
+    }
+    renderAllDocLists();
+    _mergeLocalDocs(loadedRef);
+  });
+}
+
 function loadJobByRef(ref) {
   if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Configure Supabase first', 'err'); return; }
   setStatus('Loading...', '');
@@ -183,79 +260,7 @@ function loadJobByRef(ref) {
     .then(function(r){ return r.json(); })
     .then(function(rows){
       if (!rows || rows.length === 0) { setStatus('Not found: ' + ref, 'err'); return; }
-      clearAllForms();
-      // First rebuild dynamic selects so values can be set
-      initAllStaffSelects();
-      // form_data may be a JSONB object OR a JSON string depending on Supabase column type
-      var fd_raw = rows[0].form_data;
-      var fd_parsed = (typeof fd_raw === 'string') ? JSON.parse(fd_raw) : fd_raw;
-      // Grow the Daily Task Register to fit however many rows this job
-      // actually has saved, BEFORE restoring — otherwise rows beyond the
-      // default 12 have no DOM element to restore into and get wiped by
-      // the next autosave (saves are a full overwrite, not a merge).
-      ensureDailyRowsFor(fd_parsed);
-      restoreFormData(fd_parsed);
-      // Re-sync shared fields and re-apply supervisor value after select is populated
-      setTimeout(function() { /* 50ms: enough for selects to populate */
-        syncShared();
-        var fd = fd_parsed;
-        if (fd) {
-          var superSels = ['p_completed_by']; // supervisor fields restored independently by their own IDs
-          for (var si = 0; si < superSels.length; si++) {
-            var sel = document.getElementById(superSels[si]);
-            if (sel && fd[superSels[si]]) {
-              // Make sure the value exists in options, if not add it
-              var found = false;
-              for (var oi = 0; oi < sel.options.length; oi++) {
-                if (sel.options[oi].value === fd[superSels[si]]) { found = true; break; }
-              }
-              if (!found && fd[superSels[si]]) {
-                var newOpt = document.createElement('option');
-                newOpt.value = fd[superSels[si]];
-                newOpt.textContent = fd[superSels[si]];
-                sel.appendChild(newOpt);
-              }
-              sel.value = fd[superSels[si]];
-            }
-          }
-          // Restore text override fields
-          if (fd.ms_supervisor_text) {
-            var mst = document.getElementById('ms_supervisor_text');
-            if (mst) mst.value = fd.ms_supervisor_text;
-          }
-          if (fd.ms_super_name_text) {
-            var msnt = document.getElementById('ms_super_name_text');
-            if (msnt) msnt.value = fd.ms_super_name_text;
-          }
-          // Also ensure shared text fields are properly restored
-          var sharedFields = ['so_client','ms_client','so_site','ms_site','p_address','so_quote','ms_jobno','p_quote','dr_quote','dr_site','so_w3w','ms_w3w'];
-          for (var sf = 0; sf < sharedFields.length; sf++) {
-            var fld = document.getElementById(sharedFields[sf]);
-            if (fld && fd[sharedFields[sf]]) fld.value = fd[sharedFields[sf]];
-          }
-          // Restore w3w link buttons
-          if (fd.so_w3w) updateW3WLink('so_w3w_link', fd.so_w3w);
-          if (fd.ms_w3w) updateW3WLink('ms_w3w_link', fd.ms_w3w);
-        }
-      }, 50);
-      var loadedRef = rows[0].quote_ref;
-      setJobRef(loadedRef);
-      _saveJobLocalCache(loadedRef, fd_parsed);
-      syncShared();
-      setStatus('Loaded: ' + loadedRef, 'ok');
-      // Load documents from dedicated table
-      _docDbLoad(loadedRef, function(err, docs) {
-        docStore = {};
-        if (!err && docs.length) {
-          docs.forEach(function(row) {
-            if (!docStore[row.category]) docStore[row.category] = [];
-            // data is null — fetched on demand when user taps View
-            docStore[row.category].push({name:row.name, type:row.mime_type, data:null, status:'saved', dbId:row.id});
-          });
-        }
-        renderAllDocLists();
-        _mergeLocalDocs(loadedRef);
-      });
+      _applyLoadedJobData(rows[0].quote_ref, rows[0].form_data);
       if (_fromJobSelect) {
         _fromJobSelect = false;
         hideModals();
@@ -404,6 +409,21 @@ function uploadSigsToStorage(formData) {
   uploadNext();
 }
 
+// Job-link mode (see job-share-link.js) has no team session, so it can't hit
+// job_forms directly under RLS — it goes through the job_share_link_save RPC
+// instead, which checks the link token itself. Same payload shape either way.
+function _jobFormsUpsert(payload) {
+  if (JOB_LINK_TOKEN) {
+    return fetch(SUPA_URL + '/rest/v1/rpc/job_share_link_save', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken()},
+      body: JSON.stringify({p_token: JOB_LINK_TOKEN, p_form_data: payload.form_data}),
+      credentials: 'omit', mode: 'cors'
+    });
+  }
+  return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload);
+}
+
 function sendSave(formData) {
   var payload = {quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
 
@@ -413,14 +433,14 @@ function sendSave(formData) {
     sendSaveRaw(payload);
   }, 15000);
 
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
+  _jobFormsUpsert(payload)
     .then(function(r){
       clearTimeout(saveTimeout);
       if (r.ok || r.status === 201 || r.status === 204) {
         _saveJobLocalCache(currentJobRef, payload.form_data);
         _clearOfflinePending();
         setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
-        fetchJobList();
+        if (!JOB_LINK_TOKEN) fetchJobList();
       } else {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
       }
@@ -444,13 +464,13 @@ function sendSave(formData) {
 
 function sendSaveRaw(payload) {
   // Retry without signatures if original save timed out
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
+  _jobFormsUpsert(payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
         _saveJobLocalCache(currentJobRef, payload.form_data);
         _clearOfflinePending();
         setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
-        fetchJobList();
+        if (!JOB_LINK_TOKEN) fetchJobList();
       } else {
         setStatus('Save error — check connection', 'err');
       }

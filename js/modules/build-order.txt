@@ -17,3 +17,4 @@ toolbox-talks.js
 audits.js
 method-statement-builder.js
 staff-portal.js
+job-share-link.js
