@@ -481,6 +481,38 @@ let sortState = {key:'contactDate', dir:'desc'};
 
 function uid(){ return 'l' + Math.random().toString(36).slice(2,9); }
 
+// ── SUPABASE (via the parent app's session — see openCRMView in office-permdocs.js) ──
+// This page has no login of its own; when embedded it pings the parent for
+// the credentials the team already logged in with. Opened standalone (not in
+// an iframe) it just falls back to data.json/EMBEDDED_SEED below, same as before.
+let CRM_AUTH = null;
+let _crmAuthWaiters = [];
+function waitForCrmAuth(timeoutMs){
+  return new Promise(resolve=>{
+    if (CRM_AUTH) { resolve(CRM_AUTH); return; }
+    let done = false;
+    _crmAuthWaiters.push(()=>{ if(!done){ done = true; resolve(CRM_AUTH); } });
+    setTimeout(()=>{ if(!done){ done = true; resolve(null); } }, timeoutMs);
+  });
+}
+window.addEventListener('message', event=>{
+  if (event.origin !== window.location.origin) return;
+  if (!event.data || event.data.type !== 'crm-auth') return;
+  CRM_AUTH = event.data;
+  _crmAuthWaiters.forEach(fn=>fn());
+  _crmAuthWaiters = [];
+});
+if (window.parent !== window) {
+  window.parent.postMessage({type:'crm-ready'}, window.location.origin);
+}
+function crmFetch(method, path, body){
+  const h = {'Content-Type':'application/json', apikey: CRM_AUTH.supaKey, Authorization: 'Bearer ' + CRM_AUTH.accessToken};
+  if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+  const opts = {method, headers:h, credentials:'omit', mode:'cors'};
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(CRM_AUTH.supaUrl + '/rest/v1/' + path, opts);
+}
+
 const EMBEDDED_SEED = {
   "leads": [
     {
@@ -651,6 +683,19 @@ function money(n){
 }
 
 async function loadData(){
+  if (window.parent !== window) {
+    await waitForCrmAuth(3000);
+    if (CRM_AUTH) {
+      try {
+        const res = await crmFetch('GET', 'crm_leads?select=*&order=created_at.asc');
+        if(!res.ok) throw new Error('supabase load failed: ' + res.status);
+        LEADS = await res.json();
+        populateFilterOptions();
+        render();
+        return;
+      } catch(e) { /* fall through to the static file below */ }
+    }
+  }
   try{
     const res = await fetch('./data.json', {cache:'no-store'});
     if(!res.ok) throw new Error('no file');
@@ -1019,7 +1064,7 @@ document.getElementById('btnAdd').addEventListener('click', ()=>openLeadModal(nu
 document.getElementById('btnCancelLead').addEventListener('click', closeLeadModal);
 leadOverlay.addEventListener('click', e=>{ if(e.target===leadOverlay) closeLeadModal(); });
 
-leadForm.addEventListener('submit', e=>{
+leadForm.addEventListener('submit', async e=>{
   e.preventDefault();
   const fd = new FormData(leadForm);
   const obj = {};
@@ -1027,11 +1072,20 @@ leadForm.addEventListener('submit', e=>{
   obj.emailed = obj.emailed === 'true';
   obj.called = obj.called === 'true';
   obj.contacts = collectContactsFromForm();
+  obj.id = editingId || uid();
+  if (CRM_AUTH) {
+    try {
+      const res = await crmFetch('POST', 'crm_leads', obj);
+      if (!res.ok) throw new Error('save failed: ' + res.status);
+    } catch(err) {
+      alert('Could not save this lead — check your connection and try again.');
+      return;
+    }
+  }
   if(editingId){
     const idx = LEADS.findIndex(l=>l.id===editingId);
     LEADS[idx] = {...LEADS[idx], ...obj, id:editingId};
   }else{
-    obj.id = uid();
     LEADS.push(obj);
   }
   closeLeadModal();
@@ -1043,8 +1097,17 @@ document.getElementById('btnDeleteLead').addEventListener('click', ()=>{
   closeLeadModal();
 });
 
-function deleteLead(id){
+async function deleteLead(id){
   if(!confirm('Delete this lead? This cannot be undone.')) return;
+  if (CRM_AUTH) {
+    try {
+      const res = await crmFetch('DELETE', 'crm_leads?id=eq.' + encodeURIComponent(id));
+      if (!res.ok) throw new Error('delete failed: ' + res.status);
+    } catch(err) {
+      alert('Could not delete this lead — check your connection and try again.');
+      return;
+    }
+  }
   LEADS = LEADS.filter(l=>l.id!==id);
   render();
 }

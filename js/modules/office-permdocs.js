@@ -57,12 +57,27 @@ function openFormFromOffice(panelId) {
 }
 
 // ── CLIENT LEDGER / CRM ──
+// The ledger runs in an iframe and has no login of its own — rather than
+// asking the team to log in twice, it pings us on load and we hand it the
+// session it can already see the team is using, scoped to our own origin.
 function openCRMView() {
   document.getElementById('crmView').style.display = 'block';
 }
 function closeCRMView() {
   document.getElementById('crmView').style.display = 'none';
 }
+window.addEventListener('message', function(event) {
+  if (event.origin !== window.location.origin) return;
+  var frame = document.getElementById('crmFrame');
+  if (!frame || event.source !== frame.contentWindow) return;
+  if (!event.data || event.data.type !== 'crm-ready') return;
+  frame.contentWindow.postMessage({
+    type: 'crm-auth',
+    supaUrl: SUPA_URL,
+    supaKey: SUPA_KEY,
+    accessToken: _authToken()
+  }, window.location.origin);
+});
 
 // ── PERMANENT DOCUMENTS ──
 var PERMANENT_DOCS = {
