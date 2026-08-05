@@ -56,6 +56,14 @@ function openFormFromOffice(panelId) {
   openForm(panelId);
 }
 
+// ── CLIENT LEDGER / CRM ──
+function openCRMView() {
+  document.getElementById('crmView').style.display = 'block';
+}
+function closeCRMView() {
+  document.getElementById('crmView').style.display = 'none';
+}
+
 // ── PERMANENT DOCUMENTS ──
 var PERMANENT_DOCS = {
   ats_cfra: {
