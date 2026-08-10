@@ -301,6 +301,7 @@ function showTab(id, btn) {
 
 // ── INIT ──
 window.addEventListener('load', function() {
+  _pruneJobLocalCache();
   init();
   for (var i = 0; i < PANELS.length; i++) {
     document.getElementById(PANELS[i]).style.display = 'none';

@@ -559,11 +559,61 @@ function _loadJobListCache() {
 }
 
 // ── OFFLINE JOB CACHE ──
+// This is only an offline fallback (the server copy is authoritative), so it's
+// safe to cap and prune — unbounded growth here is what was freezing the two
+// most-used iPads (every job ever opened piling up in localStorage, including
+// base64 signature data, until the device's storage quota choked the page).
+var LOCAL_JOB_CACHE_LIMIT = 15;
+
 function _saveJobLocalCache(ref, data) {
-  try { localStorage.setItem('arb_job_' + ref, JSON.stringify(data)); } catch(e) {}
+  try {
+    localStorage.setItem('arb_job_' + ref, JSON.stringify(data));
+    _touchJobCacheOrder(ref);
+  } catch(e) {}
 }
 function _loadJobLocalCache(ref) {
   try { var s = localStorage.getItem('arb_job_' + ref); return s ? JSON.parse(s) : null; } catch(e) { return null; }
+}
+
+function _loadJobCacheOrder() {
+  try { var s = localStorage.getItem('arb_job_cache_order'); return s ? JSON.parse(s) : []; } catch(e) { return []; }
+}
+function _saveJobCacheOrder(order) {
+  try { localStorage.setItem('arb_job_cache_order', JSON.stringify(order)); } catch(e) {}
+}
+// Marks `ref` as most-recently-used, then evicts whatever falls off the end
+// of the cap so localStorage never accumulates more than LOCAL_JOB_CACHE_LIMIT
+// cached jobs.
+function _touchJobCacheOrder(ref) {
+  var order = _loadJobCacheOrder().filter(function(r){ return r !== ref; });
+  order.push(ref);
+  while (order.length > LOCAL_JOB_CACHE_LIMIT) {
+    var evicted = order.shift();
+    try { localStorage.removeItem('arb_job_' + evicted); } catch(e) {}
+  }
+  _saveJobCacheOrder(order);
+}
+// One-time (per load) sweep for devices that built up cached jobs before this
+// cap existed — any arb_job_* entry not tracked in the order list predates
+// tracking, so its age is unknown; safest is to drop it immediately rather
+// than guess. Also re-applies the cap in case the order list itself is stale.
+function _pruneJobLocalCache() {
+  try {
+    var order = _loadJobCacheOrder();
+    var tracked = {};
+    for (var i = 0; i < order.length; i++) tracked[order[i]] = true;
+    for (var k in localStorage) {
+      if (k.indexOf('arb_job_') !== 0) continue;
+      if (k === 'arb_job_list' || k === 'arb_job_cache_order') continue;
+      var ref = k.substring('arb_job_'.length);
+      if (!tracked[ref]) { try { localStorage.removeItem(k); } catch(e) {} }
+    }
+    while (order.length > LOCAL_JOB_CACHE_LIMIT) {
+      var evicted = order.shift();
+      try { localStorage.removeItem('arb_job_' + evicted); } catch(e) {}
+    }
+    _saveJobCacheOrder(order);
+  } catch(e) {}
 }
 function _markOfflinePending(ref) {
   try { localStorage.setItem('arb_offline_pending', ref); } catch(e) {}
