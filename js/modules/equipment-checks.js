@@ -3,7 +3,7 @@ var CHECK_CATEGORIES = {
   stump: {
     label: 'Stump Grinder', icon: '🪵', table: 'stump_grinder_checks',
     machineLabel: 'Serial / Reference / Model / Reg No',
-    machines: ['50RX', 'RG13-II'],
+    machines: ['50RX', 'RG13-II', 'FSI D74'],
     fields: [
       {key:'used_since_last', label:'Has the machine been used since its last inspection?', options:['Yes','No']},
       {key:'teeth_condition', label:'In what condition are the teeth?', options:['Good','Fair','Poor']},
