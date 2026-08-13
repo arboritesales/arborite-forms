@@ -527,23 +527,43 @@ begin
 end;
 $$;
 
--- Read-only, no token — approved leave (+ bank holidays/shutdown) for one
--- calendar month, across everyone. Deliberately excludes 'pending' (privacy
--- rule) and the historical-import placeholder rows (they'd just clutter the
--- calendar with a single "1 Apr" entry covering a whole backdated total).
-create or replace function sp_calendar_days(p_year int, p_month int)
-returns table(staff_name text, start_date date, end_date date, type text)
-language sql
+-- Approved leave (+ bank holidays/shutdown) for one calendar month, across
+-- everyone — plus, when p_token identifies a signed-in staff member, that
+-- same person's own PENDING entries too, so they can see their own upcoming
+-- requests on the calendar before a manager decides them. Everyone else's
+-- pending requests stay invisible here (privacy rule, unchanged) — only the
+-- token owner's own pending rows are ever included. Still excludes the
+-- historical-import placeholder rows (they'd just clutter the calendar with
+-- a single "1 Apr" entry covering a whole backdated total).
+-- (DROP first — p_token is a new parameter, so this is a different signature
+-- from the old 2-arg version, not a like-for-like replace.)
+drop function if exists sp_calendar_days(int, int);
+create or replace function sp_calendar_days(p_year int, p_month int, p_token text default null)
+returns table(staff_name text, start_date date, end_date date, type text, status text)
+language plpgsql
 security definer
 set search_path = public, extensions
 as $$
-  select s.name, slr.start_date, slr.end_date, slr.type
-  from staff_leave_requests slr
-  join staff s on s.id = slr.staff_id
-  where slr.status = 'approved'
-    and coalesce(slr.note, '') not like 'Historical balance import%'
-    and slr.start_date <= (make_date(p_year, p_month, 1) + interval '1 month' - interval '1 day')::date
-    and slr.end_date >= make_date(p_year, p_month, 1);
+declare
+  v_staff_id uuid;
+begin
+  if p_token is not null then
+    begin
+      v_staff_id := (sp_staff_from_token(p_token)).id;
+    exception when others then
+      v_staff_id := null; -- expired/invalid token — just fall back to approved-only
+    end;
+  end if;
+
+  return query
+    select s.name, slr.start_date, slr.end_date, slr.type, slr.status
+    from staff_leave_requests slr
+    join staff s on s.id = slr.staff_id
+    where coalesce(slr.note, '') not like 'Historical balance import%'
+      and slr.start_date <= (make_date(p_year, p_month, 1) + interval '1 month' - interval '1 day')::date
+      and slr.end_date >= make_date(p_year, p_month, 1)
+      and (slr.status = 'approved' or (v_staff_id is not null and slr.staff_id = v_staff_id and slr.status = 'pending'));
+end;
 $$;
 
 -- Manager-only (Staff Dashboards, reached via the real Office login) —
@@ -753,7 +773,7 @@ $$;
 grant execute on function sp_my_leave_balance(text) to anon, authenticated;
 grant execute on function sp_my_leave_requests(text) to anon, authenticated;
 grant execute on function sp_submit_leave_request(text, date, date, numeric, text, text) to anon, authenticated;
-grant execute on function sp_calendar_days(int, int) to anon, authenticated;
+grant execute on function sp_calendar_days(int, int, text) to anon, authenticated;
 
 -- authenticated only: the manager side (Staff Dashboards, reached via the
 -- real Office login) — no reason for anon to see everyone's balances,

@@ -368,19 +368,27 @@ function spFirstName(fullName) { return (fullName || '').split(' ')[0]; }
 function spRenderCalendar() {
   var y = spCalMonth.getFullYear(), m = spCalMonth.getMonth(); // JS month is 0-based
   document.getElementById('spCalTitle').textContent = spCalMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
-  spRpc('sp_calendar_days', { p_year: y, p_month: m + 1 }).then(function(res) {
+  // p_token lets the RPC also include the signed-in staff member's own
+  // pending requests (everyone else's pending stays hidden — see the SQL).
+  spRpc('sp_calendar_days', { p_year: y, p_month: m + 1, p_token: spSessionToken }).then(function(res) {
     var rows = res.ok && Array.isArray(res.data) ? res.data : [];
-    var marks = {}; // day-of-month -> {names:[...], bh:true}
+    var marks = {}; // day-of-month -> {names:[{text,pending}], bh:true}
     rows.forEach(function(r) {
       var s = new Date(r.start_date + 'T00:00:00'), e = new Date(r.end_date + 'T00:00:00');
       for (var d = new Date(Math.max(s, new Date(y, m, 1))); d <= e && d <= new Date(y, m + 1, 0); d.setDate(d.getDate() + 1)) {
         var day = d.getDate();
         if (!marks[day]) marks[day] = { names: [] };
         // Bank holidays/shutdown apply to literally everyone — a "BH" tag says
-        // that better than listing all 15 names. Personal holiday lists who,
-        // since that's the actually useful info on a shared calendar.
-        if (r.type === 'holiday') marks[day].names.push(spFirstName(r.staff_name));
-        else if (r.type === 'bank_holiday' || r.type === 'shutdown') marks[day].bh = true;
+        // that better than listing all 15 names. Every other leave type
+        // (holiday, sick, other) lists who, since that's the actually useful
+        // info on a shared calendar — sick/other used to be silently dropped
+        // here, so a day off for anything but "holiday" never showed. Rows
+        // are either approved (anyone) or pending (only ever the signed-in
+        // user's own, per the SQL filter), so a "pending" tag here can only
+        // ever be describing your own request.
+        if (r.type === 'bank_holiday' || r.type === 'shutdown') { marks[day].bh = true; continue; }
+        var label = spFirstName(r.staff_name) + (r.type === 'holiday' ? '' : ' (' + r.type + ')') + (r.status === 'pending' ? ' — pending' : '');
+        marks[day].names.push({ text: label, pending: r.status === 'pending' });
       }
     });
     var first = new Date(y, m, 1);
@@ -393,7 +401,7 @@ function spRenderCalendar() {
       var mk = marks[d2] || { names: [] };
       html += '<div class="sp-cal-day' + (mk.bh ? ' sp-is-bh' : '') + '"><span class="sp-dnum">' + d2 + '</span>'
         + (mk.bh ? '<span class="sp-bh-tag">BH</span>' : '')
-        + (mk.names.length ? '<div class="sp-cal-names">' + mk.names.map(function(n) { return '<span class="sp-cal-name">' + spEsc(n) + '</span>'; }).join('') + '</div>' : '')
+        + (mk.names.length ? '<div class="sp-cal-names">' + mk.names.map(function(n) { return '<span class="sp-cal-name' + (n.pending ? ' sp-cal-name-pending' : '') + '">' + spEsc(n.text) + '</span>'; }).join('') + '</div>' : '')
         + '</div>';
     }
     document.getElementById('spCalGrid').innerHTML = html;
@@ -504,6 +512,39 @@ function spOnEditStaffChange() {
   spCurrentEditStaff = document.getElementById('spEditStaffSelect').value;
   document.getElementById('spEditStaffHistory').style.display = spCurrentEditStaff ? 'block' : 'none';
   if (spCurrentEditStaff) spRenderStaffHistory();
+}
+
+// Clears one person's password so they land back on "create your password"
+// next time they sign in — the RPC itself already exists (reset_staff_password
+// in supabase_staff_portal.sql) but nothing in the UI called it until now.
+function spResetOneStaffPassword() {
+  if (!spCurrentEditStaff) return;
+  if (!confirm('Reset the password for ' + spCurrentEditStaff + '? They\'ll need to set a new one next time they sign in.')) return;
+  spRpc('reset_staff_password', { p_name: spCurrentEditStaff }).then(function(res) {
+    if (!res.ok || !res.data) { spToast('Could not reset password.'); return; }
+    spToast(spCurrentEditStaff + '’s password has been reset.');
+  }).catch(function() { spToast('Connection error — try again.'); });
+}
+
+// Bulk version — resets every active staff member's password in one go, one
+// RPC call per person (reset_staff_password only takes a single name).
+function spResetAllStaffPasswords() {
+  if (!confirm('Reset EVERY staff member’s password? Everyone will need to create a new password next time they sign in. This cannot be undone.')) return;
+  spRpc('sp_list_staff_names', {}).then(function(res) {
+    var names = (res.ok && Array.isArray(res.data)) ? res.data.map(function(r) { return r.name; }) : [];
+    if (!names.length) { spToast('Could not load staff list.'); return; }
+    var done = 0, failed = [];
+    names.forEach(function(name) {
+      spRpc('reset_staff_password', { p_name: name }).then(function(r) {
+        if (!r.ok || !r.data) failed.push(name);
+      }).catch(function() { failed.push(name); }).then(function() {
+        done++;
+        if (done === names.length) {
+          spToast(failed.length ? ('Reset ' + (names.length - failed.length) + ' of ' + names.length + ' — failed: ' + failed.join(', ')) : ('Reset all ' + names.length + ' staff passwords.'));
+        }
+      });
+    });
+  }).catch(function() { spToast('Connection error — try again.'); });
 }
 
 function spRenderStaffHistory() {
