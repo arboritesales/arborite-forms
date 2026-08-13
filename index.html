@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.9.9">
+  <link rel="stylesheet" href="css/app.css?v=1.9.11">
 </head>
 <body>
 
@@ -30,7 +30,7 @@
     <div style="margin-top:10px;font-size:12px;">
       <a href="#" onclick="spOpen('spPortalLogin');return false;" style="color:rgba(126,200,32,0.85);text-decoration:none;font-weight:600;cursor:pointer;">&#128336; Staff Portal &mdash; clock in / my leave</a>
     </div>
-    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.9.9</div>
+    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.9.11</div>
   </div>
 </div>
 
@@ -282,7 +282,7 @@
   <div style="position:relative;z-index:1;">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.9</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.11</span></div>
     <div class="dash-header-actions">
       <button id="logoutBtn" onclick="logoutToTeamLogin()" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">&#128274; Log Out</button>
     </div>
@@ -319,7 +319,7 @@
     <div class="dash-tile" id="officeTile" onclick="openOffice()" style="display:none;text-align:center;padding:20px 16px;">
       <div class="dash-tile-icon">&#127970;</div>
       <div class="dash-tile-name">Office</div>
-      <div class="dash-tile-sub">Audit &amp; Safety Checker</div>
+      <div class="dash-tile-sub">Audit &amp; manager tools</div>
     </div>
   </div>
   </div><!-- end content wrapper -->
@@ -330,7 +330,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.9</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.11</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -1657,490 +1657,6 @@
   </div>
   <div class="print-bar"><button class="btn btn-print" onclick="printPanel('documents')">&#128424; Save as PDF</button></div>
 </div></div>
-<!-- â•â•â• SAFETY CHECKS â•â•â• -->
-<div id="safety" class="panel"><div class="form-wrap" style="background:#f7f7f5;">
-
-  <!-- Header -->
-  <div class="form-header" style="background:#1a2e10;">
-    <div>
-      <h1 style="color:#7ec820;">Tree Surgery PPE &amp; Safety Guide</h1>
-      <div class="sub" style="color:rgba(255,255,255,.7);">Based on HSE L25 &mdash; Personal Protective Equipment at Work Regulations 1992 &mdash; Arborite Tree Services Ltd</div>
-    </div>
-  </div>
-
-  <!-- Legal notice banner -->
-  <div style="background:#c0392b;color:white;padding:13px 20px;display:flex;align-items:center;gap:12px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.3px;">
-    <span style="font-size:22px;">&#9888;</span>
-    <span>Under the PPE at Work Regulations 1992 (Regulation 4), every employer MUST provide suitable PPE to employees exposed to risk. Employees MUST use it correctly (Regulation 10). Failure is a legal offence.</span>
-  </div>
-
-  <!-- Legal Framework box -->
-  <div style="margin:20px 20px 0;background:#E8F5E9;border:2px solid #7ec820;border-radius:8px;padding:16px 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#1a2e10;text-transform:uppercase;margin-bottom:10px;">&#128196; Legal Framework â€” PPE at Work Regulations 1992 (L25)</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;font-size:12px;color:#333;">
-      <div><strong>Regulation 4:</strong> Employer must provide suitable PPE where risk cannot be controlled by other means</div>
-      <div><strong>Regulation 5:</strong> Multiple PPE items must be compatible with each other</div>
-      <div><strong>Regulation 6:</strong> PPE must be assessed as suitable before provision</div>
-      <div><strong>Regulation 7:</strong> PPE must be maintained, cleaned and replaced as needed</div>
-      <div><strong>Regulation 8:</strong> Appropriate storage/accommodation must be provided for PPE</div>
-      <div><strong>Regulation 9:</strong> Employees must receive information, instruction and training</div>
-      <div><strong>Regulation 10:</strong> Employees must use PPE properly as instructed</div>
-      <div><strong>Regulation 11:</strong> Employees must report any loss or defect immediately</div>
-    </div>
-    <div style="margin-top:10px;font-size:11px;color:#555;font-style:italic;">Note: PPE is the LAST resort â€” engineering controls and safe systems of work must be considered first (L25 Guidance 4, para 26)</div>
-  </div>
-
-
-  <!-- â•â• PPE REQUIREMENTS TABLE â•â• -->
-  <div style="padding:20px 20px 0;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #7ec820;padding-bottom:8px;margin-bottom:16px;">
-      &#128196; PPE Requirements by Work Activity
-    </div>
-    <div style="background:#E8F5E9;border:1px solid #7ec820;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#1a3210;">
-      <strong>&#9432; Note:</strong> âœ“ = Required &nbsp;|&nbsp; â€” = Not applicable &nbsp;|&nbsp; Text = Condition applies. All PPE must comply with listed BS/EN standards under the Personal Protective Equipment at Work Regulations 1992.
-    </div>
-    <div style="overflow-x:auto;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.1);">
-      <table style="width:100%;border-collapse:collapse;min-width:700px;background:white;">
-        <thead>
-          <tr><th style="padding:10px 12px;background:#1a2e10;color:#7ec820;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid #2a4a1a;vertical-align:bottom;">Equipment</th><th style="padding:10px 12px;background:#1a2e10;color:#7ec820;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid #2a4a1a;vertical-align:bottom;">BS / EN Standard</th><th style="padding:10px 12px;background:#1a2e10;color:#7ec820;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid #2a4a1a;vertical-align:bottom;">Using a chainsaw on the ground</th><th style="padding:10px 12px;background:#1a2e10;color:#7ec820;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid #2a4a1a;vertical-align:bottom;">Using a chainsaw off the ground</th><th style="padding:10px 12px;background:#1a2e10;color:#7ec820;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid #2a4a1a;vertical-align:bottom;">Plant operator</th><th style="padding:10px 12px;background:#1a2e10;color:#7ec820;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid #2a4a1a;vertical-align:bottom;">Machine operator (woodchipper, stumpgrinder)</th><th style="padding:10px 12px;background:#1a2e10;color:#7ec820;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1px solid #2a4a1a;vertical-align:bottom;">Brushcutter / trimmer</th></tr>
-        </thead>
-        <tbody>
-<tr><td style="padding:10px 12px;border:1px solid #c8dda0;background:#f0f4e8;color:#1a1a1a;font-weight:700;font-size:12px;vertical-align:middle;">Safety helmet</td><td style="padding:10px 12px;border:1px solid #c8dda0;font-size:11px;color:#555;vertical-align:middle;">BS EN 397 / BS EN 12492</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">To be worn outside of a protective cab</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td></tr>
-<tr><td style="padding:10px 12px;border:1px solid #c8dda0;background:#f0f4e8;color:#1a1a1a;font-weight:700;font-size:12px;vertical-align:middle;">Hearing protection</td><td style="padding:10px 12px;border:1px solid #c8dda0;font-size:11px;color:#555;vertical-align:middle;">BS EN 352-1</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#fafafa;text-align:center;vertical-align:middle;"><span style="color:#ccc;font-size:16px;">â€”</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td></tr>
-<tr><td style="padding:10px 12px;border:1px solid #c8dda0;background:#f0f4e8;color:#1a1a1a;font-weight:700;font-size:12px;vertical-align:middle;">Eye protection mesh visor</td><td style="padding:10px 12px;border:1px solid #c8dda0;font-size:11px;color:#555;vertical-align:middle;">BS EN 1731</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#fafafa;text-align:center;vertical-align:middle;"><span style="color:#ccc;font-size:16px;">â€”</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td></tr>
-<tr><td style="padding:10px 12px;border:1px solid #c8dda0;background:#f0f4e8;color:#1a1a1a;font-weight:700;font-size:12px;vertical-align:middle;">Safety glasses or goggles</td><td style="padding:10px 12px;border:1px solid #c8dda0;font-size:11px;color:#555;vertical-align:middle;">BS EN 166</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#fafafa;text-align:center;vertical-align:middle;"><span style="color:#ccc;font-size:16px;">â€”</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">As determined by SSRA</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td></tr>
-<tr><td style="padding:10px 12px;border:1px solid #c8dda0;background:#f0f4e8;color:#1a1a1a;font-weight:700;font-size:12px;vertical-align:middle;">Gloves</td><td style="padding:10px 12px;border:1px solid #c8dda0;font-size:11px;color:#555;vertical-align:middle;">Suitable for intended task</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">No mandatory requirement</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#fafafa;text-align:center;vertical-align:middle;"><span style="color:#ccc;font-size:16px;">â€”</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">Non-snag/close fitting</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td></tr>
-<tr><td style="padding:10px 12px;border:1px solid #c8dda0;background:#f0f4e8;color:#1a1a1a;font-weight:700;font-size:12px;vertical-align:middle;">Leg and groin protection</td><td style="padding:10px 12px;border:1px solid #c8dda0;font-size:11px;color:#555;vertical-align:middle;">BS EN 381-5</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#fafafa;text-align:center;vertical-align:middle;"><span style="color:#ccc;font-size:16px;">â€”</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">Non-snag/close fitting outer clothing including long trousers</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">Non-snag/close fitting outer clothing including long trousers</td></tr>
-<tr><td style="padding:10px 12px;border:1px solid #c8dda0;background:#f0f4e8;color:#1a1a1a;font-weight:700;font-size:12px;vertical-align:middle;">Chainsaw boots</td><td style="padding:10px 12px;border:1px solid #c8dda0;font-size:11px;color:#555;vertical-align:middle;">BS EN ISO 17249</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:#e8f5e9;text-align:center;vertical-align:middle;"><span style="color:#2e7d32;font-size:18px;font-weight:900;">âœ“</span></td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">Steel toe capped</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">Steel toe capped</td><td style="padding:10px 12px;border:1px solid #c8dda0;background:white;color:#1a1a1a;font-weight:400;font-size:12px;vertical-align:middle;">Steel toe capped</td></tr>
-<tr>
-    <td style="padding:10px 12px;border:1px solid #c8dda0;background:#f0f4e8;font-weight:700;font-size:12px;vertical-align:top;">High visibility clothing</td>
-    <td colspan="6" style="padding:10px 12px;border:1px solid #c8dda0;font-size:12px;color:#333;vertical-align:middle;font-style:italic;">The use of high visibility clothing is to be implemented following the undertaking of a suitable and sufficient site-specific risk assessment. When worn, it must be ensured items are close fitting and non-snag, meeting the requirements of BS EN ISO 20471.</td>
-</tr>        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 1: HEAD PROTECTION â•â• -->
-  <div style="padding:20px 20px 0;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #FF6B00;padding-bottom:8px;margin-bottom:16px;">
-      &#9888; Section 1 â€” Head Protection (L25 para 86â€“88)
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:20px;">
-      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Industrial Safety Helmet</span>
-          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
-        </div>
-        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
-          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
-            <ellipse cx="35" cy="46" rx="28" ry="7" fill="#ddd"/>
-            <path d="M10 40 Q10 14 35 11 Q60 14 60 40 Z" fill="#FF6B00"/>
-            <rect x="8" y="38" width="54" height="6" rx="3" fill="#E55A00"/>
-            <path d="M22 38 Q22 27 35 25 Q48 27 48 38" fill="none" stroke="#fff" stroke-width="1.5" opacity=".4"/>
-            <rect x="28" y="11" width="14" height="4" rx="2" fill="#E55A00"/>
-          </svg>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN 397 / EN 12492</div>
-            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-              <li>Worn during ALL tree work â€” mandatory (L25 para 87c: tree felling)</li>
-              <li>Use adjustable chinstrap â€” helmet must not fall off (para 88a)</li>
-              <li>Replace every 3 years or after any significant impact (para 88d)</li>
-              <li>Do NOT customise, paint or drill holes (para 88g)</li>
-              <li>Worn with brim level â€” never back-to-front (para 88eâ€“f)</li>
-            </ul>
-          </div>
-        </div>
-        <div style="background:#fff8e1;border-top:1px solid #ffe082;padding:8px 14px;font-size:11px;color:#7b5e00;font-weight:600;">
-          Employer duty: Provide &amp; maintain. Employee duty: Wear correctly, report defects (Reg 10â€“11)
-        </div>
-      </div>
-
-      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Climbing Helmet (EN 12492)</span>
-          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">CLIMBING</span>
-        </div>
-        <div style="padding:14px 16px;">
-          <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN 12492 â€” climbing/mountaineering helmet</div>
-          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-            <li>Designed for side and top impact â€” essential for aerial work</li>
-            <li>Must be fitted with chinstrap â€” worn and fastened when climbing</li>
-            <li>Compatible with visor and ear defenders (Reg 5 â€” compatibility)</li>
-            <li>Check suspension harness inside before every use</li>
-            <li>Retire immediately after any significant impact</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 2: EYE AND FACE PROTECTION â•â• -->
-  <div style="padding:0 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #1565C0;padding-bottom:8px;margin-bottom:16px;">
-      &#128065; Section 2 â€” Eye &amp; Face Protection (L25 para 89â€“91)
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:20px;">
-      <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#0D47A1;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#90CAF9;text-transform:uppercase;letter-spacing:.5px;">Mesh Visor (Chainsaw)</span>
-          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
-        </div>
-        <div style="padding:14px 16px;display:flex;gap:14px;align-items:flex-start;">
-          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
-            <rect x="10" y="22" width="50" height="26" rx="4" fill="#90CAF9" opacity=".8"/>
-            <rect x="10" y="22" width="50" height="5" rx="2" fill="#1565C0"/>
-            <!-- Mesh pattern -->
-            <line x1="16" y1="27" x2="16" y2="48" stroke="#1565C0" stroke-width="1" opacity=".4"/>
-            <line x1="24" y1="27" x2="24" y2="48" stroke="#1565C0" stroke-width="1" opacity=".4"/>
-            <line x1="32" y1="27" x2="32" y2="48" stroke="#1565C0" stroke-width="1" opacity=".4"/>
-            <line x1="40" y1="27" x2="40" y2="48" stroke="#1565C0" stroke-width="1" opacity=".4"/>
-            <line x1="48" y1="27" x2="48" y2="48" stroke="#1565C0" stroke-width="1" opacity=".4"/>
-            <line x1="10" y1="33" x2="60" y2="33" stroke="#1565C0" stroke-width="1" opacity=".4"/>
-            <line x1="10" y1="40" x2="60" y2="40" stroke="#1565C0" stroke-width="1" opacity=".4"/>
-            <line x1="10" y1="47" x2="60" y2="47" stroke="#1565C0" stroke-width="1" opacity=".4"/>
-            <rect x="8" y="44" width="54" height="5" rx="2.5" fill="#1565C0"/>
-          </svg>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN 1731 â€” mesh face shield</div>
-            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-              <li>Required for ALL chainsaw operation â€” flying debris risk (para 90b)</li>
-              <li>Check mesh â€” no blocked, bent or broken sections before use</li>
-              <li>Clean regularly â€” obscured vision increases risk</li>
-              <li>Must be compatible with helmet and ear defenders (Reg 5)</li>
-              <li>Issue on personal basis â€” store in protective case (para 91c)</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#0D47A1;padding:10px 16px;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#90CAF9;text-transform:uppercase;letter-spacing:.5px;">Safety Glasses / Goggles</span>
-        </div>
-        <div style="padding:14px 16px;">
-          <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN 166 â€” eye protection for industrial use</div>
-          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-            <li>Required for chipper operation and stump grinding</li>
-            <li>Anti-scratch and anti-fog lenses required</li>
-            <li>Discard if lenses are deeply scratched or frame distorted (para 91e)</li>
-            <li>Goggles provide full rim contact â€” best for dust and debris</li>
-            <li>Faceshields protect face but do not fully enclose eyes (para 89c)</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 3: HAND & ARM PROTECTION â•â• -->
-  <div style="padding:0 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #7ec820;padding-bottom:8px;margin-bottom:16px;">
-      &#129336; Section 3 â€” Hand &amp; Arm Protection (L25 para 92â€“94)
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:20px;">
-      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#2a4a1a;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">Chainsaw Gloves</span>
-          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
-        </div>
-        <div style="padding:14px 16px;display:flex;gap:12px;align-items:flex-start;">
-          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
-            <path d="M25 55 L20 30 Q20 22 28 22 L30 22 L30 17 Q30 13 34 13 Q38 13 38 17 L38 22 L40 22 Q44 22 44 26 L44 28 Q47 28 47 32 L47 34 Q49 34 49 38 L49 52 Q49 58 42 58 L28 58 Z" fill="#FF8F00"/>
-            <path d="M30 22 L30 38" stroke="#E65100" stroke-width="1.5" opacity=".5"/>
-            <path d="M34 20 L34 38" stroke="#E65100" stroke-width="1.5" opacity=".5"/>
-            <path d="M38 22 L38 38" stroke="#E65100" stroke-width="1.5" opacity=".5"/>
-            <path d="M20 30 L49 30" stroke="#E65100" stroke-width="1.5" opacity=".5"/>
-            <rect x="19" y="50" width="30" height="6" rx="2" fill="#7ec820" opacity=".8"/>
-            <text x="22" y="56" font-size="7" fill="white" font-family="sans-serif" font-weight="bold">CUT RESIST</text>
-          </svg>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN 381-7 Class 1 minimum (para 92, L25 p.31â€ )</div>
-            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-              <li>Cut-resistant protection on back of left hand â€” minimum</li>
-              <li>Must fit snugly â€” no loose material near chain (para 94b)</li>
-              <li>Check cut-resistant padding layers before each use</li>
-              <li>Retire if protection layer is damaged or cut (para 94e)</li>
-              <li>Keep hands warm in cold â€” reduces vibration white finger risk (para 93c)</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div style="background:white;border-radius:10px;border:2px solid #e0e0da;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#2a4a1a;padding:10px 16px;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#7ec820;text-transform:uppercase;letter-spacing:.5px;">General Work Gloves</span>
-        </div>
-        <div style="padding:14px 16px;">
-          <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN 388 â€” mechanical risk gloves</div>
-          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-            <li>Worn during climbing, rigging and manual handling</li>
-            <li>Check for holes, cuts and worn areas before use (para 94e)</li>
-            <li>Do not wear for extended periods â€” skin moisture risk (para 94f)</li>
-            <li>Check for latex allergy before issuing rubber gloves (para 94a)</li>
-            <li>Fit correctly â€” no gap at wrist (para 94b)</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 4: PROTECTIVE CLOTHING (LEGS) â•â• -->
-  <div style="padding:0 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #7b1fa2;padding-bottom:8px;margin-bottom:16px;">
-      &#128736; Section 4 â€” Protective Clothing &amp; Legs (L25 para 95â€“98, p.31â€ )
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:20px;">
-      <div style="background:white;border-radius:10px;border:2px solid #E1BEE7;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#6A1B9A;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#CE93D8;text-transform:uppercase;letter-spacing:.5px;">Chainsaw Trousers</span>
-          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
-        </div>
-        <div style="padding:14px 16px;display:flex;gap:12px;align-items:flex-start;">
-          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
-            <path d="M18 14 L52 14 L48 55 L38 55 L35 40 L32 55 L22 55 Z" fill="#1565C0"/>
-            <path d="M18 14 L52 14 L50 26 L20 26 Z" fill="#0D47A1"/>
-            <rect x="20" y="26" width="30" height="3" fill="#7ec820" opacity=".9"/>
-            <line x1="35" y1="14" x2="35" y2="55" stroke="#0D47A1" stroke-width="1.5" opacity=".5"/>
-            <!-- Anti-cut layers indicator -->
-            <rect x="22" y="30" width="12" height="18" rx="1" fill="none" stroke="#7ec820" stroke-width="1.5" stroke-dasharray="3,2" opacity=".7"/>
-            <text x="23" y="45" font-size="6" fill="#7ec820" font-family="sans-serif">ANTI-CUT</text>
-          </svg>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN 381-5 Class 1 (20 m/s) â€” L25 p.31â€ </div>
-            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-              <li>Front leg protection (Type A) minimum for ground work</li>
-              <li>All-round (Type C) required for climbing â€” most protective</li>
-              <li>Anti-clog synthetic fibre layers clogs chainsaw sprocket on contact</li>
-              <li>Inspect seams, surface damage before use (para 98d)</li>
-              <li>Do not store contaminated trousers with clean PPE (para 98a)</li>
-              <li>Retire immediately if chain contact occurs â€” even no visible damage</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      <div style="background:white;border-radius:10px;border:2px solid #E1BEE7;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#6A1B9A;padding:10px 16px;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#CE93D8;text-transform:uppercase;letter-spacing:.5px;">Weatherproof Clothing</span>
-        </div>
-        <div style="padding:14px 16px;">
-          <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Covered by Regulations where worn to manage health risk (Reg 3 â€” Clothing)</div>
-          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-            <li>Waterproof/insulated clothing is PPE if worn against health/safety risks</li>
-            <li>Protects against cold and wet â€” hypothermia risk management</li>
-            <li>Do not wear loose clothing near moving machinery (para 98e)</li>
-            <li>Employer must provide; employee must not be charged (Reg 4, para 37)</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 5: HIGH VISIBILITY â•â• -->
-  <div style="padding:0 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #F9A825;padding-bottom:8px;margin-bottom:16px;">
-      &#128307; Section 5 â€” High Visibility Clothing (L25 para 99â€“102)
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:20px;">
-      <div style="background:white;border-radius:10px;border:2px solid #FFF9C4;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#F57F17;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:white;text-transform:uppercase;letter-spacing:.5px;">Hi-Vis Vest / Jacket</span>
-          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
-        </div>
-        <div style="padding:14px 16px;display:flex;gap:12px;align-items:flex-start;">
-          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
-            <path d="M15 20 L28 20 L35 30 L42 20 L55 20 L55 55 L42 55 L42 40 L28 40 L28 55 L15 55 Z" fill="#FFEB3B"/>
-            <rect x="15" y="30" width="40" height="4" fill="#bbb" opacity=".9"/>
-            <rect x="15" y="43" width="40" height="4" fill="#bbb" opacity=".9"/>
-            <text x="22" y="38" font-size="5" fill="#555" font-family="sans-serif">RETROFLECTIVE</text>
-          </svg>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN ISO 20471 â€” Class 2 min, Class 3 near traffic (para 101b)</div>
-            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-              <li>Fluorescent yellow/orange background with retroflective bands (para 99)</li>
-              <li>Class 3 (full sleeves) â€” dual carriageways 50mph+ (para 101b)</li>
-              <li>Inspect for wear, fading and loose seams before use (para 102b)</li>
-              <li>Clean using correct materials â€” dirt reduces visibility (para 102c)</li>
-              <li>Worn over all other PPE â€” always visible to others</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 6: FOOT PROTECTION â•â• -->
-  <div style="padding:0 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #5D4037;padding-bottom:8px;margin-bottom:16px;">
-      &#128095; Section 6 â€” Foot Protection (L25 para 103â€“105)
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:20px;">
-      <div style="background:white;border-radius:10px;border:2px solid #D7CCC8;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="background:#4E342E;padding:10px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#FFCCBC;text-transform:uppercase;letter-spacing:.5px;">Safety Boots (Chainsaw)</span>
-          <span style="margin-left:auto;background:#c0392b;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">MANDATORY</span>
-        </div>
-        <div style="padding:14px 16px;display:flex;gap:12px;align-items:flex-start;">
-          <svg width="70" height="70" viewBox="0 0 70 70" style="flex-shrink:0;">
-            <path d="M10 50 L10 35 Q10 27 20 27 L32 27 L32 22 Q32 18 36 18 L42 18 Q46 18 46 24 L46 34 L58 42 L58 52 Z" fill="#5D4037"/>
-            <path d="M10 52 L58 52 L58 56 L10 56 Z" fill="#4E342E"/>
-            <ellipse cx="20" cy="38" rx="4" ry="3" fill="#7ec820" opacity=".8"/>
-            <text x="13" y="40" font-size="5" fill="white" font-family="sans-serif" font-weight="bold">S3</text>
-            <path d="M32 27 L32 52" stroke="#3E2723" stroke-width="1.5" opacity=".5"/>
-          </svg>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:#c0392b;margin-bottom:4px;">Standard: EN ISO 20345 S3 + EN 381-3 chainsaw protection</div>
-            <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-              <li>Steel/composite toecap (200J impact) â€” para 103a</li>
-              <li>Penetration-resistant midsole â€” protects against ground hazards (para 104b)</li>
-              <li>Anti-slip sole â€” reduces slip risk on uneven ground (para 104c)</li>
-              <li>Chainsaw protection on top of foot (EN 381-3) â€” para 103d</li>
-              <li>Inspect for wear and loose seams before use (para 105b)</li>
-              <li>No trainers, wellingtons or non-rated footwear on site</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 7: HEARING PROTECTION â•â• -->
-  <div style="padding:0 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #00695C;padding-bottom:8px;margin-bottom:16px;">
-      &#128266; Section 7 â€” Hearing Protection (L25 para 113â€“114)
-    </div>
-    <div style="background:white;border-radius:10px;border:2px solid #B2DFDB;padding:16px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-      <div style="font-size:11px;font-weight:700;color:#004D40;margin-bottom:8px;">Note: Hearing protection is covered by the Control of Noise at Work Regulations 2005, not PPE Regs â€” BUT must be compatible with all other PPE worn (Reg 5, para 113)</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
-        <div>
-          <div style="font-size:13px;font-weight:700;color:#00695C;margin-bottom:6px;">Ear Defenders (Earmuffs)</div>
-          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-            <li>Standard: EN 352 â€” SNR 28 dB minimum</li>
-            <li>Chainsaws: 100â€“115 dB(A) â€” mandatory protection</li>
-            <li>Hard plastic cups over ears, cushion-sealed (para 114b)</li>
-            <li>Helmet-mounted preferred for compatibility (Reg 5)</li>
-          </ul>
-        </div>
-        <div>
-          <div style="font-size:13px;font-weight:700;color:#00695C;margin-bottom:6px;">Earplugs</div>
-          <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.8;">
-            <li>Fit into/cover ear canal â€” form a seal (para 114a)</li>
-            <li>Disposable â€” single use only, discard correctly</li>
-            <li>Acceptable as secondary protection alongside defenders</li>
-            <li>Must be compatible with helmet and visor (Reg 5)</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 8: PERSONAL FALL PROTECTION â•â• -->
-  <div style="padding:0 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #1565C0;padding-bottom:8px;margin-bottom:16px;">
-      &#128279; Section 8 â€” Personal Fall Protection (L25 para 110â€“112)
-    </div>
-    <div style="background:#E3F2FD;border-left:4px solid #1565C0;padding:12px 16px;border-radius:4px;margin-bottom:14px;font-size:13px;color:#0D47A1;font-weight:600;">
-      &#8505; All climbing equipment must be inspected before EVERY use. Pre-use check required by Regulation 7 (maintenance). LOLER 1998 also applies to lifting equipment used to raise persons.
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;margin-bottom:20px;">
-      <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="font-size:13px;font-weight:700;color:#1565C0;margin-bottom:8px;">Work Restraint System (para 111a)</div>
-        <p style="font-size:12px;color:#555;margin:0 0 8px;">Prevents user reaching zones where risk of fall exists. Does not arrest a fall â€” prevents access to fall zone.</p>
-        <div style="font-size:11px;font-weight:700;color:#c0392b;">Standard: EN 358 â€” work positioning lanyards</div>
-      </div>
-      <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="font-size:13px;font-weight:700;color:#1565C0;margin-bottom:8px;">Work Positioning System (para 111b)</div>
-        <p style="font-size:12px;color:#555;margin:0 0 8px;">Supports operative in suspension while working. Both hands free. MUST have fall arrest back-up system.</p>
-        <div style="font-size:11px;font-weight:700;color:#c0392b;">Standards: EN 813 (sit harness) + EN 354 (lanyards)</div>
-      </div>
-      <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="font-size:13px;font-weight:700;color:#1565C0;margin-bottom:8px;">Fall Arrest System (para 111e)</div>
-        <p style="font-size:12px;color:#555;margin:0 0 8px;">Arrests fall and limits force on body to max 6 kN. Energy absorbing lanyards or inertia reel devices.</p>
-        <div style="font-size:11px;font-weight:700;color:#c0392b;">Standards: EN 361 (full harness) + EN 355 (energy absorber)</div>
-      </div>
-    </div>
-
-    <!-- Fall protection system diagram -->
-    <div style="background:white;border-radius:10px;border:2px solid #BBDEFB;padding:16px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#1565C0;margin-bottom:12px;text-transform:uppercase;">Key Points for Fall Protection (L25 para 112)</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;font-size:12px;color:#555;">
-        <div style="background:#E3F2FD;padding:10px;border-radius:6px;"><strong>Para 112a:</strong> Consider max descent height, load, secure anchor points, rope length and recovery system</div>
-        <div style="background:#E3F2FD;padding:10px;border-radius:6px;"><strong>Para 112b:</strong> Inspect equipment at regular intervals. LOLER requires 6-monthly examination by competent person</div>
-        <div style="background:#E3F2FD;padding:10px;border-radius:6px;"><strong>Para 112c:</strong> Webbing and rope deteriorates â€” inspect every metre for cuts, abrasion, stiffness and discolouration</div>
-        <div style="background:#FFF3E0;padding:10px;border-radius:6px;"><strong>&#9888; Key rule:</strong> Maintain 2-point connection at ALL times â€” never unclip both lanyards simultaneously</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- â•â• SECTION 9: PPE MANAGEMENT DUTIES â•â• -->
-  <div style="padding:0 20px 20px;">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:#1a2e10;text-transform:uppercase;letter-spacing:1px;border-bottom:3px solid #c0392b;padding-bottom:8px;margin-bottom:16px;">
-      &#128196; Section 9 â€” PPE Management Duties (L25 Regs 4â€“11)
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:20px;">
-      <div style="background:white;border-radius:8px;border:2px solid #FFCDD2;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#c0392b;text-transform:uppercase;margin-bottom:8px;">Employer Duties</div>
-        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
-          <li><strong>Reg 4:</strong> Provide suitable, correct-fitting PPE free of charge (para 37)</li>
-          <li><strong>Reg 5:</strong> Ensure all PPE worn together is compatible</li>
-          <li><strong>Reg 6:</strong> Assess PPE is suitable before issuing</li>
-          <li><strong>Reg 7:</strong> Maintain, clean and replace PPE as needed</li>
-          <li><strong>Reg 8:</strong> Provide appropriate storage for PPE</li>
-          <li><strong>Reg 9:</strong> Provide information, instruction and training</li>
-        </ul>
-      </div>
-      <div style="background:white;border-radius:8px;border:2px solid #FFCDD2;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#c0392b;text-transform:uppercase;margin-bottom:8px;">Employee Duties</div>
-        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
-          <li><strong>Reg 10:</strong> Use PPE properly as instructed and trained</li>
-          <li><strong>Reg 10(4):</strong> Return PPE to storage after use</li>
-          <li><strong>Reg 11:</strong> Report any loss or obvious defect immediately</li>
-          <li>Take reasonable care of PPE provided</li>
-          <li>Do not modify or damage PPE</li>
-          <li>Attend all PPE training provided</li>
-        </ul>
-      </div>
-      <div style="background:white;border-radius:8px;border:2px solid #FFCDD2;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:#c0392b;text-transform:uppercase;margin-bottom:8px;">PPE Suitability (Reg 4(3))</div>
-        <ul style="font-size:12px;color:#555;margin:0;padding-left:16px;line-height:1.9;">
-          <li>Appropriate for the specific risk involved</li>
-          <li>Takes account of ergonomic needs and health of wearer</li>
-          <li>Capable of fitting the wearer correctly</li>
-          <li>Effective without increasing overall risk</li>
-          <li>Bears CE mark â€” Personal Protective Equipment Regs 2002 (para 44)</li>
-          <li>Employer cannot charge employees for PPE (para 37)</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Emergency numbers footer -->
-    <div style="background:#c0392b;border-radius:10px;padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;color:white;">
-      <div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:2px;">999</div>
-        <div style="font-size:11px;opacity:.9;">Fire / Police / Ambulance</div>
-      </div>
-      <div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:1px;">0800 404 090</div>
-        <div style="font-size:11px;opacity:.9;">National Gas Emergency</div>
-      </div>
-      <div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:2px;">105</div>
-        <div style="font-size:11px;opacity:.9;">Power Cut / Electricity</div>
-      </div>
-      <div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;">HSE Infoline</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;">0300 003 1747</div>
-        <div style="font-size:11px;opacity:.9;">Health &amp; Safety Executive</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div style="background:#1a2e10;padding:12px 20px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.5px;">
-    Arborite Tree Services Ltd &nbsp;|&nbsp; Based on HSE L25 Personal Protective Equipment at Work Regulations 1992 (Third Edition 2015) &nbsp;|&nbsp; Review annually
-  </div>
-
-  <div class="print-bar">
-    <button class="btn btn-print" onclick="printPanel('safety')">&#128424; Print / Save as PDF</button>
-  </div>
-</div></div>
 
 
 <!-- â•â•â• COMMON FACTOR RISK ASSESSMENT PANEL â•â•â• -->
@@ -2775,24 +2291,6 @@
       <div style="background:#305818;border:1px solid rgba(126,200,32,.5);border-radius:10px;padding:26px 20px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px;-webkit-tap-highlight-color:transparent;"
            onmouseover="this.style.background='#3d6a1b';this.style.transform='translateY(-2px)'"
            onmouseout="this.style.background='#305818';this.style.transform=''"
-           onclick="openFormFromOffice('safety')">
-        <div style="font-size:40px;line-height:1;margin-bottom:4px;">&#128737;</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:white;line-height:1.2;">Safety Checker</div>
-        <div style="font-size:12px;color:rgba(200,255,100,.7);letter-spacing:.3px;margin-top:2px;">Equipment &amp; PPE checks</div>
-      </div>
-
-      <div style="background:#305818;border:1px solid rgba(126,200,32,.5);border-radius:10px;padding:26px 20px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px;-webkit-tap-highlight-color:transparent;"
-           onmouseover="this.style.background='#3d6a1b';this.style.transform='translateY(-2px)'"
-           onmouseout="this.style.background='#305818';this.style.transform=''"
-           onclick="openStorageCleanup()">
-        <div style="font-size:40px;line-height:1;margin-bottom:4px;">&#128465;</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:white;line-height:1.2;">Storage Cleanup</div>
-        <div style="font-size:12px;color:rgba(200,255,100,.7);letter-spacing:.3px;margin-top:2px;">Remove orphaned files</div>
-      </div>
-
-      <div style="background:#305818;border:1px solid rgba(126,200,32,.5);border-radius:10px;padding:26px 20px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px;-webkit-tap-highlight-color:transparent;"
-           onmouseover="this.style.background='#3d6a1b';this.style.transform='translateY(-2px)'"
-           onmouseout="this.style.background='#305818';this.style.transform=''"
            onclick="openMSBView()">
         <div style="font-size:40px;line-height:1;margin-bottom:4px;">&#128203;</div>
         <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:white;line-height:1.2;">Build Your Method Statement</div>
@@ -2866,24 +2364,6 @@
     <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;flex:1;">&#128393; Client Ledger</div>
   </div>
   <iframe id="crmFrame" src="crm/index.html" title="Arborite Client Ledger" style="width:100%;height:calc(100% - 52px);border:0;display:block;background:#F5F6F3;"></iframe>
-</div>
-
-<!-- STORAGE CLEANUP VIEW -->
-<div id="storageCleanupView" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#2d5218;overflow-y:auto;z-index:950;padding:0 0 40px;">
-  <div style="background:#1a3210;padding:14px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:10;box-shadow:0 2px 12px rgba(0,0,0,.4);">
-    <button onclick="closeStorageCleanup()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8592; Back</button>
-    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;flex:1;">&#128465; Storage Cleanup</div>
-    <button onclick="scanStorageOrphans()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:7px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#8635; Re-scan</button>
-  </div>
-  <div style="max-width:600px;margin:0 auto;padding:20px;">
-    <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:14px;line-height:1.6;">Compares files in the Signatures and Documents Storage buckets against current job records, and lists any folders left over from jobs that have since been deleted.</div>
-    <div id="storageCleanupStatus" style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Scanning…</div>
-    <div id="storageCleanupList" style="margin-bottom:16px;"></div>
-    <button id="storageCleanupDeleteBtn" onclick="deleteStorageOrphans()" style="display:none;background:#c62828;border:none;color:white;padding:10px 20px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;margin-bottom:20px;">&#128465; Delete All Orphaned Files</button>
-
-    <button id="storageCleanupJobsToggle" onclick="toggleStorageCleanupJobs()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;padding:8px 16px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#128065; Show Current Jobs (for reference)</button>
-    <div id="storageCleanupJobsList" style="display:none;margin-top:12px;"></div>
-  </div>
 </div>
 
 <!-- â•â•â• TOOLBOX TALKS VIEW â•â•â• -->
@@ -3422,7 +2902,7 @@
 </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=1.9.9"></script>
+  <script src="js/app.js?v=1.9.11"></script>
 </body>
 </html>
 

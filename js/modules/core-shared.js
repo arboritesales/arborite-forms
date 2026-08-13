@@ -131,7 +131,7 @@ function checkPass() {
 var SUPA_URL = 'https://labskiotmfvdgcfbhbbl.supabase.co';
 var SUPA_KEY = 'sb_publishable_D15QbbKwIm3FB1Lwdcn_YA_TxfXuDX9';
 var TABLE    = 'job_forms';
-var PANELS   = ['powa','signoff','method','daily','documents','emergency','safety'];
+var PANELS   = ['powa','signoff','method','daily','documents','emergency'];
 var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads, drCount, docStore;
 
 // A subcontractor job link (?jobLink=<token> — see job-share-link.js) skips

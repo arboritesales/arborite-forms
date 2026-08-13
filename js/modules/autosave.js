@@ -1,6 +1,6 @@
 // ── AUTO-SAVE ──
 var autoSaveTimer = null;
-var AUTO_SAVE_PANELS = ['signoff', 'method', 'daily', 'powa', 'safety', 'emergency'];
+var AUTO_SAVE_PANELS = ['signoff', 'method', 'daily', 'powa', 'emergency'];
 
 function scheduleAutoSave(panelId, immediate) {
   if (!currentJobRef) return;

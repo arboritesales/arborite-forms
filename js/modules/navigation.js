@@ -82,7 +82,6 @@ function openForm(panelId) {
     audit:'Audit',
     documents:'Documents',
     emergency:'Emergency Procedure',
-    safety:'Safety Checks',
     cfra:'Common Factor Risk Assessment'
   };
   var titleEl = document.getElementById('appViewTitle');
