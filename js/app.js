@@ -6619,13 +6619,12 @@ function spRenderCalendar() {
         var day = d.getDate();
         if (!marks[day]) marks[day] = { names: [] };
         // Bank holidays/shutdown apply to literally everyone — a "BH" tag says
-        // that better than listing all 15 names. Every other leave type
-        // (holiday, sick, other) lists who, since that's the actually useful
-        // info on a shared calendar — sick/other used to be silently dropped
-        // here, so a day off for anything but "holiday" never showed. Rows
-        // are either approved (anyone) or pending (only ever the signed-in
-        // user's own, per the SQL filter), so a "pending" tag here can only
-        // ever be describing your own request.
+        // that better than listing all 15 names. Every other row here is
+        // either someone's approved holiday (public, per the SQL — the whole
+        // point of a shared calendar) or the signed-in user's own entry of
+        // any type/status (sick, other, or a still-pending request) — the
+        // SQL never sends anyone else's sick/other/pending rows, so whatever
+        // shows up beyond "holiday" can only ever be describing yourself.
         if (r.type === 'bank_holiday' || r.type === 'shutdown') { marks[day].bh = true; continue; }
         var label = spFirstName(r.staff_name) + (r.type === 'holiday' ? '' : ' (' + r.type + ')') + (r.status === 'pending' ? ' — pending' : '');
         marks[day].names.push({ text: label, pending: r.status === 'pending' });

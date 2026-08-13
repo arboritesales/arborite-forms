@@ -527,17 +527,18 @@ begin
 end;
 $$;
 
--- Approved leave (+ bank holidays/shutdown) for one calendar month, across
--- everyone — plus, when p_token identifies a signed-in staff member, that
--- same person's own PENDING entries too, so they can see their own upcoming
--- requests on the calendar before a manager decides them. Everyone else's
--- pending requests stay invisible here (privacy rule, unchanged) — only the
--- token owner's own pending rows are ever included. Still excludes the
--- historical-import placeholder rows (they'd just clutter the calendar with
--- a single "1 Apr" entry covering a whole backdated total).
--- (DROP first — p_token is a new parameter, so this is a different signature
--- from the old 2-arg version, not a like-for-like replace.)
-drop function if exists sp_calendar_days(int, int);
+-- Calendar visibility rules (p_token identifies the signed-in staff member,
+-- if any):
+--   - bank_holiday / shutdown — company-wide, always visible to everyone.
+--   - approved 'holiday'      — visible to everyone (the whole point of a
+--                                shared team calendar: see who's off).
+--   - anything else that's yours (your own holiday even while still
+--     pending, and your own sick/other regardless of status) — visible
+--     only to you. Sickness and pending requests are never shown to
+--     anyone but the person they belong to.
+-- Still excludes the historical-import placeholder rows (they'd just
+-- clutter the calendar with a single "1 Apr" entry covering a whole
+-- backdated total).
 create or replace function sp_calendar_days(p_year int, p_month int, p_token text default null)
 returns table(staff_name text, start_date date, end_date date, type text, status text)
 language plpgsql
@@ -551,7 +552,7 @@ begin
     begin
       v_staff_id := (sp_staff_from_token(p_token)).id;
     exception when others then
-      v_staff_id := null; -- expired/invalid token — just fall back to approved-only
+      v_staff_id := null; -- expired/invalid token — just fall back to what's public
     end;
   end if;
 
@@ -562,7 +563,11 @@ begin
     where coalesce(slr.note, '') not like 'Historical balance import%'
       and slr.start_date <= (make_date(p_year, p_month, 1) + interval '1 month' - interval '1 day')::date
       and slr.end_date >= make_date(p_year, p_month, 1)
-      and (slr.status = 'approved' or (v_staff_id is not null and slr.staff_id = v_staff_id and slr.status = 'pending'));
+      and (
+        slr.type in ('bank_holiday', 'shutdown')
+        or (slr.type = 'holiday' and slr.status = 'approved')
+        or (v_staff_id is not null and slr.staff_id = v_staff_id)
+      );
 end;
 $$;
 
