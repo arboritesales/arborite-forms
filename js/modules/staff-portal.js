@@ -372,20 +372,25 @@ function spRenderCalendar() {
   // pending requests (everyone else's pending stays hidden — see the SQL).
   spRpc('sp_calendar_days', { p_year: y, p_month: m + 1, p_token: spSessionToken }).then(function(res) {
     var rows = res.ok && Array.isArray(res.data) ? res.data : [];
-    var marks = {}; // day-of-month -> {names:[{text,pending}], bh:true}
+    var marks = {}; // day-of-month -> {names:[{text,pending}], bh:true, shutdown:true}
     rows.forEach(function(r) {
       var s = new Date(r.start_date + 'T00:00:00'), e = new Date(r.end_date + 'T00:00:00');
       for (var d = new Date(Math.max(s, new Date(y, m, 1))); d <= e && d <= new Date(y, m + 1, 0); d.setDate(d.getDate() + 1)) {
         var day = d.getDate();
         if (!marks[day]) marks[day] = { names: [] };
-        // Bank holidays/shutdown apply to literally everyone — a "BH" tag says
-        // that better than listing all 15 names. Every other row here is
-        // either someone's approved holiday (public, per the SQL — the whole
-        // point of a shared calendar) or the signed-in user's own entry of
-        // any type/status (sick, other, or a still-pending request) — the
-        // SQL never sends anyone else's sick/other/pending rows, so whatever
-        // shows up beyond "holiday" can only ever be describing yourself.
-        if (r.type === 'bank_holiday' || r.type === 'shutdown') { marks[day].bh = true; continue; }
+        // Bank holidays and the company shutdown both apply to everyone, so
+        // neither lists all 15 names — but they're tagged differently: a real
+        // bank holiday doesn't touch anyone's allowance, while the shutdown
+        // (Christmas closure) is counted as staff holiday and does use a day
+        // of it, so labelling it "BH" was actively misleading. Every other
+        // row here is either someone's approved holiday (public, per the
+        // SQL — the whole point of a shared calendar) or the signed-in
+        // user's own entry of any type/status (sick, other, or a still-
+        // pending request) — the SQL never sends anyone else's sick/other/
+        // pending rows, so whatever shows up beyond "holiday" can only ever
+        // be describing yourself.
+        if (r.type === 'bank_holiday') { marks[day].bh = true; continue; }
+        if (r.type === 'shutdown') { marks[day].shutdown = true; continue; }
         var label = spFirstName(r.staff_name) + (r.type === 'holiday' ? '' : ' (' + r.type + ')') + (r.status === 'pending' ? ' — pending' : '');
         marks[day].names.push({ text: label, pending: r.status === 'pending' });
       }
@@ -398,8 +403,9 @@ function spRenderCalendar() {
     for (var i = 0; i < startOffset; i++) html += '<div class="sp-cal-day sp-blank"></div>';
     for (var d2 = 1; d2 <= daysInMonth; d2++) {
       var mk = marks[d2] || { names: [] };
-      html += '<div class="sp-cal-day' + (mk.bh ? ' sp-is-bh' : '') + '"><span class="sp-dnum">' + d2 + '</span>'
+      html += '<div class="sp-cal-day' + (mk.bh || mk.shutdown ? ' sp-is-bh' : '') + '"><span class="sp-dnum">' + d2 + '</span>'
         + (mk.bh ? '<span class="sp-bh-tag">BH</span>' : '')
+        + (mk.shutdown ? '<span class="sp-bh-tag sp-shutdown-tag">Shutdown</span>' : '')
         + (mk.names.length ? '<div class="sp-cal-names">' + mk.names.map(function(n) { return '<span class="sp-cal-name' + (n.pending ? ' sp-cal-name-pending' : '') + '">' + spEsc(n.text) + '</span>'; }).join('') + '</div>' : '')
         + '</div>';
     }
@@ -461,9 +467,23 @@ function spRenderClockActivity() {
       var when = t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
       var label = r.action === 'in' ? 'Clocked in' : 'Clocked out';
       return '<div class="sp-onsite-row"><span>' + spEsc(r.name) + ' — ' + label
-        + '<br><span class="sp-onsite-time">' + when + (r.lat != null ? spMapLink(r.lat, r.lng) : ' &middot; no location') + '</span></span></div>';
+        + '<br><span class="sp-onsite-time">' + when + (r.lat != null ? spMapLink(r.lat, r.lng) : ' &middot; no location') + '</span></span>'
+        + '<button class="sp-clock-del-btn" title="Delete this entry" onclick="spDeleteClockEvent(\'' + r.id + '\')">&times;</button></div>';
     }).join('');
   });
+}
+
+// Manager-only: removes a mis-tap or duplicate clock event outright — there's
+// no "pending/decide" state for a clock event like there is for leave, so
+// this is a straight delete, not an approve/decline.
+function spDeleteClockEvent(id) {
+  if (!confirm('Delete this clock event? This cannot be undone.')) return;
+  spRpc('sp_manager_delete_clock_event', { p_id: id }).then(function(res) {
+    if (!res.ok || !res.data) { spToast('Could not delete.'); return; }
+    spToast('Deleted.');
+    spRenderClockActivity();
+    spRenderOnsite();
+  }).catch(function() { spToast('Connection error — try again.'); });
 }
 
 // Fetches the UK bank holiday list client-side (Postgres has no outbound

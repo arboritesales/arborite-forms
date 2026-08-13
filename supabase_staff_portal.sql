@@ -357,17 +357,37 @@ $$;
 -- location, not just who's currently on site. Employees only ever see each
 -- other's on-site status via sp_onsite_now above (name only, no location) —
 -- location is manager-visible only, hence authenticated-only grant below.
+-- Includes the row id so a manager can delete a mistaken/duplicate entry
+-- (see sp_manager_delete_clock_event below).
+-- (DROP first — id is a new output column, so this is a different return
+-- type from the old version, not a like-for-like replace.)
+drop function if exists sp_clock_activity(int);
 create or replace function sp_clock_activity(p_limit int default 100)
-returns table(name text, action text, ts timestamptz, lat double precision, lng double precision, accuracy_m numeric)
+returns table(id uuid, name text, action text, ts timestamptz, lat double precision, lng double precision, accuracy_m numeric)
 language sql
 security definer
 set search_path = public, extensions
 as $$
-  select s.name, sce.action, sce.ts, sce.lat, sce.lng, sce.accuracy_m
+  select sce.id, s.name, sce.action, sce.ts, sce.lat, sce.lng, sce.accuracy_m
   from staff_clock_events sce
   join staff s on s.id = sce.staff_id
   order by sce.ts desc
   limit p_limit;
+$$;
+
+-- Manager-only — deletes one clock in/out event outright (a mis-tap, a
+-- duplicate, testing data, etc). staff_clock_events has no "status" to
+-- decline like a leave request does, so this is a straight delete rather
+-- than a soft-decide; sp_onsite_now and the clock report both re-derive
+-- from what's left in the table, so removing a bad row just fixes those too.
+create or replace function sp_manager_delete_clock_event(p_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, extensions
+as $$
+  delete from staff_clock_events where id = p_id;
+  select true;
 $$;
 
 -- anon: Staff Portal doesn't use the shared team/manager login, so its own
@@ -387,6 +407,7 @@ grant execute on function sp_onsite_now() to anon, authenticated;
 -- reason for anon to ever be able to call this one.
 grant execute on function reset_staff_password(text) to authenticated;
 grant execute on function sp_clock_activity(int) to authenticated;
+grant execute on function sp_manager_delete_clock_event(uuid) to authenticated;
 grant execute on function sp_clock_report(int, int) to authenticated;
 
 -- ============================================================================
