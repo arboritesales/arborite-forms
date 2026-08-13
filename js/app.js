@@ -6605,6 +6605,52 @@ function spShiftMonth(delta) {
 
 function spFirstName(fullName) { return (fullName || '').split(' ')[0]; }
 
+// Shared by the staff-facing Team Calendar and the manager's read-only copy
+// of it in Staff Dashboards — same month grid, same day-marking rules, just
+// fed different rows (a signed-in staff token also includes that person's
+// own pending entries; the manager view always passes p_token: null, so it
+// only ever sees what's public — see sp_calendar_days for the actual rule).
+function spBuildCalGridHtml(rows, y, m) {
+  var marks = {}; // day-of-month -> {names:[{text,pending}], bh:true, shutdown:true}
+  rows.forEach(function(r) {
+    var s = new Date(r.start_date + 'T00:00:00'), e = new Date(r.end_date + 'T00:00:00');
+    for (var d = new Date(Math.max(s, new Date(y, m, 1))); d <= e && d <= new Date(y, m + 1, 0); d.setDate(d.getDate() + 1)) {
+      var day = d.getDate();
+      if (!marks[day]) marks[day] = { names: [] };
+      // Bank holidays and the company shutdown both apply to everyone, so
+      // neither lists all 15 names — but they're tagged differently: a real
+      // bank holiday doesn't touch anyone's allowance, while the shutdown
+      // (Christmas closure) is counted as staff holiday and does use a day
+      // of it, so labelling it "BH" was actively misleading. Every other
+      // row here is either someone's approved holiday (public, per the
+      // SQL — the whole point of a shared calendar) or the signed-in
+      // user's own entry of any type/status (sick, other, or a still-
+      // pending request) — the SQL never sends anyone else's sick/other/
+      // pending rows, so whatever shows up beyond "holiday" can only ever
+      // be describing yourself.
+      if (r.type === 'bank_holiday') { marks[day].bh = true; continue; }
+      if (r.type === 'shutdown') { marks[day].shutdown = true; continue; }
+      var label = spFirstName(r.staff_name) + (r.type === 'holiday' ? '' : ' (' + r.type + ')') + (r.status === 'pending' ? ' — pending' : '');
+      marks[day].names.push({ text: label, pending: r.status === 'pending' });
+    }
+  });
+  var first = new Date(y, m, 1);
+  var startOffset = (first.getDay() + 6) % 7;
+  var daysInMonth = new Date(y, m + 1, 0).getDate();
+  var dows = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var html = dows.map(function(d) { return '<div class="sp-cal-dow">' + d + '</div>'; }).join('');
+  for (var i = 0; i < startOffset; i++) html += '<div class="sp-cal-day sp-blank"></div>';
+  for (var d2 = 1; d2 <= daysInMonth; d2++) {
+    var mk = marks[d2] || { names: [] };
+    html += '<div class="sp-cal-day' + (mk.bh || mk.shutdown ? ' sp-is-bh' : '') + '"><span class="sp-dnum">' + d2 + '</span>'
+      + (mk.bh ? '<span class="sp-bh-tag">BH</span>' : '')
+      + (mk.shutdown ? '<span class="sp-bh-tag sp-shutdown-tag">Shutdown</span>' : '')
+      + (mk.names.length ? '<div class="sp-cal-names">' + mk.names.map(function(n) { return '<span class="sp-cal-name' + (n.pending ? ' sp-cal-name-pending' : '') + '">' + spEsc(n.text) + '</span>'; }).join('') + '</div>' : '')
+      + '</div>';
+  }
+  return html;
+}
+
 function spRenderCalendar() {
   var y = spCalMonth.getFullYear(), m = spCalMonth.getMonth(); // JS month is 0-based
   document.getElementById('spCalTitle').textContent = spCalMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
@@ -6612,50 +6658,39 @@ function spRenderCalendar() {
   // pending requests (everyone else's pending stays hidden — see the SQL).
   spRpc('sp_calendar_days', { p_year: y, p_month: m + 1, p_token: spSessionToken }).then(function(res) {
     var rows = res.ok && Array.isArray(res.data) ? res.data : [];
-    var marks = {}; // day-of-month -> {names:[{text,pending}], bh:true, shutdown:true}
-    rows.forEach(function(r) {
-      var s = new Date(r.start_date + 'T00:00:00'), e = new Date(r.end_date + 'T00:00:00');
-      for (var d = new Date(Math.max(s, new Date(y, m, 1))); d <= e && d <= new Date(y, m + 1, 0); d.setDate(d.getDate() + 1)) {
-        var day = d.getDate();
-        if (!marks[day]) marks[day] = { names: [] };
-        // Bank holidays and the company shutdown both apply to everyone, so
-        // neither lists all 15 names — but they're tagged differently: a real
-        // bank holiday doesn't touch anyone's allowance, while the shutdown
-        // (Christmas closure) is counted as staff holiday and does use a day
-        // of it, so labelling it "BH" was actively misleading. Every other
-        // row here is either someone's approved holiday (public, per the
-        // SQL — the whole point of a shared calendar) or the signed-in
-        // user's own entry of any type/status (sick, other, or a still-
-        // pending request) — the SQL never sends anyone else's sick/other/
-        // pending rows, so whatever shows up beyond "holiday" can only ever
-        // be describing yourself.
-        if (r.type === 'bank_holiday') { marks[day].bh = true; continue; }
-        if (r.type === 'shutdown') { marks[day].shutdown = true; continue; }
-        var label = spFirstName(r.staff_name) + (r.type === 'holiday' ? '' : ' (' + r.type + ')') + (r.status === 'pending' ? ' — pending' : '');
-        marks[day].names.push({ text: label, pending: r.status === 'pending' });
-      }
-    });
-    var first = new Date(y, m, 1);
-    var startOffset = (first.getDay() + 6) % 7;
-    var daysInMonth = new Date(y, m + 1, 0).getDate();
-    var dows = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    var html = dows.map(function(d) { return '<div class="sp-cal-dow">' + d + '</div>'; }).join('');
-    for (var i = 0; i < startOffset; i++) html += '<div class="sp-cal-day sp-blank"></div>';
-    for (var d2 = 1; d2 <= daysInMonth; d2++) {
-      var mk = marks[d2] || { names: [] };
-      html += '<div class="sp-cal-day' + (mk.bh || mk.shutdown ? ' sp-is-bh' : '') + '"><span class="sp-dnum">' + d2 + '</span>'
-        + (mk.bh ? '<span class="sp-bh-tag">BH</span>' : '')
-        + (mk.shutdown ? '<span class="sp-bh-tag sp-shutdown-tag">Shutdown</span>' : '')
-        + (mk.names.length ? '<div class="sp-cal-names">' + mk.names.map(function(n) { return '<span class="sp-cal-name' + (n.pending ? ' sp-cal-name-pending' : '') + '">' + spEsc(n.text) + '</span>'; }).join('') + '</div>' : '')
-        + '</div>';
-    }
-    document.getElementById('spCalGrid').innerHTML = html;
+    document.getElementById('spCalGrid').innerHTML = spBuildCalGridHtml(rows, y, m);
+  });
+}
+
+// ── MANAGER: TEAM CALENDAR (read-only overview inside Staff Dashboards) ──
+var spMgrCalMonth = new Date();
+
+function spShiftMgrCalMonth(delta) {
+  spMgrCalMonth = new Date(spMgrCalMonth.getFullYear(), spMgrCalMonth.getMonth() + delta, 1);
+  spRenderMgrCalendar();
+}
+
+function spRenderMgrCalendar() {
+  var el = document.getElementById('spMgrCalGrid');
+  if (!el) return;
+  var y = spMgrCalMonth.getFullYear(), m = spMgrCalMonth.getMonth();
+  document.getElementById('spMgrCalTitle').textContent = spMgrCalMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+  // The manager is signed in via the separate Office/Supabase Auth login,
+  // not a staff session, so p_token is null — this shows exactly what
+  // everyone's shared calendar shows (approved holiday, bank holidays,
+  // shutdown). Pending requests and sick days already have their own cards
+  // above (Pending requests / Edit staff records), so they're deliberately
+  // not duplicated here.
+  spRpc('sp_calendar_days', { p_year: y, p_month: m + 1, p_token: null }).then(function(res) {
+    var rows = res.ok && Array.isArray(res.data) ? res.data : [];
+    el.innerHTML = spBuildCalGridHtml(rows, y, m);
   });
 }
 
 // ── MANAGER: STAFF DASHBOARDS ──
 function spRenderMgr() {
   spRenderOnsite();
+  spRenderMgrCalendar();
   spSyncBankHolidaysAndShutdowns();
   spRenderTeamSummary();
   spRenderPendingRequests();
