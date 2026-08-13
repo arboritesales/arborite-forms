@@ -6696,7 +6696,6 @@ function spRenderMgr() {
   spRenderPendingRequests();
   spRenderClockActivity();
   spRenderClockReport();
-  spRenderLeaveSummary();
   spLoadEditStaffList();
 }
 
@@ -6721,35 +6720,6 @@ function spRenderClockReport() {
       return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td></tr>';
     }).join('');
     el.innerHTML = '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th></tr>' + body + '</table>';
-  });
-}
-
-// ── MANAGER: MONTHLY LEAVE SUMMARY (holiday/sick taken that month, plus the
-// running remaining balance as of that month-end) — separate from the
-// Monthly Clock Report above since that one's a daily in/out log, not a
-// per-employee monthly total, and separate from Team Summary below since
-// that one's a live all-time total, not scoped to a specific month. ──
-var spLeaveSummaryMonth = new Date();
-
-function spShiftLeaveSummaryMonth(delta) {
-  spLeaveSummaryMonth = new Date(spLeaveSummaryMonth.getFullYear(), spLeaveSummaryMonth.getMonth() + delta, 1);
-  spRenderLeaveSummary();
-}
-
-function spRound1(n) { return Math.round((n + Number.EPSILON) * 10) / 10; }
-
-function spRenderLeaveSummary() {
-  var el = document.getElementById('spLeaveSummary');
-  if (!el) return;
-  var y = spLeaveSummaryMonth.getFullYear(), m = spLeaveSummaryMonth.getMonth();
-  document.getElementById('spLeaveSummaryTitle').textContent = spLeaveSummaryMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
-  spRpc('sp_monthly_leave_summary', { p_year: y, p_month: m + 1 }).then(function(res) {
-    var rows = res.ok && Array.isArray(res.data) ? res.data : [];
-    if (!rows.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No data.</div>'; return; }
-    var body = rows.map(function(r) {
-      return '<tr><td>' + spEsc(r.name) + '</td><td>' + spRound1(r.holiday_days) + '</td><td>' + spRound1(r.sick_days) + '</td><td>' + spRound1(r.days_remaining) + '</td></tr>';
-    }).join('');
-    el.innerHTML = '<table class="sp-dash-table"><tr><th>Name</th><th>Holiday days</th><th>Sick days</th><th>Remaining (as of month end)</th></tr>' + body + '</table>';
   });
 }
 

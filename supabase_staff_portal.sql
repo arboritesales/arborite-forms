@@ -592,61 +592,12 @@ begin
 end;
 $$;
 
--- Manager-only (Staff Dashboards) — per-employee holiday/sick days actually
--- falling within one calendar month, plus their running remaining balance
--- as of the end of that month (entitlement minus every approved
--- holiday/shutdown day from any time up to that month-end — same all-time
--- basis sp_team_summary uses, just cut off at a chosen month instead of
--- "now"). A request that spans a month boundary (e.g. 28 Apr - 1 May) has
--- its `days` split proportionally between the two months by how many of
--- its calendar days fall in each, since the stored `days` figure isn't
--- always literally (end_date - start_date + 1) — a range can include a
--- weekend that wasn't counted against the allowance. The historical-import
--- placeholder row is excluded from the per-month figures (it's a lump
--- catch-up total, not a real day taken that month) but, like
--- sp_team_summary, IS included in the running remaining balance, since
--- that's the whole reason it exists — to make the balance come out right.
-create or replace function sp_monthly_leave_summary(p_year int, p_month int)
-returns table(name text, holiday_days numeric, sick_days numeric, days_remaining numeric)
-language sql
-security definer
-set search_path = public, extensions
-as $$
-  with bounds as (
-    select make_date(p_year, p_month, 1) as month_start,
-           (make_date(p_year, p_month, 1) + interval '1 month' - interval '1 day')::date as month_end
-  )
-  select
-    s.name,
-    coalesce((
-      select sum(
-        slr.days * (least(slr.end_date, b.month_end) - greatest(slr.start_date, b.month_start) + 1)::numeric
-                  / (slr.end_date - slr.start_date + 1)::numeric
-      )
-      from staff_leave_requests slr, bounds b
-      where slr.staff_id = s.id and slr.status = 'approved' and slr.type in ('holiday', 'shutdown')
-        and slr.start_date <= b.month_end and slr.end_date >= b.month_start
-        and coalesce(slr.note, '') not like 'Historical balance import%'
-    ), 0) as holiday_days,
-    coalesce((
-      select sum(
-        slr.days * (least(slr.end_date, b.month_end) - greatest(slr.start_date, b.month_start) + 1)::numeric
-                  / (slr.end_date - slr.start_date + 1)::numeric
-      )
-      from staff_leave_requests slr, bounds b
-      where slr.staff_id = s.id and slr.status = 'approved' and slr.type = 'sick'
-        and slr.start_date <= b.month_end and slr.end_date >= b.month_start
-    ), 0) as sick_days,
-    s.holiday_allowance_days - coalesce((
-      select sum(slr.days)
-      from staff_leave_requests slr, bounds b
-      where slr.staff_id = s.id and slr.status = 'approved' and slr.type in ('holiday', 'shutdown')
-        and slr.start_date <= b.month_end
-    ), 0) as days_remaining
-  from staff s, bounds b
-  where s.active = true
-  order by s.name asc;
-$$;
+-- Removed: sp_monthly_leave_summary (per-month holiday/sick/remaining
+-- breakdown) — the company-wide shutdown counted as "holiday days" for
+-- every single employee in whichever month it fell in, which just showed
+-- the same number for everyone and wasn't useful. Dropped rather than left
+-- behind unused.
+drop function if exists sp_monthly_leave_summary(int, int);
 
 -- Manager-only (Staff Dashboards, reached via the real Office login) —
 -- everyone's balance in one call for the team summary table.
@@ -861,7 +812,6 @@ grant execute on function sp_calendar_days(int, int, text) to anon, authenticate
 -- real Office login) — no reason for anon to see everyone's balances,
 -- pending requests, or trigger a sync.
 grant execute on function sp_team_summary() to authenticated;
-grant execute on function sp_monthly_leave_summary(int, int) to authenticated;
 grant execute on function sp_pending_requests() to authenticated;
 grant execute on function sp_decide_leave_request(uuid, text) to authenticated;
 grant execute on function sp_staff_leave_history(text) to authenticated;
