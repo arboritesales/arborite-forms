@@ -6282,10 +6282,18 @@ function generateMSBPDF() {
   ensureMSBPPEAssignments();
   msbState.status = 'sent';
   msbState.sentAt = new Date().toISOString();
-  saveMSBRecord().then(function() {
+  saveMSBRecord().catch(function(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
+    alert('Could not save the method statement — check your connection and try again.' + (e && e.message ? ' (' + e.message + ')' : ''));
+    throw { _msbHandled: true };
+  }).then(function() {
     var savedImages = (msbState.job.siteControlImages || []).filter(function(p) { return p.storagePath; });
-    return Promise.all(savedImages.map(function(p) { return _msbFetchAsDataUrl(_msbSiteImgUrl(p.storagePath)); }));
-  }).then(function(resolvedSiteImages) {
+    // A single unreachable photo must not block the whole PDF — skip it, don't reject.
+    return Promise.all(savedImages.map(function(p) {
+      return _msbFetchAsDataUrl(_msbSiteImgUrl(p.storagePath)).catch(function() { return null; });
+    }));
+  }).then(function(resolvedSiteImagesRaw) {
+    var resolvedSiteImages = resolvedSiteImagesRaw.filter(Boolean);
     _loadPdfMake(function(err) {
       if (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
@@ -6302,9 +6310,10 @@ function generateMSBPDF() {
       }
       renderMSBAll();
     });
-  }).catch(function() {
+  }).catch(function(e) {
+    if (e && e._msbHandled) return;
     if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
-    alert('Could not save the method statement — check your connection and try again.');
+    alert('Could not build the PDF: ' + (e && e.message ? e.message : 'unknown error'));
   });
 }
 // ── STAFF PORTAL — clock in/out, leave requests, team calendar ──
