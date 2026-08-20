@@ -508,14 +508,14 @@ function renderMSBPlantStep(container) {
   fileInput.id = 'msbSiteCtrlInput';
   fileInput.onchange = function() { msbSiteControlImageUpload(fileInput); };
   ctrlCard.appendChild(fileInput);
-  renderMSBSiteControlImages();
+  renderMSBSiteControlImages(imgWrap);
   wrap.appendChild(ctrlCard);
 
   container.appendChild(wrap);
 }
 
-function renderMSBSiteControlImages() {
-  var wrap = document.getElementById('msbSiteCtrlImages');
+function renderMSBSiteControlImages(wrap) {
+  wrap = wrap || document.getElementById('msbSiteCtrlImages');
   if (!wrap) return;
   var images = msbState.job.siteControlImages || (msbState.job.siteControlImages = []);
   wrap.innerHTML = '';
