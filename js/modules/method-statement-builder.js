@@ -49,7 +49,7 @@ function _msbFmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB') : '
 
 function resetMSBState() {
   msbState = {
-    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[] },
+    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
     team: [], equipment: [], selectedSOPs: [], selectedExclusionZones: [], ppeAssignments: {},
     emergency: { hospitalName:'', hospitalAddress:'', hospitalPhone:'' },
     status: 'draft', sentAt: null
@@ -509,6 +509,15 @@ function renderMSBPlantStep(container) {
   fileInput.onchange = function() { msbSiteControlImageUpload(fileInput); };
   ctrlCard.appendChild(fileInput);
   renderMSBSiteControlImages(imgWrap);
+
+  var commentsWrap = _msbEl('<div class="msb-field" style="margin-top:12px;"><label>Comments</label></div>');
+  var commentsTa = document.createElement('textarea');
+  commentsTa.placeholder = 'No comments required';
+  commentsTa.value = msbState.job.siteControlComments || '';
+  commentsTa.oninput = function() { msbState.job.siteControlComments = commentsTa.value; };
+  commentsWrap.appendChild(commentsTa);
+  ctrlCard.appendChild(commentsWrap);
+
   wrap.appendChild(ctrlCard);
 
   container.appendChild(wrap);
@@ -865,9 +874,14 @@ function buildMSBDocDefinition() {
   var siteControlImages = (msbState.job.siteControlImages || []).slice(0, 4);
   var siteControlImagesMap = {};
   siteControlImages.forEach(function(img, i) { siteControlImagesMap['siteCtrlImg' + i] = img; });
-  var siteControlsContent = siteControlImages.length
-    ? { columns: siteControlImages.map(function(img, i) { return { image: 'siteCtrlImg' + i, width: 120 }; }), columnGap: 10 }
-    : { text: 'No site specific control images added for this job.', style: 'body' };
+  var siteControlsContent = [
+    { text: msbState.job.siteControlComments || 'No comments required', style: 'body', margin: [0,0,0,siteControlImages.length ? 8 : 0] }
+  ];
+  if (siteControlImages.length) {
+    siteControlsContent.push({ columns: siteControlImages.map(function(img, i) { return { image: 'siteCtrlImg' + i, width: 120 }; }), columnGap: 10 });
+  } else if (!msbState.job.siteControlComments) {
+    siteControlsContent = [{ text: 'No site specific control images or comments added for this job.', style: 'body' }];
+  }
 
   var ppeTableBody, ppeWidths;
   if (msbState.team.length && derivedPPE.length) {
