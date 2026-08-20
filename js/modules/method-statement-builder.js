@@ -243,6 +243,7 @@ function loadMSB(ref) {
     var d = (rows && rows[0] && rows[0].form_data) ? rows[0].form_data : null;
     if (d) {
       if (d.job) msbState.job = d.job;
+      _msbMigrateLegacySiteImages();
       msbState.team = d.team || [];
       msbState.equipment = d.equipment || [];
       msbState.selectedSOPs = d.selectedSOPs || [];
@@ -268,7 +269,19 @@ function deleteMSB(ref) {
 
 function saveMSBRecord() {
   if (!currentMSBRef) return Promise.reject(new Error('No active record'));
-  var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: msbState };
+  // Strip transient in-flight upload state (_localPreview is a full base64 image —
+  // never let it reach the saved JSON, only the storagePath once uploaded).
+  var cleanImages = (msbState.job.siteControlImages || []).map(function(p) {
+    return { storagePath: p.storagePath || '', status: p.storagePath ? 'saved' : 'pending' };
+  }).filter(function(p) { return p.storagePath; });
+  var cleanJob = {};
+  for (var k in msbState.job) cleanJob[k] = msbState.job[k];
+  cleanJob.siteControlImages = cleanImages;
+  var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: {
+    job: cleanJob, team: msbState.team, equipment: msbState.equipment, selectedSOPs: msbState.selectedSOPs,
+    selectedExclusionZones: msbState.selectedExclusionZones, ppeAssignments: msbState.ppeAssignments,
+    emergency: msbState.emergency, status: msbState.status, sentAt: msbState.sentAt
+  }};
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
     if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('Save failed (' + r.status + ')');
   });
@@ -523,6 +536,55 @@ function renderMSBPlantStep(container) {
   container.appendChild(wrap);
 }
 
+// Site control photos are uploaded to Storage and only the storagePath is kept
+// in msbState (same reasoning as defect photos in defects-shared.js) — saving
+// the raw base64 straight into the job_forms row makes that save request too
+// big and it silently fails ("could not save ... check your connection").
+var MSB_SITE_IMG_BUCKET = 'defect-photos';
+function _msbSiteImgUrl(path) { return SUPA_URL + '/storage/v1/object/public/' + MSB_SITE_IMG_BUCKET + '/' + path; }
+function _msbFetchAsDataUrl(url) {
+  return fetch(url, { credentials: 'omit', mode: 'cors' }).then(function(r) {
+    if (!r.ok) throw new Error('image fetch failed');
+    return r.blob();
+  }).then(function(blob) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() { resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  });
+}
+function _uploadMSBSiteImage(path, dataUrl, mimeType) {
+  var base64 = dataUrl.split(',')[1];
+  var chars = atob(base64), bytes = new Uint8Array(chars.length);
+  for (var i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
+  return fetch(SUPA_URL + '/storage/v1/object/' + MSB_SITE_IMG_BUCKET + '/' + path, {
+    method: 'POST',
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':mimeType||'image/jpeg','x-upsert':'true'},
+    body: bytes, credentials: 'omit', mode: 'cors'
+  });
+}
+
+// One-off migration for records saved before the storage-bucket fix, where
+// siteControlImages held raw base64 strings instead of {storagePath} — upload
+// them to storage now so the next save doesn't silently drop the photos.
+function _msbMigrateLegacySiteImages() {
+  var images = msbState.job.siteControlImages;
+  if (!images || !images.length) return;
+  images.forEach(function(entry, i) {
+    if (typeof entry !== 'string') return;
+    var slot = { storagePath: '', status: 'processing', _localPreview: entry };
+    images[i] = slot;
+    var path = 'msb-site-controls/' + (currentMSBRef || 'draft') + '/' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2,8) + '.jpg';
+    _uploadMSBSiteImage(path, entry, 'image/jpeg').then(function(r) {
+      if (r.ok) { slot.storagePath = path; slot.status = 'saved'; delete slot._localPreview; }
+      else { slot.status = 'error'; }
+      renderMSBSiteControlImages();
+    }).catch(function() { slot.status = 'error'; renderMSBSiteControlImages(); });
+  });
+}
+
 function renderMSBSiteControlImages(wrap) {
   wrap = wrap || document.getElementById('msbSiteCtrlImages');
   if (!wrap) return;
@@ -531,13 +593,26 @@ function renderMSBSiteControlImages(wrap) {
   for (var i = 0; i < 4; i++) {
     var tile = document.createElement('div');
     if (images[i]) {
-      tile.style.cssText = 'width:84px;height:84px;border-radius:6px;border:2px solid var(--green);cursor:pointer;overflow:hidden;background:#fafafa;';
-      var img = document.createElement('img');
-      img.src = images[i];
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-      tile.appendChild(img);
+      var p = images[i];
+      tile.style.cssText = 'width:84px;height:84px;border-radius:6px;border:2px solid var(--green);cursor:pointer;overflow:hidden;background:#fafafa;position:relative;';
+      if (p.storagePath) {
+        var img = document.createElement('img');
+        img.src = _msbSiteImgUrl(p.storagePath);
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        tile.appendChild(img);
+      } else if (p._localPreview) {
+        var img2 = document.createElement('img');
+        img2.src = p._localPreview;
+        img2.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;opacity:0.6;';
+        tile.appendChild(img2);
+      } else {
+        tile.textContent = '…';
+        tile.style.display = 'flex'; tile.style.alignItems = 'center'; tile.style.justifyContent = 'center'; tile.style.color = '#999';
+      }
+      if (p.status === 'error') tile.style.borderColor = '#c62828';
       (function(idx) {
         tile.onclick = function() {
+          if (images[idx].status === 'processing') return;
           if (!confirm('Remove this photo?')) return;
           images.splice(idx, 1);
           renderMSBSiteControlImages();
@@ -563,10 +638,19 @@ function msbSiteControlImageUpload(input) {
   if (!file) return;
   var images = msbState.job.siteControlImages || (msbState.job.siteControlImages = []);
   if (images.length >= 4) return;
+  var slot = { storagePath: '', status: 'processing' };
+  images.push(slot);
+  renderMSBSiteControlImages();
   _resizeImageToJpeg(file, 1200, 0.7, function(dataUrl) {
-    if (!dataUrl) return;
-    images.push(dataUrl);
+    if (!dataUrl) { slot.status = 'error'; renderMSBSiteControlImages(); return; }
+    slot._localPreview = dataUrl;
     renderMSBSiteControlImages();
+    var path = 'msb-site-controls/' + (currentMSBRef || 'draft') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.jpg';
+    _uploadMSBSiteImage(path, dataUrl, 'image/jpeg').then(function(r) {
+      if (r.ok) { slot.storagePath = path; slot.status = 'saved'; delete slot._localPreview; }
+      else { slot.status = 'error'; }
+      renderMSBSiteControlImages();
+    }).catch(function() { slot.status = 'error'; renderMSBSiteControlImages(); });
   });
 }
 
@@ -851,7 +935,7 @@ function _msbFixedSectionBox(sectionNumber) {
   return _msbBoxed(sec.n + '  ' + sec.title, _msbBulletBlock(sec.paragraphs, 0));
 }
 
-function buildMSBDocDefinition() {
+function buildMSBDocDefinition(resolvedSiteImages) {
   var derivedPPE = derivePPEForMSB();
   var selectedEZ = msbState.selectedExclusionZones.map(_msbFindEZ).filter(Boolean);
 
@@ -871,7 +955,7 @@ function buildMSBDocDefinition() {
   var equipTableBody = [[{text:'Plant/Machinery',bold:true},{text:'Sound Pressure',bold:true},{text:'Vibration Magnitude',bold:true}]];
   msbState.equipment.forEach(function(eq) { equipTableBody.push([eq.name, eq.sound, eq.vibration]); });
 
-  var siteControlImages = (msbState.job.siteControlImages || []).slice(0, 4);
+  var siteControlImages = (resolvedSiteImages || []).slice(0, 4);
   var siteControlImagesMap = {};
   siteControlImages.forEach(function(img, i) { siteControlImagesMap['siteCtrlImg' + i] = img; });
   var siteControlsContent = [
@@ -1027,6 +1111,9 @@ function generateMSBPDF() {
   msbState.status = 'sent';
   msbState.sentAt = new Date().toISOString();
   saveMSBRecord().then(function() {
+    var savedImages = (msbState.job.siteControlImages || []).filter(function(p) { return p.storagePath; });
+    return Promise.all(savedImages.map(function(p) { return _msbFetchAsDataUrl(_msbSiteImgUrl(p.storagePath)); }));
+  }).then(function(resolvedSiteImages) {
     _loadPdfMake(function(err) {
       if (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
@@ -1034,7 +1121,7 @@ function generateMSBPDF() {
         return;
       }
       try {
-        var doc = buildMSBDocDefinition();
+        var doc = buildMSBDocDefinition(resolvedSiteImages);
         pdfMake.createPdf(doc).download('method-statement-' + (msbState.job.client || 'job').replace(/\s+/g,'-').toLowerCase() + '.pdf');
       } catch (e) {
         if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
