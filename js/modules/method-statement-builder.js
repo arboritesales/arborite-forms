@@ -10,6 +10,20 @@ var msbLogoBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAd0AAAB/CAYAA
 // PPE that's always included regardless of task selected
 var msbBasePPE = ["ppe_helmet", "ppe_hivis", "ppe_boots", "ppe_gloves", "ppe_eye"];
 
+// Contractor is always us — fixed, not user-editable
+var MSB_CONTRACTOR_LINES = ["Arborite Tree Services Ltd", "Oxford House", "12-20 Oxford Street", "NEWBURY", "Berkshire", "RG14 1JB"];
+
+// Fixed sequence of work that always appears in 2.0 Work Methodology, below the job-specific overview
+var MSB_METHODOLOGY_FIXED_POINTS = [
+  "When operators arrive for the first time on site, a site induction will have been booked in with the client. This induction will be site specific, and an operative cannot start work until this has been completed.",
+  "A pre commencement meeting shall take place between all operators prior to works starting to be briefed on the method statement and ensure everyone understands the agreed systems of work.",
+  "All machinery and equipment shall be subject to pre use checks by competent operators to confirm their suitability for use.",
+  "Checklists on plant prior to commencing works shall be completed.",
+  "Works will be undertaken within a site signed and guarded on all reasonably foreseeable approaches, using banks person deployed to manage third party access.",
+  "Material shall be placed in the designed processing area for woodchipping and removal off site.",
+  "The site shall be left in a clean and tidy state, handed back to client."
+];
+
 var MSB_STEPS = [
   {key:"job", label:"Job Details"},
   {key:"team", label:"Team & Competency"},
@@ -35,7 +49,7 @@ function _msbFmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB') : '
 
 function resetMSBState() {
   msbState = {
-    job: { titleOfDocument:'', client:'', contractor:'', siteAddress:'', what3words:'', startDate:'', endDate:'', workingHours:'', workingDays:'', scope:'', clientContactName:'', clientContactPhone:'', clientContactEmail:'' },
+    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[] },
     team: [], equipment: [], selectedSOPs: [], selectedExclusionZones: [], ppeAssignments: {},
     emergency: { hospitalName:'', hospitalAddress:'', hospitalPhone:'' },
     status: 'draft', sentAt: null
@@ -95,7 +109,8 @@ function _msbFindPPE(id) {
   return null;
 }
 function _msbStaffRoles() {
-  var seen = {}, out = [];
+  var seen = {}, out = ['Project Manager', 'Site Supervisor'];
+  out.forEach(function(r) { seen[r] = true; });
   msbRefLib.staff.forEach(function(p) { if (!seen[p.defaultRole]) { seen[p.defaultRole] = true; out.push(p.defaultRole); } });
   return out;
 }
@@ -313,10 +328,9 @@ function renderMSBJobStep(container) {
   var card = _msbEl('<div class="msb-card"><h3>Job &amp; Site</h3></div>');
   var fields = [
     ['titleOfDocument','Title of Document'],
-    ['client','Client'], ['contractor','Contractor'],
+    ['client','Client'],
     ['siteAddress','Site Address'], ['what3words','What3Words for Access'],
-    ['startDate','Project Start Date','date'], ['endDate','Project End Date','date'],
-    ['workingHours','Working Hours on Site'], ['workingDays','Number of Working Days on Site']
+    ['workingDays','Number of Working Days on Site']
   ];
   var grid = _msbEl('<div class="msb-grid2"></div>');
   fields.forEach(function(f) {
@@ -332,6 +346,8 @@ function renderMSBJobStep(container) {
   });
   card.appendChild(grid);
 
+  card.appendChild(_msbEl('<div class="msb-field" style="margin-top:6px;"><label>Contractor</label><div style="font-size:13px;color:var(--mid);padding:8px 0;">' + MSB_CONTRACTOR_LINES.join('<br>') + ' <span style="color:#999;">(fixed — always shown in the PDF)</span></div></div>'));
+
   var scopeWrap = _msbEl('<div class="msb-field" style="margin-top:6px;"><label>Scope of Work (project scope)</label></div>');
   var ta = document.createElement('textarea');
   ta.placeholder = 'Brief description of the works to be carried out...';
@@ -339,6 +355,23 @@ function renderMSBJobStep(container) {
   ta.oninput = function() { msbState.job.scope = ta.value; };
   scopeWrap.appendChild(ta);
   card.appendChild(scopeWrap);
+
+  var methWrap = _msbEl('<div class="msb-field" style="margin-top:14px;"></div>');
+  methWrap.appendChild(_msbEl('<label>Work Methodology (Section 2.0)</label>'));
+  var methPrompt = document.createElement('div');
+  methPrompt.style.cssText = 'font-size:12px;color:var(--mid);margin:2px 0 6px;line-height:1.4;';
+  methPrompt.textContent = "This section should be a simple overview of what is going to happen on the site, it does not need to be war and peace, but it is important to include a sequence of work that you would like your staff to follow. Please don't think you have to use long sentences and complex wording, think about who is going to read it i.e. the client who needs to understand what it is that you are going to do and your staff who need to know what order to do things in.";
+  methWrap.appendChild(methPrompt);
+  var methTa = document.createElement('textarea');
+  methTa.placeholder = 'Overview and sequence of work...';
+  methTa.value = msbState.job.methodology || '';
+  methTa.oninput = function() { msbState.job.methodology = methTa.value; };
+  methWrap.appendChild(methTa);
+  var methNote = document.createElement('div');
+  methNote.style.cssText = 'font-size:11px;color:#999;margin-top:6px;';
+  methNote.textContent = 'The standard sequence of work steps is always included automatically in the PDF, underneath what you write here.';
+  methWrap.appendChild(methNote);
+  card.appendChild(methWrap);
   wrap.appendChild(card);
 
   var contactCard = _msbEl('<div class="msb-card"><h3>On-Site Client Contact</h3></div>');
@@ -463,7 +496,69 @@ function renderMSBPlantStep(container) {
   });
 
   wrap.appendChild(card);
+
+  var ctrlCard = _msbEl('<div class="msb-card"><h3>Site Specific Controls (Section 5.5)</h3></div>');
+  ctrlCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Add up to 4 photos showing site-specific controls (e.g. barriers, signage, access points).</div>'));
+  var imgWrap = _msbEl('<div id="msbSiteCtrlImages" style="display:flex;gap:10px;flex-wrap:wrap;"></div>');
+  ctrlCard.appendChild(imgWrap);
+  var fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+  fileInput.id = 'msbSiteCtrlInput';
+  fileInput.onchange = function() { msbSiteControlImageUpload(fileInput); };
+  ctrlCard.appendChild(fileInput);
+  renderMSBSiteControlImages();
+  wrap.appendChild(ctrlCard);
+
   container.appendChild(wrap);
+}
+
+function renderMSBSiteControlImages() {
+  var wrap = document.getElementById('msbSiteCtrlImages');
+  if (!wrap) return;
+  var images = msbState.job.siteControlImages || (msbState.job.siteControlImages = []);
+  wrap.innerHTML = '';
+  for (var i = 0; i < 4; i++) {
+    var tile = document.createElement('div');
+    if (images[i]) {
+      tile.style.cssText = 'width:84px;height:84px;border-radius:6px;border:2px solid var(--green);cursor:pointer;overflow:hidden;background:#fafafa;';
+      var img = document.createElement('img');
+      img.src = images[i];
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+      tile.appendChild(img);
+      (function(idx) {
+        tile.onclick = function() {
+          if (!confirm('Remove this photo?')) return;
+          images.splice(idx, 1);
+          renderMSBSiteControlImages();
+        };
+      })(i);
+    } else if (i === images.length) {
+      tile.style.cssText = 'width:84px;height:84px;border-radius:6px;border:2px dashed var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:24px;color:#999;background:#fafafa;';
+      tile.textContent = '+';
+      tile.onclick = function() {
+        var inp = document.getElementById('msbSiteCtrlInput');
+        if (inp) inp.click();
+      };
+    } else {
+      continue;
+    }
+    wrap.appendChild(tile);
+  }
+}
+
+function msbSiteControlImageUpload(input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  var images = msbState.job.siteControlImages || (msbState.job.siteControlImages = []);
+  if (images.length >= 4) return;
+  _resizeImageToJpeg(file, 1200, 0.7, function(dataUrl) {
+    if (!dataUrl) return;
+    images.push(dataUrl);
+    renderMSBSiteControlImages();
+  });
 }
 
 // ── STEP 4 — SOPs & EXCLUSION ZONES ──
@@ -614,7 +709,7 @@ function renderMSBReviewStep(container) {
   jobSec.appendChild(_msbEl('<div class="row"><strong>Title of Document:</strong> ' + (msbState.job.titleOfDocument || '—') + '</div>'));
   jobSec.appendChild(_msbEl('<div class="row"><strong>Client:</strong> ' + (msbState.job.client || '—') + '</div>'));
   jobSec.appendChild(_msbEl('<div class="row"><strong>Site Address:</strong> ' + (msbState.job.siteAddress || '—') + '</div>'));
-  jobSec.appendChild(_msbEl('<div class="row"><strong>Dates:</strong> ' + _msbFmtDate(msbState.job.startDate) + ' &rarr; ' + _msbFmtDate(msbState.job.endDate) + ' (' + (msbState.job.workingDays || '—') + ' working days)</div>'));
+  jobSec.appendChild(_msbEl('<div class="row"><strong>Working Days:</strong> ' + (msbState.job.workingDays || '—') + '</div>'));
   jobSec.appendChild(_msbEl('<div class="row"><strong>On-Site Client Contact:</strong> ' + (msbState.job.clientContactName || '—') + ' — ' + (msbState.job.clientContactPhone || '—') + ' — ' + (msbState.job.clientContactEmail || '—') + '</div>'));
   card.appendChild(jobSec);
 
@@ -715,16 +810,36 @@ function _loadPdfMake(cb) {
 }
 
 function _msbBulletBlock(lines, marginBottom) {
-  return { text: lines.map(function(l) { return '-  ' + l; }).join('\n'), style: 'body', margin: [0,0,0,marginBottom||16], lineHeight: 1.35 };
+  return { text: lines.map(function(l) { return '-  ' + l; }).join('\n'), style: 'body', margin: [0,0,0,marginBottom||0], lineHeight: 1.35 };
 }
-function _msbFixedSectionBlocks(sectionNumber) {
+// Wraps a section's heading + content in a bordered box with a shaded title bar
+function _msbBoxed(titleText, body, opts) {
+  var bodyStack = Array.isArray(body) ? body : [body];
+  var box = {
+    table: { widths: ['*'], body: [
+      [{ text: titleText, style: 'boxTitle', fillColor: '#e3ead9' }],
+      [{ stack: bodyStack, margin: [10,10,10,10] }]
+    ]},
+    layout: {
+      hLineWidth: function() { return 1; },
+      vLineWidth: function() { return 1; },
+      hLineColor: function() { return '#c4d0bd'; },
+      vLineColor: function() { return '#c4d0bd'; },
+      paddingLeft: function() { return 0; },
+      paddingRight: function() { return 0; },
+      paddingTop: function() { return 0; },
+      paddingBottom: function() { return 0; }
+    },
+    margin: [0,0,0,16]
+  };
+  if (opts && opts.pageBreak) box.pageBreak = opts.pageBreak;
+  return box;
+}
+function _msbFixedSectionBox(sectionNumber) {
   var sec = null;
   for (var i = 0; i < msbRefLib.fixedSections.length; i++) if (msbRefLib.fixedSections[i].n === sectionNumber) sec = msbRefLib.fixedSections[i];
-  if (!sec) return [];
-  return [
-    { text: sec.n + '  ' + sec.title, style: 'h1' },
-    _msbBulletBlock(sec.paragraphs, 16)
-  ];
+  if (!sec) return null;
+  return _msbBoxed(sec.n + '  ' + sec.title, _msbBulletBlock(sec.paragraphs, 0));
 }
 
 function buildMSBDocDefinition() {
@@ -746,6 +861,13 @@ function buildMSBDocDefinition() {
 
   var equipTableBody = [[{text:'Plant/Machinery',bold:true},{text:'Sound Pressure',bold:true},{text:'Vibration Magnitude',bold:true}]];
   msbState.equipment.forEach(function(eq) { equipTableBody.push([eq.name, eq.sound, eq.vibration]); });
+
+  var siteControlImages = (msbState.job.siteControlImages || []).slice(0, 4);
+  var siteControlImagesMap = {};
+  siteControlImages.forEach(function(img, i) { siteControlImagesMap['siteCtrlImg' + i] = img; });
+  var siteControlsContent = siteControlImages.length
+    ? { columns: siteControlImages.map(function(img, i) { return { image: 'siteCtrlImg' + i, width: 120 }; }), columnGap: 10 }
+    : { text: 'No site specific control images added for this job.', style: 'body' };
 
   var ppeTableBody, ppeWidths;
   if (msbState.team.length && derivedPPE.length) {
@@ -774,19 +896,94 @@ function buildMSBDocDefinition() {
   var hazardsTableBody = [[{text:'Hazard',bold:true},{text:'Control Measure',bold:true}]];
   msbRefLib.hazards.forEach(function(h) { hazardsTableBody.push([h.hazard, h.control]); });
 
-  var sopContent = [];
+  var sopContent = [
+    { text: 'General', style: 'sopHeading', margin: [0,0,0,4] },
+    { ol: [
+        'All personal protective equipment must be worn prior to work commencing.',
+        'Machinery shall be subject to pre-use checks by the operator, removing machinery from service that fails any of those checks.',
+        'The operator is responsible for walking the work area prior to starting, to ensure they have identified any hazards that they may need to mark and that they are happy it is safe to proceed.',
+        'Safe working distances shall be applied in accordance with industry good practice. Any deviation from this must first be authorised by the Site Supervisor.'
+      ], style: 'body', margin: [0,0,0,10] }
+  ];
   msbState.selectedSOPs.forEach(function(id) {
     var sop = _msbFindSop(id);
     if (!sop) return;
     sopContent.push({ text: sop.heading, style: 'sopHeading', margin: [0,14,0,4] });
     sop.description.forEach(function(line) { sopContent.push({ text: '-  ' + line, style: 'body', margin: [0,0,0,4] }); });
   });
-  if (!sopContent.length) sopContent.push({ text: 'No SOPs were selected for this job.', style: 'body' });
+  if (!msbState.selectedSOPs.length) sopContent.push({ text: 'No task-specific SOPs were selected for this job.', style: 'body' });
+
+  var pdfImages = { logo: msbLogoBase64 };
+  for (var _siteImgKey in siteControlImagesMap) pdfImages[_siteImgKey] = siteControlImagesMap[_siteImgKey];
+
+  var content = [
+    { text: 'Method Statement', style: 'title' },
+    { text: msbState.job.client || 'Client not specified', style: 'subtitle', margin: [0,0,0,20] },
+
+    _msbBoxed('Job Details', { table: { widths: ['30%','70%'], body: [
+      ['Title of Document', msbState.job.titleOfDocument || '—'],
+      ['Client', msbState.job.client || '—'],
+      ['Scope of Work', msbState.job.scope || '—'],
+      ['Contractor', MSB_CONTRACTOR_LINES.join('\n')],
+      ['Site Address', msbState.job.siteAddress || '—'],
+      ['What3Words for Access', msbState.job.what3words || '—'],
+      ['Number of Working Days on Site', msbState.job.workingDays || '—'],
+      ['Name of On-Site Client Contact', msbState.job.clientContactName || '—'],
+      ['Contact Telephone', msbState.job.clientContactPhone || '—'],
+      ['Contact Email', msbState.job.clientContactEmail || '—']
+    ]}, layout: 'lightHorizontalLines' }),
+
+    _msbBoxed('1.0  Introduction', { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body' }),
+
+    _msbBoxed('2.0  Work Methodology', [
+      { text: msbState.job.methodology || 'No work methodology overview entered.', style: 'body', margin: [0,0,0,10] },
+      { ul: MSB_METHODOLOGY_FIXED_POINTS, style: 'body' }
+    ]),
+
+    _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], body: teamTableBody }, layout: 'lightHorizontalLines' }),
+
+    _msbBoxed('4.0  Competency', { table: { widths: ['35%','65%'], body: compTableBody }, layout: 'lightHorizontalLines' }),
+
+    _msbBoxed('5.0  Plant and Machinery', { table: { widths: ['*','*','*'], body: equipTableBody }, layout: 'lightHorizontalLines' }),
+
+    _msbBoxed('5.5  Site Specific Controls', siteControlsContent),
+
+    _msbBoxed('6.0  Exclusion Zones', selectedEZ.length
+      ? { table: { widths: ['40%','60%'], body: ezTableBody }, layout: 'lightHorizontalLines' }
+      : { text: 'No exclusion zones selected for this job.', style: 'body' }),
+
+    _msbBoxed('7.0  Permits Required', { table: { widths: ['40%','60%'], body: [
+      [{text:'Permit Type',bold:true},{text:'Issued By',bold:true}],
+      ['Highways Traffic Management','—'],
+      ['Breaking Ground','—'],
+      ['Waste Transfer Licence','Environment Agency']
+    ]}, layout: 'lightHorizontalLines' }),
+
+    _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, body: ppeTableBody }, layout: 'lightHorizontalLines' }),
+
+    _msbBoxed('9.0  Standard Operating Procedures', [
+      { text: 'Only the SOPs relevant to this job are listed below.', style: 'noteText', margin: [0,0,0,8] }
+    ].concat(sopContent), { pageBreak: 'before' }),
+
+    _msbBoxed('10.0  Known Hazards (as identified by the Risk Assessment)', { table: { widths: ['30%','70%'], body: hazardsTableBody }, layout: 'lightHorizontalLines' }, { pageBreak: 'before' })
+  ];
+
+  ['11.0','12.0','13.0','14.0'].forEach(function(n) { var b = _msbFixedSectionBox(n); if (b) content.push(b); });
+
+  content.push(_msbBoxed('15.0  Emergency Arrangements', { table: { widths: ['30%','70%'], body: [
+    ['Nearest A&E Hospital', msbState.emergency.hospitalName || 'Not entered'],
+    ['Address', msbState.emergency.hospitalAddress || '—'],
+    ['Phone', msbState.emergency.hospitalPhone || '—']
+  ]}, layout: 'lightHorizontalLines' }));
+
+  ['16.0','17.0','18.0','19.0','20.0','21.0','22.0','23.0','24.0','25.0','26.0','27.0','28.0','29.0'].forEach(function(n) {
+    var b = _msbFixedSectionBox(n); if (b) content.push(b);
+  });
 
   return {
     pageSize: 'A4',
     pageMargins: [40,80,40,50],
-    images: { logo: msbLogoBase64 },
+    images: pdfImages,
     header: function() {
       return { margin: [40,18,40,0], columns: [
         { image: 'logo', width: 110 },
@@ -796,85 +993,11 @@ function buildMSBDocDefinition() {
     footer: function(currentPage, pageCount) {
       return { text: 'Page ' + currentPage + ' of ' + pageCount, alignment: 'center', fontSize: 8, color: '#888' };
     },
-    content: [
-      { text: 'Method Statement', style: 'title' },
-      { text: msbState.job.client || 'Client not specified', style: 'subtitle', margin: [0,0,0,20] },
-
-      { text: 'Job Details', style: 'h1' },
-      { table: { widths: ['30%','70%'], body: [
-        ['Title of Document', msbState.job.titleOfDocument || '—'],
-        ['Client', msbState.job.client || '—'],
-        ['Contractor', msbState.job.contractor || '—'],
-        ['Site Address', msbState.job.siteAddress || '—'],
-        ['What3Words for Access', msbState.job.what3words || '—'],
-        ['Project Start Date', _msbFmtDate(msbState.job.startDate)],
-        ['Project End Date', _msbFmtDate(msbState.job.endDate)],
-        ['Number of Working Days on Site', msbState.job.workingDays || '—'],
-        ['Working Hours on Site', msbState.job.workingHours || '—'],
-        ['Name of On-Site Client Contact', msbState.job.clientContactName || '—'],
-        ['Contact Telephone', msbState.job.clientContactPhone || '—'],
-        ['Contact Email', msbState.job.clientContactEmail || '—']
-      ]}, layout: 'lightHorizontalLines', margin: [0,6,0,16] },
-
-      { text: '1.0  Introduction', style: 'h1' },
-      { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body', margin: [0,0,0,16] },
-
-      { text: '2.0  Work Methodology', style: 'h1' },
-      { text: msbState.job.scope || 'No scope of work entered.', style: 'body', margin: [0,0,0,16] },
-
-      { text: '3.0  Operational Team', style: 'h1' },
-      { table: { widths: ['*','*','*'], body: teamTableBody }, layout: 'lightHorizontalLines', margin: [0,6,0,16] },
-
-      { text: '4.0  Competency', style: 'h1' },
-      { table: { widths: ['35%','65%'], body: compTableBody }, layout: 'lightHorizontalLines', margin: [0,6,0,16] },
-
-      { text: '5.0  Plant and Machinery', style: 'h1' },
-      { table: { widths: ['*','*','*'], body: equipTableBody }, layout: 'lightHorizontalLines', margin: [0,6,0,16] },
-
-      { text: '6.0  Exclusion Zones', style: 'h1' },
-      selectedEZ.length
-        ? { table: { widths: ['40%','60%'], body: ezTableBody }, layout: 'lightHorizontalLines', margin: [0,6,0,16] }
-        : { text: 'No exclusion zones selected for this job.', style: 'body', margin: [0,0,0,16] },
-
-      { text: '7.0  Permits Required', style: 'h1' },
-      { table: { widths: ['40%','60%'], body: [
-        [{text:'Permit Type',bold:true},{text:'Issued By',bold:true}],
-        ['Highways Traffic Management','—'],
-        ['Breaking Ground','—'],
-        ['Waste Transfer Licence','Environment Agency']
-      ]}, layout: 'lightHorizontalLines', margin: [0,6,0,16] },
-
-      { text: '8.0  PPE Requirements', style: 'h1' },
-      { table: { widths: ppeWidths, body: ppeTableBody }, layout: 'lightHorizontalLines', margin: [0,6,0,16] },
-
-      { text: '9.0  Standard Operating Procedures', style: 'h1', pageBreak: 'before' },
-      { text: 'Only the SOPs relevant to this job are listed below.', style: 'noteText', margin: [0,0,0,8] }
-    ].concat(sopContent).concat([
-
-      { text: '10.0  Known Hazards (as identified by the Risk Assessment)', style: 'h1', pageBreak: 'before' },
-      { table: { widths: ['30%','70%'], body: hazardsTableBody }, layout: 'lightHorizontalLines', margin: [0,6,0,16] }
-
-    ]).concat(_msbFixedSectionBlocks('11.0')).concat(_msbFixedSectionBlocks('12.0'))
-      .concat(_msbFixedSectionBlocks('13.0')).concat(_msbFixedSectionBlocks('14.0')).concat([
-
-      { text: '15.0  Emergency Arrangements', style: 'h1' },
-      { table: { widths: ['30%','70%'], body: [
-        ['Nearest A&E Hospital', msbState.emergency.hospitalName || 'Not entered'],
-        ['Address', msbState.emergency.hospitalAddress || '—'],
-        ['Phone', msbState.emergency.hospitalPhone || '—']
-      ]}, layout: 'lightHorizontalLines', margin: [0,6,0,16] }
-
-    ]).concat(_msbFixedSectionBlocks('16.0')).concat(_msbFixedSectionBlocks('17.0'))
-      .concat(_msbFixedSectionBlocks('18.0')).concat(_msbFixedSectionBlocks('19.0'))
-      .concat(_msbFixedSectionBlocks('20.0')).concat(_msbFixedSectionBlocks('21.0'))
-      .concat(_msbFixedSectionBlocks('22.0')).concat(_msbFixedSectionBlocks('23.0'))
-      .concat(_msbFixedSectionBlocks('24.0')).concat(_msbFixedSectionBlocks('25.0'))
-      .concat(_msbFixedSectionBlocks('26.0')).concat(_msbFixedSectionBlocks('27.0'))
-      .concat(_msbFixedSectionBlocks('28.0')).concat(_msbFixedSectionBlocks('29.0')),
+    content: content,
     styles: {
       title: { fontSize:24, bold:true, color:'#20342c' },
       subtitle: { fontSize:13, color:'#5a625c' },
-      h1: { fontSize:14, bold:true, color:'#20342c', margin:[0,14,0,4] },
+      boxTitle: { fontSize:12.5, bold:true, color:'#20342c', margin:[10,7,10,7] },
       sopHeading: { fontSize:12.5, bold:true, color:'#5b4636' },
       body: { fontSize:10.5, color:'#20241f', lineHeight:1.3 },
       noteText: { fontSize:9, italics:true, color:'#888' }
