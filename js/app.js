@@ -5713,10 +5713,20 @@ function renderMSBPlantStep(container) {
 // the raw base64 straight into the job_forms row makes that save request too
 // big and it silently fails ("could not save ... check your connection").
 var MSB_SITE_IMG_BUCKET = 'defect-photos';
-function _msbSiteImgUrl(path) { return SUPA_URL + '/storage/v1/object/public/' + MSB_SITE_IMG_BUCKET + '/' + path; }
+// Reads go through the authenticated storage endpoint with an auth header —
+// same pattern as documents.js/_docAuthUrl and defects-dashboard.js, which is
+// the one proven to actually work in this app (the public-bypass URL doesn't).
+function _msbSiteImgAuthUrl(path) { return SUPA_URL + '/storage/v1/object/authenticated/' + MSB_SITE_IMG_BUCKET + '/' + path; }
+var _msbSiteImgBlobCache = {}; // storagePath -> blob: URL, so repeated re-renders don't re-fetch
+function _msbFetchSiteImageBlobUrl(path) {
+  if (_msbSiteImgBlobCache[path]) return Promise.resolve(_msbSiteImgBlobCache[path]);
+  return fetch(_msbSiteImgAuthUrl(path), {credentials:'omit', headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()}})
+    .then(function(r) { if (!r.ok) throw new Error('image fetch failed (' + r.status + ')'); return r.blob(); })
+    .then(function(blob) { var url = URL.createObjectURL(blob); _msbSiteImgBlobCache[path] = url; return url; });
+}
 function _msbFetchAsDataUrl(url) {
-  return fetch(url, { credentials: 'omit', mode: 'cors' }).then(function(r) {
-    if (!r.ok) throw new Error('image fetch failed');
+  return fetch(url, { credentials: 'omit', mode: 'cors', headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()} }).then(function(r) {
+    if (!r.ok) throw new Error('image fetch failed (' + r.status + ')');
     return r.blob();
   }).then(function(blob) {
     return new Promise(function(resolve, reject) {
@@ -5769,9 +5779,11 @@ function renderMSBSiteControlImages(wrap) {
       tile.style.cssText = 'width:84px;height:84px;border-radius:6px;border:2px solid var(--green);cursor:pointer;overflow:hidden;background:#fafafa;position:relative;';
       if (p.storagePath) {
         var img = document.createElement('img');
-        img.src = _msbSiteImgUrl(p.storagePath);
         img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
         tile.appendChild(img);
+        (function(imgEl, storagePath) {
+          _msbFetchSiteImageBlobUrl(storagePath).then(function(blobUrl) { imgEl.src = blobUrl; }).catch(function() { imgEl.replaceWith('⚠'); });
+        })(img, p.storagePath);
       } else if (p._localPreview) {
         var img2 = document.createElement('img');
         img2.src = p._localPreview;
@@ -6290,7 +6302,7 @@ function generateMSBPDF() {
     var savedImages = (msbState.job.siteControlImages || []).filter(function(p) { return p.storagePath; });
     // A single unreachable photo must not block the whole PDF — skip it, don't reject.
     return Promise.all(savedImages.map(function(p) {
-      return _msbFetchAsDataUrl(_msbSiteImgUrl(p.storagePath)).catch(function() { return null; });
+      return _msbFetchAsDataUrl(_msbSiteImgAuthUrl(p.storagePath)).catch(function() { return null; });
     }));
   }).then(function(resolvedSiteImagesRaw) {
     var resolvedSiteImages = resolvedSiteImagesRaw.filter(Boolean);
