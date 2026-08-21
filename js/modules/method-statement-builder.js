@@ -49,7 +49,7 @@ function _msbFmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB') : '
 
 function resetMSBState() {
   msbState = {
-    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', methodologyPoints: MSB_METHODOLOGY_FIXED_POINTS.slice(), signOffDate:'', permitsIssuedBy: { highways:'', breakingGround:'', wasteTransfer:'Environment Agency' }, clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
+    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', methodologyPoints: MSB_METHODOLOGY_FIXED_POINTS.slice(), signOffDate:'', permitsIssuedBy: { highways:'', breakingGround:'' }, clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
     team: [], equipment: [], selectedSOPs: [], selectedExclusionZones: [], ppeAssignments: {},
     emergency: { hospitalName:'', hospitalAddress:'', hospitalPhone:'', routeMap:{storagePath:'',status:''}, routeDistance:'', routeTime:'' },
     status: 'draft', sentAt: null
@@ -526,11 +526,11 @@ function renderMSBJobStep(container) {
   signOffCard.appendChild(dateWrap);
   wrap.appendChild(signOffCard);
 
-  if (!msbState.job.permitsIssuedBy) msbState.job.permitsIssuedBy = { highways:'', breakingGround:'', wasteTransfer:'' };
+  if (!msbState.job.permitsIssuedBy) msbState.job.permitsIssuedBy = { highways:'', breakingGround:'' };
   var permitsCard = _msbEl('<div class="msb-card"><h3>Permits Required (Section 7.0)</h3></div>');
   permitsCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Enter who issued each permit, if applicable — leave blank to show "—" in the PDF.</div>'));
   var permitsGrid = _msbEl('<div class="msb-grid2"></div>');
-  [['highways','Highways Traffic Management — Issued By'],['breakingGround','Breaking Ground — Issued By'],['wasteTransfer','Waste Transfer Licence — Issued By']].forEach(function(f) {
+  [['highways','Highways Traffic Management — Issued By'],['breakingGround','Breaking Ground — Issued By']].forEach(function(f) {
     var key = f[0], label = f[1];
     var fwrap = _msbEl('<div class="msb-field"></div>');
     fwrap.appendChild(_msbEl('<label>' + label + '</label>'));
@@ -1361,8 +1361,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
     _msbBoxed('7.0  Permits Required', { table: { widths: ['40%','60%'], body: [
       [{text:'Permit Type',bold:true},{text:'Issued By',bold:true}],
       ['Highways Traffic Management', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.highways) || '—'],
-      ['Breaking Ground', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.breakingGround) || '—'],
-      ['Waste Transfer Licence', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.wasteTransfer) || '—']
+      ['Breaking Ground', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.breakingGround) || '—']
     ]}, layout: 'lightHorizontalLines' }),
 
     _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, body: ppeTableBody }, layout: 'lightHorizontalLines' }),
