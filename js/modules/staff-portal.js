@@ -199,22 +199,32 @@ function spAttemptGPS() {
   navigator.geolocation.getCurrentPosition(function(pos) {
     note.className = 'sp-gps-note';
     note.textContent = '📍 Location ready (±' + Math.round(pos.coords.accuracy) + 'm) — captured fresh each time you clock in/out.';
-  }, function() {
+  }, function(err) {
     note.className = 'sp-gps-note err';
-    note.textContent = '📍 Location permission not granted — clocking in/out still works without it.';
+    // err.code: 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT.
+    // All three used to show "permission not granted", which was misleading —
+    // a slow GPS fix (very common indoors/on first load) reads identically to
+    // an actual blocked permission unless we check the code.
+    if (err && err.code === 1) {
+      note.textContent = '📍 Location permission not granted — check your browser/phone location settings. Clocking in/out still works without it.';
+    } else if (err && err.code === 3) {
+      note.textContent = '📍 Location is taking a while to lock on — it\'ll keep trying when you clock in/out.';
+    } else {
+      note.textContent = '📍 Could not determine location right now — clocking in/out still works without it.';
+    }
   }, { timeout: 4000, maximumAge: 0 });
 }
 
 function spGetFreshGPS(cb) {
-  if (!navigator.geolocation) { cb(null); return; }
+  if (!navigator.geolocation) { cb(null, null); return; }
   var done = false;
-  var timer = setTimeout(function() { if (!done) { done = true; cb(null); } }, 6000);
+  var timer = setTimeout(function() { if (!done) { done = true; cb(null, {code:3}); } }, 6000);
   navigator.geolocation.getCurrentPosition(function(pos) {
     if (done) return; done = true; clearTimeout(timer);
-    cb({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy_m: pos.coords.accuracy });
-  }, function() {
+    cb({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy_m: pos.coords.accuracy }, null);
+  }, function(err) {
     if (done) return; done = true; clearTimeout(timer);
-    cb(null);
+    cb(null, err);
   }, { timeout: 6000, maximumAge: 0, enableHighAccuracy: true });
 }
 
@@ -224,7 +234,7 @@ function spDoClock(action) {
   btn1.disabled = true; btn2.disabled = true;
   note.className = 'sp-gps-note';
   note.textContent = '📍 Getting your location…';
-  spGetFreshGPS(function(gps) {
+  spGetFreshGPS(function(gps, gpsErr) {
     var body = { p_token: spSessionToken, p_action: action };
     if (gps) {
       body.p_lat = gps.lat; body.p_lng = gps.lng; body.p_accuracy_m = gps.accuracy_m;
@@ -242,7 +252,8 @@ function spDoClock(action) {
         note.textContent = '📍 Location captured (±' + Math.round(gps.accuracy_m) + 'm) for this ' + (action === 'in' ? 'clock-in' : 'clock-out') + '.';
       } else {
         note.className = 'sp-gps-note err';
-        note.textContent = '📍 Clocked ' + (action === 'in' ? 'in' : 'out') + ' without a location — permission wasn\'t granted or it timed out.';
+        var reason = gpsErr && gpsErr.code === 1 ? 'permission wasn\'t granted' : gpsErr && gpsErr.code === 3 ? 'it took too long to lock on' : 'it wasn\'t available';
+        note.textContent = '📍 Clocked ' + (action === 'in' ? 'in' : 'out') + ' without a location — ' + reason + '.';
       }
       spRenderClockStatus(action === 'in');
       spRenderOnsite();
