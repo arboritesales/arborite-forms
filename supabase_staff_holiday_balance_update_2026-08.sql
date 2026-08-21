@@ -22,13 +22,16 @@
 --
 -- Allowance stays 20 for everyone (already the default) — set explicitly
 -- below just to be certain.
+--
+-- Olly Key is a new starter — 20 allowance, 0 used, pending his real figures
+-- being confirmed later.
 -- ============================================================================
 
 update staff set holiday_allowance_days = 20
 where name in (
   'Brook Taylor-Ware','Liam Cooper','Liam Couling-Foulkes','Joel Cripps','Jack Fisher',
   'Joe Grace','Sarah Haste','Shai Kelleher','James Hilborn','Jason Hiscock',
-  'Dave Norris','Luke Richardson','Frances Winney','Haiden R-Brown'
+  'Dave Norris','Luke Richardson','Frances Winney','Haiden R-Brown','Olly Key'
 );
 
 do $$
@@ -38,22 +41,25 @@ declare
   v_other_used numeric;
   v_hist_id uuid;
 begin
-  for v in (values
-    ('Brook Taylor-Ware', 9.5),
-    ('Liam Cooper', 14),
-    ('Liam Couling-Foulkes', 16),
-    ('Joel Cripps', 5),
-    ('Jack Fisher', 14),
-    ('Joe Grace', 19),
-    ('Sarah Haste', 12),
-    ('Shai Kelleher', 5),
-    ('James Hilborn', 10),
-    ('Jason Hiscock', 14),
-    ('Dave Norris', 18),
-    ('Luke Richardson', 18),
-    ('Frances Winney', 12),
-    ('Haiden R-Brown', 8)
-  ) as t(name, target_used)
+  for v in (
+    select * from (values
+      ('Brook Taylor-Ware', 9.5),
+      ('Liam Cooper', 14),
+      ('Liam Couling-Foulkes', 16),
+      ('Joel Cripps', 5),
+      ('Jack Fisher', 14),
+      ('Joe Grace', 19),
+      ('Sarah Haste', 12),
+      ('Shai Kelleher', 5),
+      ('James Hilborn', 10),
+      ('Jason Hiscock', 14),
+      ('Dave Norris', 18),
+      ('Luke Richardson', 18),
+      ('Frances Winney', 12),
+      ('Haiden R-Brown', 8),
+      ('Olly Key', 0)
+    ) as t(name, target_used)
+  )
   loop
     select id into v_staff_id from staff where name = v.name;
     if v_staff_id is null then
