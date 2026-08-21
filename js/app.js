@@ -5221,7 +5221,7 @@ function _msbFmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB') : '
 
 function resetMSBState() {
   msbState = {
-    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', methodologyPoints: MSB_METHODOLOGY_FIXED_POINTS.slice(), signOffDate:'', clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
+    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', methodologyPoints: MSB_METHODOLOGY_FIXED_POINTS.slice(), signOffDate:'', permitsIssuedBy: { highways:'', breakingGround:'', wasteTransfer:'Environment Agency' }, clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
     team: [], equipment: [], selectedSOPs: [], selectedExclusionZones: [], ppeAssignments: {},
     emergency: { hospitalName:'', hospitalAddress:'', hospitalPhone:'', routeMap:{storagePath:'',status:''}, routeDistance:'', routeTime:'' },
     status: 'draft', sentAt: null
@@ -5688,7 +5688,7 @@ function renderMSBJobStep(container) {
   wrap.appendChild(card);
 
   var signOffCard = _msbEl('<div class="msb-card"><h3>Document Sign-off</h3></div>');
-  signOffCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Shown under 1.0 Introduction in the PDF — Prepared by Sarah Haste, Reviewed by Joel Cripps, Approved by Jon Challinor are fixed; only the date changes.</div>'));
+  signOffCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Shown above 1.0 Introduction in the PDF — Prepared by Sarah Haste, Reviewed by Joel Cripps, Approved by Jon Challinor are fixed; only the date changes.</div>'));
   var dateWrap = _msbEl('<div class="msb-field" style="max-width:220px;"><label>Date</label></div>');
   var dateInput = document.createElement('input');
   dateInput.type = 'date';
@@ -5697,6 +5697,24 @@ function renderMSBJobStep(container) {
   dateWrap.appendChild(dateInput);
   signOffCard.appendChild(dateWrap);
   wrap.appendChild(signOffCard);
+
+  if (!msbState.job.permitsIssuedBy) msbState.job.permitsIssuedBy = { highways:'', breakingGround:'', wasteTransfer:'' };
+  var permitsCard = _msbEl('<div class="msb-card"><h3>Permits Required (Section 7.0)</h3></div>');
+  permitsCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Enter who issued each permit, if applicable — leave blank to show "—" in the PDF.</div>'));
+  var permitsGrid = _msbEl('<div class="msb-grid2"></div>');
+  [['highways','Highways Traffic Management — Issued By'],['breakingGround','Breaking Ground — Issued By'],['wasteTransfer','Waste Transfer Licence — Issued By']].forEach(function(f) {
+    var key = f[0], label = f[1];
+    var fwrap = _msbEl('<div class="msb-field"></div>');
+    fwrap.appendChild(_msbEl('<label>' + label + '</label>'));
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = msbState.job.permitsIssuedBy[key] || '';
+    input.oninput = function() { msbState.job.permitsIssuedBy[key] = input.value; };
+    fwrap.appendChild(input);
+    permitsGrid.appendChild(fwrap);
+  });
+  permitsCard.appendChild(permitsGrid);
+  wrap.appendChild(permitsCard);
 
   var contactCard = _msbEl('<div class="msb-card"><h3>On-Site Client Contact</h3></div>');
   var cGrid = _msbEl('<div class="msb-grid2"></div>');
@@ -6367,9 +6385,14 @@ function _msbFmtDateDotted(d) {
 // name and position are fixed, only the date is editable per document.
 function _msbSignOffTable(label, name, position, date) {
   return { table: { widths: ['33%','34%','33%'], body: [
-    [{ text: label, bold: true, fillColor: '#e0e0e0' }, { text: 'Position', bold: true, fillColor: '#e0e0e0' }, { text: 'Date', bold: true, fillColor: '#e0e0e0' }],
+    [{ text: label, bold: true, fillColor: '#e3ead9' }, { text: 'Position', bold: true, fillColor: '#e3ead9' }, { text: 'Date', bold: true, fillColor: '#e3ead9' }],
     [name, position, _msbFmtDateDotted(date)]
-  ]}, margin: [0,0,0,10] };
+  ]}, layout: {
+    hLineWidth: function() { return 1; },
+    vLineWidth: function() { return 1; },
+    hLineColor: function() { return '#c4d0bd'; },
+    vLineColor: function() { return '#c4d0bd'; }
+  }, margin: [0,0,0,10] };
 }
 
 function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
@@ -6472,11 +6495,11 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ['Contact Email', msbState.job.clientContactEmail || '—']
     ]}, layout: 'lightHorizontalLines' }),
 
-    _msbBoxed('1.0  Introduction', { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body' }),
-
     _msbSignOffTable('Prepared by', 'Sarah Haste', 'Office Coordinator', msbState.job.signOffDate),
     _msbSignOffTable('Reviewed by', 'Joel Cripps', 'Contracts Manager', msbState.job.signOffDate),
     _msbSignOffTable('Approved by', 'Jon Challinor', 'Managing Director', msbState.job.signOffDate),
+
+    _msbBoxed('1.0  Introduction', { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body' }),
 
     _msbBoxed('2.0  Work Methodology', [
       { text: msbState.job.methodology || 'No work methodology overview entered.', style: 'body' }
@@ -6496,9 +6519,9 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('7.0  Permits Required', { table: { widths: ['40%','60%'], body: [
       [{text:'Permit Type',bold:true},{text:'Issued By',bold:true}],
-      ['Highways Traffic Management','—'],
-      ['Breaking Ground','—'],
-      ['Waste Transfer Licence','Environment Agency']
+      ['Highways Traffic Management', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.highways) || '—'],
+      ['Breaking Ground', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.breakingGround) || '—'],
+      ['Waste Transfer Licence', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.wasteTransfer) || '—']
     ]}, layout: 'lightHorizontalLines' }),
 
     _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, body: ppeTableBody }, layout: 'lightHorizontalLines' }),
