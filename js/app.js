@@ -5784,7 +5784,13 @@ function renderMSBTeamStep(container) {
       var person = _msbFindStaff(t.staffId);
       if (!person) return;
       person.competencies.forEach(function(c, i) {
-        var tr = _msbEl('<tr><td>' + (i === 0 ? person.name : '') + '</td><td>' + (i === 0 ? t.roleOverride : '') + '</td><td>' + c.name + '</td></tr>');
+        // <tr>/<td> built via document.createElement, NOT _msbEl — browsers
+        // silently drop bare table-row tags set through innerHTML on a div.
+        var tr = document.createElement('tr');
+        var tdName = document.createElement('td'); tdName.textContent = i === 0 ? person.name : '';
+        var tdRole = document.createElement('td'); tdRole.textContent = i === 0 ? t.roleOverride : '';
+        var tdComp = document.createElement('td'); tdComp.textContent = c.name;
+        tr.appendChild(tdName); tr.appendChild(tdRole); tr.appendChild(tdComp);
         tbody.appendChild(tr);
       });
     });
@@ -6140,21 +6146,28 @@ function renderMSBPPEStep(container) {
   } else if (!derivedPPE.length) {
     card.appendChild(_msbEl('<div class="msb-note">Select at least one SOP first — PPE requirements are generated from the tasks selected.</div>'));
   } else {
-    var table = _msbEl('<table class="msb-ppe-matrix"></table>');
-    var thead = _msbEl('<thead></thead>');
-    var headRow = _msbEl('<tr></tr>');
-    headRow.appendChild(_msbEl('<th class="itemcol">PPE Item</th>'));
+    // Built via document.createElement, NOT _msbEl — browsers silently drop
+    // bare table-structural tags (<tr>/<thead>/<tbody>) set through innerHTML
+    // on a plain div, which was crashing this table for everyone.
+    var table = document.createElement('table');
+    table.className = 'msb-ppe-matrix';
+    var thead = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    var itemHeadTh = document.createElement('th'); itemHeadTh.className = 'itemcol'; itemHeadTh.textContent = 'PPE Item';
+    headRow.appendChild(itemHeadTh);
     msbState.team.forEach(function(t) {
       var person = _msbFindStaff(t.staffId);
-      headRow.appendChild(_msbEl('<th>' + (person ? person.name : t.staffId) + '</th>'));
+      var th = document.createElement('th'); th.textContent = person ? person.name : t.staffId;
+      headRow.appendChild(th);
     });
     thead.appendChild(headRow);
     table.appendChild(thead);
 
-    var tbody = _msbEl('<tbody></tbody>');
+    var tbody = document.createElement('tbody');
     derivedPPE.forEach(function(p) {
-      var tr = _msbEl('<tr></tr>');
-      tr.appendChild(_msbEl('<td class="itemcol">' + p.name + '</td>'));
+      var tr = document.createElement('tr');
+      var itemTd = document.createElement('td'); itemTd.className = 'itemcol'; itemTd.textContent = p.name;
+      tr.appendChild(itemTd);
       msbState.team.forEach(function(t) {
         var td = document.createElement('td');
         var cb = document.createElement('input');
