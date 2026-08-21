@@ -49,7 +49,7 @@ function _msbFmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB') : '
 
 function resetMSBState() {
   msbState = {
-    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
+    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', methodologyPoints: MSB_METHODOLOGY_FIXED_POINTS.slice(), signOffDate:'', clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
     team: [], equipment: [], selectedSOPs: [], selectedExclusionZones: [], ppeAssignments: {},
     emergency: { hospitalName:'', hospitalAddress:'', hospitalPhone:'', routeMap:{storagePath:'',status:''}, routeDistance:'', routeTime:'' },
     status: 'draft', sentAt: null
@@ -132,12 +132,17 @@ function deriveExclusionZonesFromMSBSops() {
   });
   return order;
 }
+// Jon Challinor and Joel Cripps are normally site-visit only, not field
+// operators — default their PPE to unticked so they pick only what they
+// actually need, rather than starting with the full field-operator set.
+var MSB_REDUCED_DEFAULT_PPE_STAFF_IDS = ['s1', 's3'];
 function ensureMSBPPEAssignments() {
   var derived = derivePPEForMSB();
   msbState.team.forEach(function(t) {
     if (!msbState.ppeAssignments[t.staffId]) msbState.ppeAssignments[t.staffId] = {};
+    var defaultChecked = MSB_REDUCED_DEFAULT_PPE_STAFF_IDS.indexOf(t.staffId) === -1;
     derived.forEach(function(p) {
-      if (msbState.ppeAssignments[t.staffId][p.id] === undefined) msbState.ppeAssignments[t.staffId][p.id] = true;
+      if (msbState.ppeAssignments[t.staffId][p.id] === undefined) msbState.ppeAssignments[t.staffId][p.id] = defaultChecked;
     });
   });
 }
@@ -416,6 +421,33 @@ function msbNextStep() { if (msbStep < MSB_STEPS.length - 1) { msbStep++; render
 function msbBackStep() { if (msbStep > 0) { msbStep--; renderMSBAll(); } }
 
 // ── STEP 1 — JOB DETAILS ──
+function renderMSBMethodologyPoints(listEl) {
+  listEl.innerHTML = '';
+  var points = msbState.job.methodologyPoints || (msbState.job.methodologyPoints = []);
+  if (!points.length) {
+    listEl.appendChild(_msbEl('<div class="msb-note" style="margin:0;">No points — tap + Add point below if you want any.</div>'));
+  }
+  points.forEach(function(pt, i) {
+    var row = _msbEl('<div style="display:flex;gap:8px;align-items:flex-start;"></div>');
+    var ta = document.createElement('textarea');
+    ta.style.cssText = 'flex:1;min-height:44px;';
+    ta.value = pt;
+    ta.oninput = function() { points[i] = ta.value; };
+    row.appendChild(ta);
+    var rmBtn = document.createElement('button');
+    rmBtn.type = 'button';
+    rmBtn.textContent = '✕';
+    rmBtn.title = 'Remove this point';
+    rmBtn.style.cssText = 'background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#c62828;font-size:14px;padding:6px 10px;cursor:pointer;flex-shrink:0;';
+    rmBtn.onclick = function() {
+      points.splice(i, 1);
+      renderMSBMethodologyPoints(listEl);
+    };
+    row.appendChild(rmBtn);
+    listEl.appendChild(row);
+  });
+}
+
 function renderMSBJobStep(container) {
   var wrap = _msbEl('<div class="msb-main"></div>');
   wrap.appendChild(_msbEl('<div class="msb-h1">Job Details</div>'));
@@ -465,10 +497,34 @@ function renderMSBJobStep(container) {
   methWrap.appendChild(methTa);
   var methNote = document.createElement('div');
   methNote.style.cssText = 'font-size:11px;color:#999;margin-top:6px;';
-  methNote.textContent = 'The standard sequence of work steps is always included automatically in the PDF, underneath what you write here.';
+  methNote.textContent = 'The points below are always included underneath what you write above — keep, edit, or remove any of them.';
   methWrap.appendChild(methNote);
   card.appendChild(methWrap);
+
+  var methPointsWrap = _msbEl('<div class="msb-field" style="margin-top:14px;"><label>Standard Sequence of Work</label></div>');
+  var methPointsList = _msbEl('<div id="msbMethPointsList" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>');
+  methPointsWrap.appendChild(methPointsList);
+  var addPointBtn = _msbEl('<button class="btn btn-clear" style="margin-top:8px;" type="button">+ Add point</button>');
+  addPointBtn.onclick = function() {
+    if (!msbState.job.methodologyPoints) msbState.job.methodologyPoints = [];
+    msbState.job.methodologyPoints.push('');
+    renderMSBMethodologyPoints(methPointsList);
+  };
+  methPointsWrap.appendChild(addPointBtn);
+  renderMSBMethodologyPoints(methPointsList);
+  card.appendChild(methPointsWrap);
   wrap.appendChild(card);
+
+  var signOffCard = _msbEl('<div class="msb-card"><h3>Document Sign-off</h3></div>');
+  signOffCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Shown under 1.0 Introduction in the PDF — Prepared by Sarah Haste, Reviewed by Joel Cripps, Approved by Jon Challinor are fixed; only the date changes.</div>'));
+  var dateWrap = _msbEl('<div class="msb-field" style="max-width:220px;"><label>Date</label></div>');
+  var dateInput = document.createElement('input');
+  dateInput.type = 'date';
+  dateInput.value = msbState.job.signOffDate || '';
+  dateInput.oninput = function() { msbState.job.signOffDate = dateInput.value; };
+  dateWrap.appendChild(dateInput);
+  signOffCard.appendChild(dateWrap);
+  wrap.appendChild(signOffCard);
 
   var contactCard = _msbEl('<div class="msb-card"><h3>On-Site Client Contact</h3></div>');
   var cGrid = _msbEl('<div class="msb-grid2"></div>');
@@ -885,6 +941,10 @@ function renderMSBPPEStep(container) {
 
   var card = _msbEl('<div class="msb-card"><h3>PPE Requirements by Operator</h3></div>');
 
+  if (msbState.team.some(function(t) { return MSB_REDUCED_DEFAULT_PPE_STAFF_IDS.indexOf(t.staffId) !== -1; })) {
+    card.appendChild(_msbEl('<div class="msb-note" style="margin-bottom:12px;">Jon and Joel default to no PPE ticked, since they\'re usually site visits only — tick whatever they actually need for this job.</div>'));
+  }
+
   if (!msbState.team.length) {
     card.appendChild(_msbEl('<div class="msb-note">Select your team on the Team &amp; Competency step first — PPE is assigned per operator.</div>'));
   } else if (!derivedPPE.length) {
@@ -1124,6 +1184,22 @@ function _msbFixedSectionBox(sectionNumber) {
   return _msbBoxed(sec.n + '  ' + sec.title, _msbBulletBlock(sec.paragraphs, 0));
 }
 
+function _msbFmtDateDotted(d) {
+  if (!d) return '—';
+  var dt = new Date(d + 'T00:00:00');
+  if (isNaN(dt.getTime())) return '—';
+  var pad = function(n) { return String(n).length < 2 ? '0' + n : String(n); };
+  return pad(dt.getDate()) + '.' + pad(dt.getMonth() + 1) + '.' + dt.getFullYear();
+}
+// Prepared by / Reviewed by / Approved by table under 1.0 Introduction —
+// name and position are fixed, only the date is editable per document.
+function _msbSignOffTable(label, name, position, date) {
+  return { table: { widths: ['33%','34%','33%'], body: [
+    [{ text: label, bold: true, fillColor: '#e0e0e0' }, { text: 'Position', bold: true, fillColor: '#e0e0e0' }, { text: 'Date', bold: true, fillColor: '#e0e0e0' }],
+    [name, position, _msbFmtDateDotted(date)]
+  ]}, margin: [0,0,0,10] };
+}
+
 function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
   var derivedPPE = derivePPEForMSB();
   var selectedEZ = msbState.selectedExclusionZones.map(_msbFindEZ).filter(Boolean);
@@ -1180,9 +1256,6 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
   var ezTableBody = [[{text:'Activity',bold:true},{text:'Minimum Safe Working Distance',bold:true}]];
   selectedEZ.forEach(function(z) { ezTableBody.push([z.activity, z.distance]); });
 
-  var hazardsTableBody = [[{text:'Hazard',bold:true},{text:'Control Measure',bold:true}]];
-  msbRefLib.hazards.forEach(function(h) { hazardsTableBody.push([h.hazard, h.control]); });
-
   var sopContent = [
     { text: 'General', style: 'sopHeading', margin: [0,0,0,4] },
     { ol: [
@@ -1199,6 +1272,8 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
     sop.description.forEach(function(line) { sopContent.push({ text: '-  ' + line, style: 'body', margin: [0,0,0,4] }); });
   });
   if (!msbState.selectedSOPs.length) sopContent.push({ text: 'No task-specific SOPs were selected for this job.', style: 'body' });
+
+  var methodologyPointsList = (msbState.job.methodologyPoints || []).map(function(p) { return (p || '').trim(); }).filter(Boolean);
 
   var pdfImages = { logo: msbLogoBase64 };
   for (var _siteImgKey in siteControlImagesMap) pdfImages[_siteImgKey] = siteControlImagesMap[_siteImgKey];
@@ -1227,10 +1302,13 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('1.0  Introduction', { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body' }),
 
+    _msbSignOffTable('Prepared by', 'Sarah Haste', 'Office Coordinator', msbState.job.signOffDate),
+    _msbSignOffTable('Reviewed by', 'Joel Cripps', 'Contracts Manager', msbState.job.signOffDate),
+    _msbSignOffTable('Approved by', 'Jon Challinor', 'Managing Director', msbState.job.signOffDate),
+
     _msbBoxed('2.0  Work Methodology', [
-      { text: msbState.job.methodology || 'No work methodology overview entered.', style: 'body', margin: [0,0,0,10] },
-      { ul: MSB_METHODOLOGY_FIXED_POINTS, style: 'body' }
-    ]),
+      { text: msbState.job.methodology || 'No work methodology overview entered.', style: 'body' }
+    ].concat(methodologyPointsList.length ? [{ ul: methodologyPointsList, style: 'body', margin: [0,10,0,0] }] : [])),
 
     _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], body: teamTableBody }, layout: 'lightHorizontalLines' }),
 
@@ -1255,9 +1333,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('9.0  Standard Operating Procedures', [
       { text: 'Only the SOPs relevant to this job are listed below.', style: 'noteText', margin: [0,0,0,8] }
-    ].concat(sopContent), { pageBreak: 'before' }),
-
-    _msbBoxed('10.0  Known Hazards (as identified by the Risk Assessment)', { table: { widths: ['30%','70%'], body: hazardsTableBody }, layout: 'lightHorizontalLines' }, { pageBreak: 'before' })
+    ].concat(sopContent), { pageBreak: 'before' })
   ];
 
   ['11.0','12.0','13.0','14.0'].forEach(function(n) { var b = _msbFixedSectionBox(n); if (b) content.push(b); });
