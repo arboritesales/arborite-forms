@@ -6460,6 +6460,43 @@ var spSessionToken = null, spSessionStaffId = null, spSessionName = null, spSess
 var spSessionExpiresAt = 0, spTickHandle = null;
 var SP_PORTAL_VIEWS = ['spPortalHome', 'spClock', 'spLeave', 'spCalendar'];
 
+// ── HOLIDAY REQUEST EMAIL NOTIFICATIONS (EmailJS) ──
+// Fires-and-forgets an email to jon@arborite.co.uk / joel@arborite.co.uk (set
+// in the EmailJS template's "To Email" field, not here) whenever someone
+// submits a leave request. Sent from sales@arborite.co.uk via the connected
+// Outlook service. Never blocks or fails the actual request — this is a
+// best-effort notification layered on top, not part of the request flow.
+var EMAILJS_PUBLIC_KEY = 'NcS8zQ2guo6twuud5';
+var EMAILJS_SERVICE_ID = 'service_ty7zbgk';
+var EMAILJS_TEMPLATE_ID = 'template_wfegnoj';
+var EMAILJS_CDN = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+var _emailjsReady = false, _emailjsLoading = false, _emailjsQueue = [];
+function _loadEmailJS(cb) {
+  if (_emailjsReady) { cb(); return; }
+  _emailjsQueue.push(cb);
+  if (_emailjsLoading) return;
+  _emailjsLoading = true;
+  var s = document.createElement('script');
+  s.src = EMAILJS_CDN;
+  s.onload = function() {
+    try { emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); } catch (e) {}
+    _emailjsReady = true; _emailjsLoading = false;
+    _emailjsQueue.forEach(function(fn) { fn(); }); _emailjsQueue = [];
+  };
+  s.onerror = function() {
+    _emailjsLoading = false;
+    _emailjsQueue.forEach(function(fn) { fn(true); }); _emailjsQueue = [];
+  };
+  document.head.appendChild(s);
+}
+function spNotifyHolidayRequest(params) {
+  if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) return;
+  _loadEmailJS(function(err) {
+    if (err || typeof emailjs === 'undefined') return;
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params).catch(function() {});
+  });
+}
+
 function spHeaders() {
   return { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() };
 }
@@ -6801,6 +6838,13 @@ function spSubmitRequest() {
     document.getElementById('spReqEnd').value = '';
     document.getElementById('spReqDays').value = '';
     document.getElementById('spReqNote').value = '';
+    spNotifyHolidayRequest({
+      staff_name: spSessionName,
+      date_range: spFmtDateRange(start, end),
+      days: days,
+      type: type,
+      note: note || '(no note)'
+    });
     spRenderMyRequests();
     spToast('Request submitted.');
   }).catch(function() { err.textContent = 'Connection error — try again.'; });
