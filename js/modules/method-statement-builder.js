@@ -51,7 +51,7 @@ function resetMSBState() {
   msbState = {
     job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
     team: [], equipment: [], selectedSOPs: [], selectedExclusionZones: [], ppeAssignments: {},
-    emergency: { hospitalName:'', hospitalAddress:'', hospitalPhone:'' },
+    emergency: { hospitalName:'', hospitalAddress:'', hospitalPhone:'', routeMap:{storagePath:'',status:''}, routeDistance:'', routeTime:'' },
     status: 'draft', sentAt: null
   };
 }
@@ -277,10 +277,14 @@ function saveMSBRecord() {
   var cleanJob = {};
   for (var k in msbState.job) cleanJob[k] = msbState.job[k];
   cleanJob.siteControlImages = cleanImages;
+  var rm = msbState.emergency.routeMap || {};
+  var cleanEmergency = {};
+  for (var ek in msbState.emergency) cleanEmergency[ek] = msbState.emergency[ek];
+  cleanEmergency.routeMap = { storagePath: rm.storagePath || '', status: rm.storagePath ? 'saved' : '' };
   var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: {
     job: cleanJob, team: msbState.team, equipment: msbState.equipment, selectedSOPs: msbState.selectedSOPs,
     selectedExclusionZones: msbState.selectedExclusionZones, ppeAssignments: msbState.ppeAssignments,
-    emergency: msbState.emergency, status: msbState.status, sentAt: msbState.sentAt
+    emergency: cleanEmergency, status: msbState.status, sentAt: msbState.sentAt
   }};
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
     if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('Save failed (' + r.status + ')');
@@ -666,6 +670,70 @@ function msbSiteControlImageUpload(input) {
   });
 }
 
+// Route map for Section 15.0 — a single uploaded photo (e.g. a Google Maps
+// route screenshot), same storage upload/read pattern as site control images.
+function renderMSBRouteMapImage(wrap) {
+  wrap = wrap || document.getElementById('msbRouteMapImg');
+  if (!wrap) return;
+  var rm = msbState.emergency.routeMap || (msbState.emergency.routeMap = { storagePath:'', status:'' });
+  wrap.innerHTML = '';
+  var tile = document.createElement('div');
+  if (rm.storagePath || rm._localPreview || rm.status === 'processing' || rm.status === 'error') {
+    tile.style.cssText = 'width:180px;height:120px;border-radius:6px;border:2px solid var(--green);cursor:pointer;overflow:hidden;background:#fafafa;position:relative;';
+    if (rm.storagePath) {
+      var img = document.createElement('img');
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+      tile.appendChild(img);
+      (function(imgEl, storagePath) {
+        _msbFetchSiteImageBlobUrl(storagePath).then(function(blobUrl) { imgEl.src = blobUrl; }).catch(function() { imgEl.replaceWith('⚠'); });
+      })(img, rm.storagePath);
+    } else if (rm._localPreview) {
+      var img2 = document.createElement('img');
+      img2.src = rm._localPreview;
+      img2.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;opacity:0.6;';
+      tile.appendChild(img2);
+    } else {
+      tile.textContent = '…';
+      tile.style.display = 'flex'; tile.style.alignItems = 'center'; tile.style.justifyContent = 'center'; tile.style.color = '#999';
+    }
+    if (rm.status === 'error') tile.style.borderColor = '#c62828';
+    tile.onclick = function() {
+      if (rm.status === 'processing') return;
+      if (!confirm('Remove this route map image?')) return;
+      msbState.emergency.routeMap = { storagePath: '', status: '' };
+      renderMSBRouteMapImage(wrap);
+    };
+  } else {
+    tile.style.cssText = 'width:180px;height:120px;border-radius:6px;border:2px dashed var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:24px;color:#999;background:#fafafa;';
+    tile.textContent = '+';
+    tile.onclick = function() {
+      var inp = document.getElementById('msbRouteMapInput');
+      if (inp) inp.click();
+    };
+  }
+  wrap.appendChild(tile);
+}
+
+function msbRouteMapImageUpload(input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  var rm = msbState.emergency.routeMap || (msbState.emergency.routeMap = { storagePath:'', status:'' });
+  rm.status = 'processing';
+  renderMSBRouteMapImage();
+  _resizeImageToJpeg(file, 1200, 0.7, function(dataUrl) {
+    if (!dataUrl) { rm.status = 'error'; renderMSBRouteMapImage(); return; }
+    rm._localPreview = dataUrl;
+    renderMSBRouteMapImage();
+    var path = 'msb-route-map/' + (currentMSBRef || 'draft') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.jpg';
+    _uploadMSBSiteImage(path, dataUrl, 'image/jpeg').then(function(r) {
+      if (r.ok) { rm.storagePath = path; rm.status = 'saved'; delete rm._localPreview; }
+      else { rm.status = 'error'; }
+      renderMSBRouteMapImage();
+    }).catch(function() { rm.status = 'error'; renderMSBRouteMapImage(); });
+  });
+}
+
 // ── STEP 4 — SOPs & EXCLUSION ZONES ──
 function renderMSBSOPStep(container) {
   var wrap = _msbEl('<div class="msb-main"></div>');
@@ -799,6 +867,35 @@ function renderMSBEmergencyStep(container) {
   });
   card.appendChild(grid);
   wrap.appendChild(card);
+
+  var routeCard = _msbEl('<div class="msb-card"><h3>Route Map (Section 15.0)</h3></div>');
+  routeCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Upload a screenshot of the driving route to the nearest A&amp;E (e.g. from Google Maps).</div>'));
+  var rmWrap = _msbEl('<div id="msbRouteMapImg"></div>');
+  routeCard.appendChild(rmWrap);
+  var rmInput = document.createElement('input');
+  rmInput.type = 'file';
+  rmInput.accept = 'image/*';
+  rmInput.style.display = 'none';
+  rmInput.id = 'msbRouteMapInput';
+  rmInput.onchange = function() { msbRouteMapImageUpload(rmInput); };
+  routeCard.appendChild(rmInput);
+  renderMSBRouteMapImage(rmWrap);
+
+  var rmGrid = _msbEl('<div class="msb-grid2" style="margin-top:12px;"></div>');
+  [['routeDistance','Distance from site to Urgent Care'],['routeTime','Time from site to Urgent Care']].forEach(function(f) {
+    var key = f[0], label = f[1];
+    var fwrap = _msbEl('<div class="msb-field"></div>');
+    fwrap.appendChild(_msbEl('<label>' + label + '</label>'));
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = msbState.emergency[key] || '';
+    input.oninput = function() { msbState.emergency[key] = input.value; };
+    fwrap.appendChild(input);
+    rmGrid.appendChild(fwrap);
+  });
+  routeCard.appendChild(rmGrid);
+  wrap.appendChild(routeCard);
+
   container.appendChild(wrap);
 }
 
@@ -856,6 +953,7 @@ function renderMSBReviewStep(container) {
 
   var emSec = _msbEl('<div class="msb-review-section"><h4>Emergency Arrangements (Section 15.0)</h4></div>');
   emSec.appendChild(_msbEl('<div class="row">' + (msbState.emergency.hospitalName || 'Not entered yet') + '</div>'));
+  emSec.appendChild(_msbEl('<div class="row">Route map: ' + (msbState.emergency.routeMap && msbState.emergency.routeMap.storagePath ? 'added' : 'not added') + ' — ' + (msbState.emergency.routeDistance || '—') + ', ' + (msbState.emergency.routeTime || '—') + '</div>'));
   card.appendChild(emSec);
 
   wrap.appendChild(card);
@@ -947,7 +1045,7 @@ function _msbFixedSectionBox(sectionNumber) {
   return _msbBoxed(sec.n + '  ' + sec.title, _msbBulletBlock(sec.paragraphs, 0));
 }
 
-function buildMSBDocDefinition(resolvedSiteImages) {
+function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
   var derivedPPE = derivePPEForMSB();
   var selectedEZ = msbState.selectedExclusionZones.map(_msbFindEZ).filter(Boolean);
 
@@ -1025,6 +1123,11 @@ function buildMSBDocDefinition(resolvedSiteImages) {
 
   var pdfImages = { logo: msbLogoBase64 };
   for (var _siteImgKey in siteControlImagesMap) pdfImages[_siteImgKey] = siteControlImagesMap[_siteImgKey];
+  if (resolvedRouteMapImage) pdfImages.routeMapImg = resolvedRouteMapImage;
+
+  var routeMapContent = resolvedRouteMapImage
+    ? [{ image: 'routeMapImg', width: 300, margin: [0,0,0,8] }]
+    : [{ text: 'No route map image added for this job.', style: 'body', margin: [0,0,0,8] }];
 
   var content = [
     { text: 'Method Statement', style: 'title' },
@@ -1080,11 +1183,19 @@ function buildMSBDocDefinition(resolvedSiteImages) {
 
   ['11.0','12.0','13.0','14.0'].forEach(function(n) { var b = _msbFixedSectionBox(n); if (b) content.push(b); });
 
-  content.push(_msbBoxed('15.0  Emergency Arrangements', { table: { widths: ['30%','70%'], body: [
-    ['Nearest A&E Hospital', msbState.emergency.hospitalName || 'Not entered'],
-    ['Address', msbState.emergency.hospitalAddress || '—'],
-    ['Phone', msbState.emergency.hospitalPhone || '—']
-  ]}, layout: 'lightHorizontalLines' }));
+  content.push(_msbBoxed('15.0  Emergency Arrangements', [
+    { table: { widths: ['30%','70%'], body: [
+      ['Nearest A&E Hospital', msbState.emergency.hospitalName || 'Not entered'],
+      ['Address', msbState.emergency.hospitalAddress || '—'],
+      ['Phone', msbState.emergency.hospitalPhone || '—']
+    ]}, layout: 'lightHorizontalLines', margin: [0,0,0,12] },
+    { text: 'Route Map', style: 'sopHeading', margin: [0,0,0,6] }
+  ].concat(routeMapContent).concat([
+    { table: { widths: ['40%','60%'], body: [
+      ['Distance from site to Urgent Care Service', msbState.emergency.routeDistance || '—'],
+      ['Time from site to Urgent Care', msbState.emergency.routeTime || '—']
+    ]}, layout: 'lightHorizontalLines' }
+  ])));
 
   ['16.0','17.0','18.0','19.0','20.0','21.0','22.0','23.0','24.0','25.0','26.0','27.0','28.0','29.0'].forEach(function(n) {
     var b = _msbFixedSectionBox(n); if (b) content.push(b);
@@ -1128,12 +1239,17 @@ function generateMSBPDF() {
     throw { _msbHandled: true };
   }).then(function() {
     var savedImages = (msbState.job.siteControlImages || []).filter(function(p) { return p.storagePath; });
+    var routeMapPath = msbState.emergency.routeMap && msbState.emergency.routeMap.storagePath;
     // A single unreachable photo must not block the whole PDF — skip it, don't reject.
-    return Promise.all(savedImages.map(function(p) {
-      return _msbFetchAsDataUrl(_msbSiteImgAuthUrl(p.storagePath)).catch(function() { return null; });
-    }));
-  }).then(function(resolvedSiteImagesRaw) {
-    var resolvedSiteImages = resolvedSiteImagesRaw.filter(Boolean);
+    return Promise.all([
+      Promise.all(savedImages.map(function(p) {
+        return _msbFetchAsDataUrl(_msbSiteImgAuthUrl(p.storagePath)).catch(function() { return null; });
+      })),
+      routeMapPath ? _msbFetchAsDataUrl(_msbSiteImgAuthUrl(routeMapPath)).catch(function() { return null; }) : Promise.resolve(null)
+    ]);
+  }).then(function(results) {
+    var resolvedSiteImages = results[0].filter(Boolean);
+    var resolvedRouteMapImage = results[1];
     _loadPdfMake(function(err) {
       if (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
@@ -1141,7 +1257,7 @@ function generateMSBPDF() {
         return;
       }
       try {
-        var doc = buildMSBDocDefinition(resolvedSiteImages);
+        var doc = buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage);
         pdfMake.createPdf(doc).download('method-statement-' + (msbState.job.client || 'job').replace(/\s+/g,'-').toLowerCase() + '.pdf');
       } catch (e) {
         if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
