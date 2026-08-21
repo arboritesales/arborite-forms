@@ -153,6 +153,7 @@ function closeMSBView() {
 }
 function showMSBList() {
   document.getElementById('msbListPanel').style.display = 'block';
+  document.getElementById('msbDeletedListPanel').style.display = 'none';
   document.getElementById('msbFormPanel').style.display = 'none';
   currentMSBRef = null;
   document.getElementById('msbView').scrollTop = 0;
@@ -160,16 +161,32 @@ function showMSBList() {
 }
 function showMSBForm() {
   document.getElementById('msbListPanel').style.display = 'none';
+  document.getElementById('msbDeletedListPanel').style.display = 'none';
   document.getElementById('msbFormPanel').style.display = 'block';
   document.getElementById('msbView').scrollTop = 0;
 }
+function showMSBDeletedList() {
+  document.getElementById('msbListPanel').style.display = 'none';
+  document.getElementById('msbFormPanel').style.display = 'none';
+  document.getElementById('msbDeletedListPanel').style.display = 'block';
+  document.getElementById('msbView').scrollTop = 0;
+  fetchMSBDeletedList();
+}
+
+// Full form_data for every row currently shown, keyed by quote_ref — lets
+// delete/restore merge in a deletedAt flag without a round-trip fetch.
+var _msbListRowsCache = {};
 
 function fetchMSBList() {
   var listEl = document.getElementById('msbList');
   listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading...</div>';
-  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at,form_data&quote_ref=like.MSB-*&order=updated_at.desc&limit=100')
-    .then(function(r) { return r.json(); })
-    .then(function(rows) {
+  Promise.all([
+    supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at,form_data&quote_ref=like.MSB-*&form_data->>deletedAt=is.null&order=updated_at.desc&limit=100').then(function(r) { return r.json(); }),
+    supaFetch('GET', TABLE + '?select=id&quote_ref=like.MSB-*&form_data->>deletedAt=not.is.null&limit=1000').then(function(r) { return r.json(); }).catch(function() { return []; })
+  ]).then(function(results) {
+      var rows = results[0], deletedRows = results[1];
+      var countEl = document.getElementById('msbDeletedCount');
+      if (countEl) countEl.textContent = (Array.isArray(deletedRows) && deletedRows.length) ? ' (' + deletedRows.length + ')' : '';
       if (!Array.isArray(rows) || rows.length === 0) {
         listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">No method statements saved yet.<br><br>Tap <strong style="color:#7ec820;">+ New Method Statement</strong> to create one.</div>';
         return;
@@ -177,6 +194,7 @@ function fetchMSBList() {
       var html = '<div style="display:flex;flex-direction:column;gap:12px;">';
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
+        _msbListRowsCache[row.quote_ref] = row.form_data || {};
         var fd = row.form_data || {};
         var job = fd.job || {};
         var d = row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
@@ -193,6 +211,42 @@ function fetchMSBList() {
           + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
           + '<button onclick="event.stopPropagation();deleteMSB(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
+          + '</div>'
+          + '</div>';
+      }
+      html += '</div>';
+      listEl.innerHTML = html;
+    })
+    .catch(function() {
+      listEl.innerHTML = '<div style="color:#f8d7da;padding:30px;text-align:center;font-size:13px;">Could not load records — check connection.</div>';
+    });
+}
+
+function fetchMSBDeletedList() {
+  var listEl = document.getElementById('msbDeletedList');
+  listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading...</div>';
+  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at,form_data&quote_ref=like.MSB-*&form_data->>deletedAt=not.is.null&order=updated_at.desc&limit=100')
+    .then(function(r) { return r.json(); })
+    .then(function(rows) {
+      if (!Array.isArray(rows) || rows.length === 0) {
+        listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Nothing deleted right now.</div>';
+        return;
+      }
+      var html = '<div style="display:flex;flex-direction:column;gap:12px;">';
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        _msbListRowsCache[row.quote_ref] = row.form_data || {};
+        var fd = row.form_data || {};
+        var job = fd.job || {};
+        var ref = row.quote_ref;
+        var mainLine = job.client || job.titleOfDocument || ref;
+        var deletedWhen = fd.deletedAt ? _msbFmtDate(fd.deletedAt) : '—';
+        html += '<div style="background:#3a2010;border:1px solid rgba(255,150,80,.35);border-radius:8px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#ffb066;letter-spacing:.5px;">' + mainLine + '</div>'
+          + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">Deleted ' + deletedWhen + '</div></div>'
+          + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
+          + '<button onclick="restoreMSB(\'' + ref + '\')" class="btn btn-clear" style="padding:6px 12px;font-size:12px;">Restore</button>'
+          + '<button onclick="permanentlyDeleteMSB(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:12px;padding:6px 10px;cursor:pointer;">Delete Permanently</button>'
           + '</div>'
           + '</div>';
       }
@@ -260,10 +314,35 @@ function loadMSB(ref) {
   });
 }
 
+// Soft delete — moves the record to "Recently Deleted" rather than removing
+// it, so a mis-tap here can never actually lose a method statement. Only
+// permanentlyDeleteMSB() below does a real, irreversible DELETE.
 function deleteMSB(ref) {
-  if (!confirm('Delete this method statement? This cannot be undone.')) return;
-  supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))
+  if (!confirm('Delete this method statement? It moves to Recently Deleted, where it can be restored any time.')) return;
+  var fd = _msbListRowsCache[ref] || {};
+  var updated = {};
+  for (var k in fd) updated[k] = fd[k];
+  updated.deletedAt = new Date().toISOString();
+  supaFetch('PATCH', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref), { form_data: updated })
     .then(function(r) { if (r.ok || r.status === 204) fetchMSBList(); else alert('Delete failed.'); })
+    .catch(function() { alert('Delete failed — check connection.'); });
+}
+
+function restoreMSB(ref) {
+  var fd = _msbListRowsCache[ref] || {};
+  var updated = {};
+  for (var k in fd) updated[k] = fd[k];
+  delete updated.deletedAt;
+  supaFetch('PATCH', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref), { form_data: updated })
+    .then(function(r) { if (r.ok || r.status === 204) fetchMSBDeletedList(); else alert('Restore failed.'); })
+    .catch(function() { alert('Restore failed — check connection.'); });
+}
+
+function permanentlyDeleteMSB(ref) {
+  var typed = prompt('This permanently deletes it — it cannot be recovered afterwards. Type DELETE to confirm.');
+  if (typed !== 'DELETE') return;
+  supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))
+    .then(function(r) { if (r.ok || r.status === 204) { delete _msbListRowsCache[ref]; fetchMSBDeletedList(); } else alert('Delete failed.'); })
     .catch(function() { alert('Delete failed — check connection.'); });
 }
 
