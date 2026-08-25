@@ -5578,8 +5578,37 @@ function permanentlyDeleteMSB(ref) {
     .catch(function() { alert('Delete failed — check connection.'); });
 }
 
+// Guards against ANY mechanism — known or not yet found — that leaves the
+// browser holding a blank/near-empty msbState while currentMSBRef still
+// points at a record that has real content on the server. This document has
+// been silently wiped by exactly that shape of bug more than once, so the
+// check is deliberately unconditional and independent of any specific
+// trigger: before writing an essentially-empty job over an EXISTING ref,
+// fetch what's actually on the server right now and refuse if it has real
+// content this save would destroy.
+function _msbLocalStateLooksBlank() {
+  var j = msbState.job || {};
+  return !j.titleOfDocument && !j.client && !j.siteAddress && !msbState.team.length;
+}
 function saveMSBRecord() {
   if (!currentMSBRef) return Promise.reject(new Error('No active record'));
+  if (!_msbLocalStateLooksBlank()) return _msbDoSaveRecord();
+  var ref = currentMSBRef;
+  return supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1')
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .catch(function() { return []; })
+    .then(function(rows) {
+      var existingJob = rows && rows[0] && rows[0].form_data && rows[0].form_data.job;
+      var serverHasRealContent = existingJob && (existingJob.titleOfDocument || existingJob.client || existingJob.siteAddress);
+      if (serverHasRealContent) {
+        var blockErr = new Error('Refusing to save — this document already has content saved on the server, but what\'s open right now looks blank. Close this without saving, then reopen it from the list instead.');
+        blockErr._msbBlankGuard = true;
+        throw blockErr;
+      }
+      return _msbDoSaveRecord();
+    });
+}
+function _msbDoSaveRecord() {
   // Strip transient in-flight upload state (_localPreview is a full base64 image —
   // never let it reach the saved JSON, only the storagePath once uploaded).
   var cleanImages = (msbState.job.siteControlImages || []).map(function(p) {
@@ -5610,7 +5639,15 @@ function saveMSBDraft() {
   saveMSBRecord().then(function() {
     _clearMSBOfflinePending();
     if (btn) { btn.textContent = '✓ Saved'; setTimeout(function() { btn.textContent = 'Save Draft'; btn.disabled = false; }, 1800); }
-  }).catch(function() {
+  }).catch(function(e) {
+    if (e && e._msbBlankGuard) {
+      // Refused on purpose — this is not a connectivity problem, so it must
+      // NOT be queued for offline auto-sync (that would just overwrite the
+      // real content the moment the connection came back).
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Draft'; }
+      alert(e.message);
+      return;
+    }
     // Couldn't reach the server for any reason — keep the work safe locally
     // and it'll sync automatically the moment the connection comes back.
     _saveMSBLocalCache(ref, msbState);
@@ -6659,6 +6696,13 @@ function generateMSBPDF() {
   var ref = currentMSBRef;
   saveMSBRecord().catch(function(e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
+    if (e && e._msbBlankGuard) {
+      // Refused on purpose — not a connectivity problem, must NOT be queued
+      // for offline auto-sync (that would overwrite the real content once
+      // back online).
+      alert(e.message);
+      throw { _msbHandled: true };
+    }
     // Couldn't reach the server — the PDF can't be built from a saved copy
     // right now, but the work itself isn't lost: cache it and it'll sync
     // automatically once the connection is back.
