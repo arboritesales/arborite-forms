@@ -5212,6 +5212,48 @@ var msbState = null;
 var msbRefLib = { staff:[], ppe:[], ez:[], equipment:[], sops:[], hazards:[], fixedSections:[] };
 var msbRefLibPromise = null;
 
+// ── OFFLINE SAVE FALLBACK ──
+// Mirrors the same pattern already used for the main job forms in
+// jobs-storage.js (_saveJobLocalCache/_markOfflinePending/the 'online'
+// listener) — if a save can't reach the server, cache it in localStorage
+// and retry automatically once the connection is back, instead of the
+// work just being lost.
+var MSB_LOCAL_CACHE_LIMIT = 10;
+function _saveMSBLocalCache(ref, formData) {
+  try {
+    localStorage.setItem('msb_local_' + ref, JSON.stringify(formData));
+    var order = _loadMSBCacheOrder().filter(function(r) { return r !== ref; });
+    order.push(ref);
+    while (order.length > MSB_LOCAL_CACHE_LIMIT) {
+      var evicted = order.shift();
+      try { localStorage.removeItem('msb_local_' + evicted); } catch (e) {}
+    }
+    localStorage.setItem('msb_local_cache_order', JSON.stringify(order));
+  } catch (e) {}
+}
+function _loadMSBCacheOrder() {
+  try { var s = localStorage.getItem('msb_local_cache_order'); return s ? JSON.parse(s) : []; } catch (e) { return []; }
+}
+function _loadMSBLocalCache(ref) {
+  try { var s = localStorage.getItem('msb_local_' + ref); return s ? JSON.parse(s) : null; } catch (e) { return null; }
+}
+function _markMSBOfflinePending(ref) {
+  try { localStorage.setItem('msb_offline_pending', ref); } catch (e) {}
+}
+function _clearMSBOfflinePending() {
+  try { localStorage.removeItem('msb_offline_pending'); } catch (e) {}
+}
+function _getMSBOfflinePending() {
+  try { return localStorage.getItem('msb_offline_pending'); } catch (e) { return null; }
+}
+window.addEventListener('online', function() {
+  var pending = _getMSBOfflinePending();
+  if (!pending || !currentMSBRef || currentMSBRef !== pending) return;
+  setTimeout(function() {
+    saveMSBRecord().then(function() { _clearMSBOfflinePending(); }).catch(function() {});
+  }, 800);
+});
+
 function _msbEl(html) {
   var d = document.createElement('div');
   d.innerHTML = html.trim();
@@ -5564,10 +5606,16 @@ function saveMSBDraft() {
   var btn = document.getElementById('msbSaveDraftBtn');
   if (!currentMSBRef) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+  var ref = currentMSBRef;
   saveMSBRecord().then(function() {
+    _clearMSBOfflinePending();
     if (btn) { btn.textContent = '✓ Saved'; setTimeout(function() { btn.textContent = 'Save Draft'; btn.disabled = false; }, 1800); }
   }).catch(function() {
-    if (btn) { btn.disabled = false; btn.textContent = 'Save failed'; setTimeout(function() { btn.textContent = 'Save Draft'; }, 2200); }
+    // Couldn't reach the server for any reason — keep the work safe locally
+    // and it'll sync automatically the moment the connection comes back.
+    _saveMSBLocalCache(ref, msbState);
+    _markMSBOfflinePending(ref);
+    if (btn) { btn.textContent = 'Saved offline ✓'; btn.disabled = false; setTimeout(function() { btn.textContent = 'Save Draft'; }, 2400); }
   });
 }
 
@@ -6608,9 +6656,14 @@ function generateMSBPDF() {
   ensureMSBPPEAssignments();
   msbState.status = 'sent';
   msbState.sentAt = new Date().toISOString();
+  var ref = currentMSBRef;
   saveMSBRecord().catch(function(e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
-    alert('Could not save the method statement — check your connection and try again.' + (e && e.message ? ' (' + e.message + ')' : ''));
+    // Couldn't reach the server — the PDF can't be built from a saved copy
+    // right now, but the work itself isn't lost: cache it and it'll sync
+    // automatically once the connection is back.
+    if (ref) { _saveMSBLocalCache(ref, msbState); _markMSBOfflinePending(ref); }
+    alert('Could not save the method statement — check your connection and try again. Your work is safe and saved on this device — it will sync automatically once you\'re back online.' + (e && e.message ? ' (' + e.message + ')' : ''));
     throw { _msbHandled: true };
   }).then(function() {
     var savedImages = (msbState.job.siteControlImages || []).filter(function(p) { return p.storagePath; });
