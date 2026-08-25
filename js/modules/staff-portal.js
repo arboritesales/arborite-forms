@@ -397,7 +397,14 @@ function spSubmitRequest() {
       date_range: spFmtDateRange(start, end),
       days: days,
       type: type,
-      note: note || '(no note)'
+      note: note || '(no note)',
+      // The EmailJS template's body was built from EmailJS's default
+      // "Contact Us" template and still uses its original placeholder
+      // names ({{name}}, {{time}}, {{message}}) rather than the ones
+      // above — send both sets so the body actually fills in.
+      name: spSessionName,
+      time: spFmtDateRange(start, end),
+      message: type + ' leave requested for ' + spFmtDateRange(start, end) + ' (' + days + (days === 1 ? ' day' : ' days') + ').' + (note ? ' Note: ' + note : '')
     });
     spRenderMyRequests();
     spToast('Request submitted.');
