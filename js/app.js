@@ -5470,24 +5470,37 @@ function loadMSB(ref) {
     supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1').then(function(r) { return r.json(); })
   ]).then(function(results) {
     var rows = results[1];
-    resetMSBState();
     var d = (rows && rows[0] && rows[0].form_data) ? rows[0].form_data : null;
-    if (d) {
-      if (d.job) msbState.job = d.job;
-      _msbMigrateLegacySiteImages();
-      msbState.team = d.team || [];
-      msbState.equipment = d.equipment || [];
-      msbState.selectedSOPs = d.selectedSOPs || [];
-      msbState.selectedExclusionZones = d.selectedExclusionZones || [];
-      msbState.ppeAssignments = d.ppeAssignments || {};
-      if (d.emergency) msbState.emergency = d.emergency;
-      msbState.status = d.status || 'draft';
-      msbState.sentAt = d.sentAt || null;
+    if (!d) {
+      // loadMSB is only ever called for a ref that was just shown in the
+      // list, i.e. it's known to exist — a fetch that comes back with no
+      // matching row here is a transient failure (network blip, read-lag),
+      // NOT a legitimate blank document. Treating it as one previously let
+      // a save silently overwrite real content with an empty record under
+      // the same ref. Refuse instead: clear currentMSBRef so saveMSBRecord()
+      // can't write anything until the record is loaded successfully.
+      currentMSBRef = null;
+      resetMSBState();
+      document.getElementById('msbStepContent').innerHTML = '<div class="msb-main"><div class="msb-note" style="border-left-color:#c62828;">Could not load this record — check connection and try again. (Nothing has been changed or lost — go back to the list and open it again.)</div></div>';
+      return;
     }
+    resetMSBState();
+    if (d.job) msbState.job = d.job;
+    _msbMigrateLegacySiteImages();
+    msbState.team = d.team || [];
+    msbState.equipment = d.equipment || [];
+    msbState.selectedSOPs = d.selectedSOPs || [];
+    msbState.selectedExclusionZones = d.selectedExclusionZones || [];
+    msbState.ppeAssignments = d.ppeAssignments || {};
+    if (d.emergency) msbState.emergency = d.emergency;
+    msbState.status = d.status || 'draft';
+    msbState.sentAt = d.sentAt || null;
     msbStep = 0;
     renderMSBAll();
   }).catch(function() {
-    document.getElementById('msbStepContent').innerHTML = '<div class="msb-main"><div class="msb-note" style="border-left-color:#c62828;">Could not load this record — check connection and try again.</div></div>';
+    currentMSBRef = null;
+    resetMSBState();
+    document.getElementById('msbStepContent').innerHTML = '<div class="msb-main"><div class="msb-note" style="border-left-color:#c62828;">Could not load this record — check connection and try again. (Nothing has been changed or lost — go back to the list and open it again.)</div></div>';
   });
 }
 
