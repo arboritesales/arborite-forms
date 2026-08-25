@@ -1,10 +1,15 @@
 -- ============================================================================
--- Restore the Forestry England method statement (2026-08-21)
+-- Restore the Forestry England method statement (updated 2026-08-25)
 -- ============================================================================
--- Run this once in the Supabase SQL editor. Rebuilds the Forestry England
--- ("Newtown Road, Lyndhurst") method statement from the content Brook sent
--- as a PDF earlier, after the original record was lost. Once run, it will
--- appear in the Method Statement Builder list in the app immediately.
+-- Run this in the Supabase SQL editor. Rebuilds the Forestry England
+-- ("Newtown Road, Lyndhurst") method statement from the most recent PDF
+-- Brook sent, after the record was lost again. Safe to re-run — it always
+-- overwrites the same MSB-20260821-701 row with whatever's in this file.
+--
+-- NOT restored: the actual Route Map photo under 15.0 — a PDF only contains
+-- a flattened image, not the original file, so that one has to be
+-- re-uploaded by hand once this is loaded. Everything else (distance, time,
+-- sign-off date, PPE selections, equipment, permits) is restored.
 -- ============================================================================
 
 insert into job_forms (quote_ref, updated_at, form_data)
@@ -128,8 +133,36 @@ Jason Hiscock will then advise the Forestry England Contract Manager that the wo
       'clientContactName', 'TBC - Forestry England representative',
       'clientContactPhone', 'TBC',
       'clientContactEmail', 'TBC',
+      'signOffDate', '2026-05-24',
+      'permitsIssuedBy', jsonb_build_object('highways', 'Amber Langis', 'breakingGround', 'N/A'),
       'siteControlImages', '[]'::jsonb,
-      'siteControlComments', ''
+      'siteControlComments', 'Worksite review.
+Before attending site, Joel Cripps, Arborite''s Competent Person, will review the Forestry England work order, site plan and tree schedule and confirm the proposed sequence of work.
+The main site constraints identified from the information provided are:
+a. Declining ash trees affected by Chalara.
+b. Veteran/ancient oak requiring deadwooding.
+c. Overhead powerlines.
+d. Public road.
+e. Residential access road.
+f. Public right of way/footpath.
+g. Public car park.
+h. Watercourse; and
+i. Ecological constraints, particularly as the work is planned for May.
+These constraints will be considered within the site-specific RAMS and when deciding the position of the
+MEWP, drop zones, work zones and exclusion zones.
+Powerline and traffic management arrangements
+Before mobilisation, the position of the overhead powerlines (OHPL) will be checked against the trees and
+proposed MEWP operating positions.
+Where works are required within two tree lengths of the OHPL, measured at ground level horizontally from
+below the nearest wire, we will liaise with Forestry England to make sure the required arrangements with
+the Distribution Network Operator are in place before work starts.
+No work will proceed within the affected area until the required electrical controls have been agreed. Work
+will be undertaken in accordance with FISA 804 – Electricity at Work: Forestry and the agreed DNO
+arrangements.
+Work near the overhead lines will follow FISA 804 – Electricity at Work: Forestry and the agreed DNO
+arrangements.
+Traffic management will also be agreed for the trees within striking distance of the public road. This will
+be installed by Amber langis using [e.g. temporary Stop-Go.'
     ),
     'team', '[
       {"staffId":"s5","roleOverride":"Arborist"},
@@ -138,26 +171,31 @@ Jason Hiscock will then advise the Forestry England Contract Manager that the wo
       {"staffId":"s1","roleOverride":"Managing Director and Arborist"},
       {"staffId":"s7","roleOverride":"Arborist and Site Supervisor"}
     ]'::jsonb,
-    'equipment', '[]'::jsonb,
+    'equipment', '[
+      {"id":"eq_chainsaws","name":"Chainsaws","sound":"110 dB","vibration":"3.5 m/s²"},
+      {"id":"eq_tipper","name":"3.5 Tonne Tipper Vehicles","sound":"80 dB","vibration":"N/A"},
+      {"id":"eq_tr8_chipper","name":"Forst TR8 Tracked Wood Chipper","sound":"120 dB","vibration":"N/A"},
+      {"id":"eq_mewp","name":"Hinowa 2010 MEWP","sound":"102 dB","vibration":"N/A"}
+    ]'::jsonb,
     'selectedSOPs', '[
       "sop_powered_hand_tools","sop_refuelling","sop_chainsaw_ground",
       "sop_dismantling_rigging","sop_chainsaw_from_mewp","sop_hand_fed_chipper","sop_mewp"
     ]'::jsonb,
     'selectedExclusionZones', '["ez_chipping","ez_mewp","ez_refuel"]'::jsonb,
     'ppeAssignments', '{
-      "s1": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true,"ppe_harness":true},
-      "s3": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true,"ppe_harness":true},
-      "s5": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true,"ppe_harness":true},
-      "s7": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true,"ppe_harness":true},
-      "s10": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true,"ppe_harness":true}
+      "s1": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":false,"ppe_chainsaw_trousers":false,"ppe_chainsaw_boots":true,"ppe_visor":false},
+      "s3": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true},
+      "s5": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true},
+      "s7": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true},
+      "s10": {"ppe_helmet":true,"ppe_hivis":true,"ppe_boots":true,"ppe_gloves":true,"ppe_eye":true,"ppe_hearing":true,"ppe_chainsaw_gloves":true,"ppe_chainsaw_trousers":true,"ppe_chainsaw_boots":true,"ppe_visor":true}
     }'::jsonb,
     'emergency', jsonb_build_object(
       'hospitalName', 'Southampton General Hospital',
       'hospitalAddress', 'Tremona Road, Southampton, Hampshire, SO16 6YD',
       'hospitalPhone', '023 8077 7222',
       'routeMap', jsonb_build_object('storagePath', '', 'status', ''),
-      'routeDistance', '',
-      'routeTime', ''
+      'routeDistance', '12.3 miles',
+      'routeTime', '26 mins'
     ),
     'status', 'sent',
     'sentAt', to_jsonb(now())
