@@ -287,6 +287,7 @@ function showMSBForm() {
   document.getElementById('msbDeletedListPanel').style.display = 'none';
   document.getElementById('msbFormPanel').style.display = 'block';
   document.getElementById('msbView').scrollTop = 0;
+  attachMSBAutoSave();
 }
 function showMSBDeletedList() {
   document.getElementById('msbListPanel').style.display = 'none';
@@ -494,6 +495,33 @@ function _msbLocalStateLooksBlank() {
   var j = msbState.job || {};
   return !j.titleOfDocument && !j.client && !j.siteAddress && !msbState.team.length;
 }
+// ── AUTO-SAVE ──
+// Mirrors autosave.js's debounce/pattern for the main job forms, but wired
+// differently: those panels are static HTML with fixed ids, wired once per
+// panel. MSB's fields are torn down and rebuilt from scratch on every step
+// render (renderMSBAll → main.innerHTML = ''), which would silently drop
+// per-field listeners — so this delegates a single 'input'/'change'
+// listener on #msbStepContent itself (never replaced, only its children
+// are) instead of wiring each field individually. Routes through the same
+// saveMSBRecord() the Save Draft button uses, so the blank-overwrite guard
+// and offline-save fallback both apply here automatically, for free.
+var _msbAutoSaveTimer = null;
+function scheduleMSBAutoSave() {
+  if (!currentMSBRef) return;
+  if (_msbAutoSaveTimer) clearTimeout(_msbAutoSaveTimer);
+  _msbAutoSaveTimer = setTimeout(function() {
+    _msbAutoSaveTimer = null;
+    saveMSBRecord().catch(function() {}); // silent — Save Draft/Generate PDF still surface real errors
+  }, 2000);
+}
+function attachMSBAutoSave() {
+  var root = document.getElementById('msbStepContent');
+  if (!root || root._autoSaveWired) return;
+  root._autoSaveWired = true;
+  root.addEventListener('input', scheduleMSBAutoSave);
+  root.addEventListener('change', scheduleMSBAutoSave);
+}
+
 function saveMSBRecord() {
   if (!currentMSBRef) return Promise.reject(new Error('No active record'));
   if (!_msbLocalStateLooksBlank()) return _msbDoSaveRecord();
