@@ -6796,6 +6796,16 @@ function spNotifyHolidayRequest(params) {
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params).catch(function() {});
   });
 }
+// Same template/service as spNotifyHolidayRequest — the Subject field needs
+// to read {{subject}} rather than the hardcoded "Holiday request from
+// {{staff_name}}" for both to show the right subject line.
+function spNotifyClockAlert(params) {
+  if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) return;
+  _loadEmailJS(function(err) {
+    if (err || typeof emailjs === 'undefined') return;
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params).catch(function() {});
+  });
+}
 
 function spHeaders() {
   return { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() };
@@ -7040,7 +7050,30 @@ function spDoClock(action) {
       }
       spRenderClockStatus(action === 'in');
       spRenderOnsite();
+      spCheckLateEarlyAlert(action, new Date());
     }).catch(function() { btn1.disabled = false; btn2.disabled = false; spToast('Connection error — try again.'); });
+  });
+}
+
+// Normal hours are 07:00-16:00. Clocking in after 07:00 or out before 16:00
+// emails jon/joel (a shortfall worth a manager's attention). The mirror case
+// — in before 07:00 or out after 16:00 — is overtime instead, surfaced for
+// approval in the Monthly Clock Report rather than emailed (see
+// spSaveOvertime); the two are deliberately not symmetric notification-wise.
+function spCheckLateEarlyAlert(action, when) {
+  var mins = when.getHours() * 60 + when.getMinutes();
+  var isLateIn = action === 'in' && mins > 7 * 60;
+  var isEarlyOut = action === 'out' && mins < 16 * 60;
+  if (!isLateIn && !isEarlyOut) return;
+  var timeStr = String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0');
+  var dateStr = when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  spNotifyClockAlert({
+    subject: (isLateIn ? 'Late clock-in — ' : 'Early clock-out — ') + spSessionName,
+    staff_name: spSessionName,
+    name: spSessionName,
+    time: timeStr,
+    date_range: dateStr,
+    message: spSessionName + ' ' + (isLateIn ? 'clocked in at ' : 'clocked out at ') + timeStr + ' on ' + dateStr + '.'
   });
 }
 
@@ -7139,6 +7172,7 @@ function spSubmitRequest() {
     document.getElementById('spReqDays').value = '';
     document.getElementById('spReqNote').value = '';
     spNotifyHolidayRequest({
+      subject: 'Holiday request from ' + spSessionName,
       staff_name: spSessionName,
       date_range: spFmtDateRange(start, end),
       days: days,
@@ -7275,6 +7309,8 @@ function spShiftReportMonth(delta) {
   spRenderClockReport();
 }
 
+var spLastClockReportRows = [];
+
 function spRenderClockReport() {
   var el = document.getElementById('spClockReport');
   if (!el) return;
@@ -7282,13 +7318,93 @@ function spRenderClockReport() {
   document.getElementById('spReportTitle').textContent = spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
   spRpc('sp_clock_report', { p_year: y, p_month: m + 1 }).then(function(res) {
     var rows = res.ok && Array.isArray(res.data) ? res.data : [];
-    if (!rows.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No clock activity this month.</div>'; return; }
-    var body = rows.map(function(r) {
+    spLastClockReportRows = rows;
+    var weeklyEl = document.getElementById('spWeeklyHours');
+    if (!rows.length) {
+      el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No clock activity this month.</div>';
+      if (weeklyEl) weeklyEl.innerHTML = '';
+      return;
+    }
+    var body = rows.map(function(r, i) {
       var dateStr = new Date(r.work_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td></tr>';
+      var ot = r.overtime_claimed || 0;
+      var otCell = ot > 0
+        ? ot + '<br><input type="number" step="0.25" min="0" style="width:56px;" id="spOtInput' + i + '" value="' + (r.overtime_approved || 0) + '"> <button class="sp-btn-approve" style="padding:2px 8px;font-size:11px;" onclick="spSaveOvertime(' + i + ')">Save</button>'
+        : '—';
+      return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td><td>' + otCell + '</td></tr>';
     }).join('');
-    el.innerHTML = '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th></tr>' + body + '</table>';
+    el.innerHTML = '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Overtime (claimed / approve)</th></tr>' + body + '</table>';
+    if (weeklyEl) {
+      var weekly = spComputeWeeklyHours(rows);
+      weeklyEl.innerHTML = '<h3 style="margin:14px 0 8px;">Hours per week</h3><table class="sp-dash-table"><tr><th>Name</th><th>Week starting</th><th>Hours</th></tr>'
+        + weekly.map(function(w) {
+            var wDateStr = new Date(w.weekStart + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            return '<tr><td>' + spEsc(w.name) + '</td><td>' + wDateStr + '</td><td>' + Math.round(w.hours * 100) / 100 + '</td></tr>';
+          }).join('')
+        + '</table>';
+    }
   });
+}
+
+// Monday-anchored week, grouped per employee — same rows the daily table
+// uses, just summed differently (no separate RPC needed).
+// Formats via local Y/M/D rather than toISOString(), which converts to UTC
+// first — during BST (UTC+1) that rolls local midnight back a day, so a
+// Monday would misreport as the preceding Sunday.
+function spLocalDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function spComputeWeeklyHours(rows) {
+  var map = {};
+  rows.forEach(function(r) {
+    if (r.hours == null) return;
+    var d = new Date(r.work_date + 'T00:00:00');
+    var day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    var weekStart = spLocalDateStr(d);
+    var key = r.name + '|' + weekStart;
+    if (!map[key]) map[key] = { name: r.name, weekStart: weekStart, hours: 0 };
+    map[key].hours += r.hours;
+  });
+  return Object.keys(map).map(function(k) { return map[k]; }).sort(function(a, b) {
+    return a.name === b.name ? (a.weekStart < b.weekStart ? -1 : 1) : (a.name < b.name ? -1 : 1);
+  });
+}
+
+function spSaveOvertime(i) {
+  var r = spLastClockReportRows[i];
+  if (!r) return;
+  var input = document.getElementById('spOtInput' + i);
+  var hrs = parseFloat(input.value);
+  if (isNaN(hrs) || hrs < 0) { spToast('Enter a valid number of hours.'); return; }
+  spRpc('sp_manager_set_overtime', { p_staff_name: r.name, p_work_date: r.work_date, p_hours_approved: hrs }).then(function(res) {
+    if (!res.ok) { spToast((res.data && res.data.message) || 'Could not save overtime.'); return; }
+    spToast('Overtime approved.');
+    spRenderClockReport();
+  });
+}
+
+function spExportClockReport() {
+  var rows = spLastClockReportRows;
+  if (!rows.length) { spToast('Nothing to export for this month.'); return; }
+  var daily = rows.map(function(r) {
+    return {
+      Name: r.name,
+      Date: r.work_date,
+      'Clock In': r.clock_in ? r.clock_in.slice(0, 5) : '',
+      'Clock Out': r.clock_out ? r.clock_out.slice(0, 5) : '',
+      Hours: r.hours != null ? r.hours : '',
+      'Overtime Claimed': r.overtime_claimed || 0,
+      'Overtime Approved': r.overtime_approved || 0
+    };
+  });
+  var weekly = spComputeWeeklyHours(rows).map(function(w) {
+    return { Name: w.name, 'Week Starting': w.weekStart, Hours: Math.round(w.hours * 100) / 100 };
+  });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(daily), 'Daily');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(weekly), 'Weekly Hours');
+  XLSX.writeFile(wb, 'Clock Report - ' + spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + '.xlsx');
 }
 
 function spMapLink(lat, lng) {

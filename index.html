@@ -30,7 +30,7 @@
     <div style="margin-top:10px;font-size:12px;">
       <a href="#" onclick="spOpen('spPortalLogin');return false;" style="color:rgba(126,200,32,0.85);text-decoration:none;font-weight:600;cursor:pointer;">&#128336; Staff Portal &mdash; clock in / my leave</a>
     </div>
-    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.9.30</div>
+    <div style="margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-size:12px;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">v1.9.31</div>
   </div>
 </div>
 
@@ -241,7 +241,9 @@
       <div class="sp-card"><h3>Recent clock activity</h3><div id="spClockActivity"></div></div>
       <div class="sp-card">
         <div class="sp-cal-head"><button onclick="spShiftReportMonth(-1)">&lsaquo;</button><div class="sp-cal-title" id="spReportTitle">Monthly Clock Report</div><button onclick="spShiftReportMonth(1)">&rsaquo;</button></div>
+        <button class="sp-btn sp-btn-primary" style="margin-bottom:10px;" onclick="spExportClockReport()">Export to Excel</button>
         <div style="overflow-x:auto;" id="spClockReport"></div>
+        <div style="overflow-x:auto;" id="spWeeklyHours"></div>
       </div>
       <div class="sp-card"><h3>Team summary</h3><div style="overflow-x:auto;" id="spTeamSummary"></div></div>
       <div class="sp-card"><h3>Pending requests</h3><div id="spMgrPending"></div></div>
@@ -282,7 +284,7 @@
   <div style="position:relative;z-index:1;">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite" style="height:40px;width:auto;background:white;padding:5px 10px;border-radius:3px;"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.30</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.31</span></div>
     <div class="dash-header-actions">
       <button id="logoutBtn" onclick="logoutToTeamLogin()" style="display:none;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">&#128274; Log Out</button>
     </div>
@@ -330,7 +332,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.30</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.31</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -2912,7 +2914,7 @@
 </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="js/app.js?v=1.9.30"></script>
+  <script src="js/app.js?v=1.9.31"></script>
 </body>
 </html>
 
