@@ -5261,59 +5261,80 @@ function _msbEl(html) {
 }
 function _msbFmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB') : '—'; }
 
-// Bold/underline toolbar for a comment-style textarea. Wraps the selected
-// text in **bold** / __underline__ markers (typed inline, not a rich-text
-// editor) — toggles off if the selection is already wrapped. _msbRichText
-// below turns those markers into pdfmake text runs when the PDF is built.
-function _msbFormatToolbar(textarea, onChange) {
+// True WYSIWYG bold/underline for a comment-style field: a contenteditable
+// box (not a <textarea> — plain text can't show partial bold/underline) with
+// a B/U toolbar that runs the browser's own bold/underline commands. Text
+// visibly turns bold/underlined the moment you click, same as Word. Storage
+// is the box's innerHTML; _msbHtmlToRuns below walks that HTML into pdfmake
+// text runs when the PDF is built.
+if (!document.getElementById('msbRichBoxStyle')) {
+  var _msbRichBoxStyleEl = document.createElement('style');
+  _msbRichBoxStyleEl.id = 'msbRichBoxStyle';
+  _msbRichBoxStyleEl.textContent = '.msb-rich-box:empty:before{content:attr(data-placeholder);color:#999;}';
+  document.head.appendChild(_msbRichBoxStyleEl);
+}
+function _msbCreateRichBox(initialHtml, onChange, placeholder) {
+  var box = document.createElement('div');
+  box.className = 'msb-rich-box';
+  box.contentEditable = 'true';
+  box.setAttribute('data-placeholder', placeholder || '');
+  box.style.cssText = 'min-height:80px;border:1px solid var(--border);border-radius:4px;padding:8px 10px;font-size:13px;font-family:inherit;line-height:1.5;outline:none;';
+  box.innerHTML = initialHtml || '';
+  box.oninput = function() { onChange(box.innerHTML); };
+  return box;
+}
+function _msbFormatToolbar(editable) {
   var bar = document.createElement('div');
   bar.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;';
-  function toggleMarker(marker) {
-    var start = textarea.selectionStart, end = textarea.selectionEnd;
-    var val = textarea.value;
-    var selected = val.slice(start, end);
-    var before = val.slice(0, start), after = val.slice(end);
-    var wrapped = selected.length >= marker.length * 2 && selected.slice(0, marker.length) === marker && selected.slice(-marker.length) === marker;
-    var inner = wrapped ? selected.slice(marker.length, selected.length - marker.length) : selected;
-    var newText = wrapped ? inner : marker + inner + marker;
-    textarea.value = before + newText + after;
-    textarea.focus();
-    // Select the full replacement (markers included when re-wrapped) so a
-    // second click on the same spot detects it as wrapped and un-wraps it —
-    // selecting just the inner text here would hide the markers from the
-    // next click's wrapped-check, silently double-wrapping instead of toggling.
-    textarea.setSelectionRange(start, start + newText.length);
-    onChange();
-  }
-  function makeBtn(label, marker, title, extraStyle) {
+  function makeBtn(label, command, title, extraStyle) {
     var b = document.createElement('button');
     b.type = 'button';
     b.textContent = label;
     b.title = title;
     b.style.cssText = 'border:1px solid var(--border);background:#fff;border-radius:3px;padding:2px 10px;font-size:12px;cursor:pointer;' + extraStyle;
-    b.onclick = function() { toggleMarker(marker); };
+    // mousedown (not click) + preventDefault stops the button from stealing
+    // focus first — a plain click blurs `editable`, collapsing its text
+    // selection before execCommand would have anything left to act on.
+    b.onmousedown = function(e) { e.preventDefault(); };
+    b.onclick = function() { editable.focus(); document.execCommand(command, false, null); editable.oninput(); };
     return b;
   }
-  bar.appendChild(makeBtn('B', '**', 'Bold selected text', 'font-weight:700;'));
-  bar.appendChild(makeBtn('U', '__', 'Underline selected text', 'text-decoration:underline;'));
+  bar.appendChild(makeBtn('B', 'bold', 'Bold selected text', 'font-weight:700;'));
+  bar.appendChild(makeBtn('U', 'underline', 'Underline selected text', 'text-decoration:underline;'));
   return bar;
 }
 
-// Turns **bold** / __underline__ markers into a pdfmake text-run array.
-// Returns the plain string unchanged when there's no markup, so callers can
-// keep using the usual `_msbRichText(x) || '—'` fallback pattern.
-function _msbRichText(str) {
-  str = str || '';
-  if (!/\*\*.+?\*\*|__.+?__/.test(str)) return str;
-  var runs = [], regex = /\*\*(.+?)\*\*|__(.+?)__/g, lastIndex = 0, m;
-  while ((m = regex.exec(str))) {
-    if (m.index > lastIndex) runs.push({ text: str.slice(lastIndex, m.index) });
-    if (m[1] !== undefined) runs.push({ text: m[1], bold: true });
-    else runs.push({ text: m[2], decoration: 'underline' });
-    lastIndex = regex.lastIndex;
+// Walks a rich box's saved HTML into a pdfmake text-run array, preserving
+// bold (<b>/<strong>) and underline (<u>) and turning line breaks (<br>, or
+// the <div>-per-line Chrome produces on Enter) into '\n' — this app already
+// relies on pdfmake rendering literal '\n' as a line break elsewhere (see
+// MSB_CONTRACTOR_LINES.join('\n') above). Returns '' for empty/whitespace-only
+// content so callers' `_msbHtmlToRuns(x) || '—'` fallback still works.
+// Shared with the "no comments/images" fallback check below — a
+// contenteditable box can be left holding a stray <br> (or just whitespace)
+// after all visible text is deleted, which a plain !html check would treat
+// as non-empty.
+function _msbHtmlIsEmpty(html) { return !html || !/\S/.test(html.replace(/<[^>]*>/g, '')); }
+function _msbHtmlToRuns(html) {
+  if (_msbHtmlIsEmpty(html)) return '';
+  var container = document.createElement('div');
+  container.innerHTML = html;
+  var runs = [];
+  function walk(node, bold, underline) {
+    if (node.nodeType === 3) {
+      if (node.nodeValue) runs.push({ text: node.nodeValue, bold: bold || undefined, decoration: underline ? 'underline' : undefined });
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    var tag = node.tagName.toLowerCase();
+    if (tag === 'br') { runs.push({ text: '\n' }); return; }
+    var nextBold = bold || tag === 'b' || tag === 'strong';
+    var nextUnderline = underline || tag === 'u';
+    Array.prototype.forEach.call(node.childNodes, function(c) { walk(c, nextBold, nextUnderline); });
+    if ((tag === 'div' || tag === 'p') && node.nextSibling) runs.push({ text: '\n' });
   }
-  if (lastIndex < str.length) runs.push({ text: str.slice(lastIndex) });
-  return runs;
+  Array.prototype.forEach.call(container.childNodes, function(c) { walk(c, false, false); });
+  return runs.length ? runs : '';
 }
 
 function resetMSBState() {
@@ -5802,12 +5823,9 @@ function renderMSBJobStep(container) {
   card.appendChild(_msbEl('<div class="msb-field" style="margin-top:6px;"><label>Contractor</label><div style="font-size:13px;color:var(--mid);padding:8px 0;">' + MSB_CONTRACTOR_LINES.join('<br>') + ' <span style="color:#999;">(fixed — always shown in the PDF)</span></div></div>'));
 
   var scopeWrap = _msbEl('<div class="msb-field" style="margin-top:6px;"><label>Scope of Work (project scope)</label></div>');
-  var ta = document.createElement('textarea');
-  ta.placeholder = 'Brief description of the works to be carried out...';
-  ta.value = msbState.job.scope || '';
-  ta.oninput = function() { msbState.job.scope = ta.value; };
-  scopeWrap.appendChild(_msbFormatToolbar(ta, ta.oninput));
-  scopeWrap.appendChild(ta);
+  var scopeBox = _msbCreateRichBox(msbState.job.scope, function(html) { msbState.job.scope = html; }, 'Brief description of the works to be carried out...');
+  scopeWrap.appendChild(_msbFormatToolbar(scopeBox));
+  scopeWrap.appendChild(scopeBox);
   card.appendChild(scopeWrap);
 
   var methWrap = _msbEl('<div class="msb-field" style="margin-top:14px;"></div>');
@@ -5999,12 +6017,9 @@ function renderMSBPlantStep(container) {
   renderMSBSiteControlImages(imgWrap);
 
   var commentsWrap = _msbEl('<div class="msb-field" style="margin-top:12px;"><label>Comments</label></div>');
-  var commentsTa = document.createElement('textarea');
-  commentsTa.placeholder = 'No comments required';
-  commentsTa.value = msbState.job.siteControlComments || '';
-  commentsTa.oninput = function() { msbState.job.siteControlComments = commentsTa.value; };
-  commentsWrap.appendChild(_msbFormatToolbar(commentsTa, commentsTa.oninput));
-  commentsWrap.appendChild(commentsTa);
+  var commentsBox = _msbCreateRichBox(msbState.job.siteControlComments, function(html) { msbState.job.siteControlComments = html; }, 'No comments required');
+  commentsWrap.appendChild(_msbFormatToolbar(commentsBox));
+  commentsWrap.appendChild(commentsBox);
   ctrlCard.appendChild(commentsWrap);
 
   wrap.appendChild(ctrlCard);
@@ -6573,11 +6588,11 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
   var siteControlImagesMap = {};
   siteControlImages.forEach(function(img, i) { siteControlImagesMap['siteCtrlImg' + i] = img; });
   var siteControlsContent = [
-    { text: _msbRichText(msbState.job.siteControlComments) || 'No comments required', style: 'body', margin: [0,0,0,siteControlImages.length ? 8 : 0] }
+    { text: _msbHtmlToRuns(msbState.job.siteControlComments) || 'No comments required', style: 'body', margin: [0,0,0,siteControlImages.length ? 8 : 0] }
   ];
   if (siteControlImages.length) {
     siteControlsContent.push({ columns: siteControlImages.map(function(img, i) { return { image: 'siteCtrlImg' + i, width: 120 }; }), columnGap: 10 });
-  } else if (!msbState.job.siteControlComments) {
+  } else if (_msbHtmlIsEmpty(msbState.job.siteControlComments)) {
     siteControlsContent = [{ text: 'No site specific control images or comments added for this job.', style: 'body' }];
   }
 
@@ -6639,7 +6654,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
     _msbBoxed('Job Details', { table: { widths: ['30%','70%'], body: [
       ['Title of Document', msbState.job.titleOfDocument || '—'],
       ['Client', msbState.job.client || '—'],
-      ['Scope of Work', { text: _msbRichText(msbState.job.scope) || '—' }],
+      ['Scope of Work', { text: _msbHtmlToRuns(msbState.job.scope) || '—' }],
       ['Contractor', MSB_CONTRACTOR_LINES.join('\n')],
       ['Site Address', msbState.job.siteAddress || '—'],
       ['What3Words for Access', msbState.job.what3words || '—'],
