@@ -89,6 +89,61 @@ function _msbEl(html) {
 }
 function _msbFmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB') : '—'; }
 
+// Bold/underline toolbar for a comment-style textarea. Wraps the selected
+// text in **bold** / __underline__ markers (typed inline, not a rich-text
+// editor) — toggles off if the selection is already wrapped. _msbRichText
+// below turns those markers into pdfmake text runs when the PDF is built.
+function _msbFormatToolbar(textarea, onChange) {
+  var bar = document.createElement('div');
+  bar.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;';
+  function toggleMarker(marker) {
+    var start = textarea.selectionStart, end = textarea.selectionEnd;
+    var val = textarea.value;
+    var selected = val.slice(start, end);
+    var before = val.slice(0, start), after = val.slice(end);
+    var wrapped = selected.length >= marker.length * 2 && selected.slice(0, marker.length) === marker && selected.slice(-marker.length) === marker;
+    var inner = wrapped ? selected.slice(marker.length, selected.length - marker.length) : selected;
+    var newText = wrapped ? inner : marker + inner + marker;
+    textarea.value = before + newText + after;
+    textarea.focus();
+    // Select the full replacement (markers included when re-wrapped) so a
+    // second click on the same spot detects it as wrapped and un-wraps it —
+    // selecting just the inner text here would hide the markers from the
+    // next click's wrapped-check, silently double-wrapping instead of toggling.
+    textarea.setSelectionRange(start, start + newText.length);
+    onChange();
+  }
+  function makeBtn(label, marker, title, extraStyle) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.title = title;
+    b.style.cssText = 'border:1px solid var(--border);background:#fff;border-radius:3px;padding:2px 10px;font-size:12px;cursor:pointer;' + extraStyle;
+    b.onclick = function() { toggleMarker(marker); };
+    return b;
+  }
+  bar.appendChild(makeBtn('B', '**', 'Bold selected text', 'font-weight:700;'));
+  bar.appendChild(makeBtn('U', '__', 'Underline selected text', 'text-decoration:underline;'));
+  return bar;
+}
+
+// Turns **bold** / __underline__ markers into a pdfmake text-run array.
+// Returns the plain string unchanged when there's no markup, so callers can
+// keep using the usual `_msbRichText(x) || '—'` fallback pattern.
+function _msbRichText(str) {
+  str = str || '';
+  if (!/\*\*.+?\*\*|__.+?__/.test(str)) return str;
+  var runs = [], regex = /\*\*(.+?)\*\*|__(.+?)__/g, lastIndex = 0, m;
+  while ((m = regex.exec(str))) {
+    if (m.index > lastIndex) runs.push({ text: str.slice(lastIndex, m.index) });
+    if (m[1] !== undefined) runs.push({ text: m[1], bold: true });
+    else runs.push({ text: m[2], decoration: 'underline' });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < str.length) runs.push({ text: str.slice(lastIndex) });
+  return runs;
+}
+
 function resetMSBState() {
   msbState = {
     job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', methodologyPoints: MSB_METHODOLOGY_FIXED_POINTS.slice(), signOffDate:'', permitsIssuedBy: { highways:'', breakingGround:'' }, clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
@@ -579,25 +634,12 @@ function renderMSBJobStep(container) {
   ta.placeholder = 'Brief description of the works to be carried out...';
   ta.value = msbState.job.scope || '';
   ta.oninput = function() { msbState.job.scope = ta.value; };
+  scopeWrap.appendChild(_msbFormatToolbar(ta, ta.oninput));
   scopeWrap.appendChild(ta);
   card.appendChild(scopeWrap);
 
   var methWrap = _msbEl('<div class="msb-field" style="margin-top:14px;"></div>');
   methWrap.appendChild(_msbEl('<label>Work Methodology (Section 2.0)</label>'));
-  var methPrompt = document.createElement('div');
-  methPrompt.style.cssText = 'font-size:12px;color:var(--mid);margin:2px 0 6px;line-height:1.4;';
-  methPrompt.textContent = "This section should be a simple overview of what is going to happen on the site, it does not need to be war and peace, but it is important to include a sequence of work that you would like your staff to follow. Please don't think you have to use long sentences and complex wording, think about who is going to read it i.e. the client who needs to understand what it is that you are going to do and your staff who need to know what order to do things in.";
-  methWrap.appendChild(methPrompt);
-  var methTa = document.createElement('textarea');
-  methTa.placeholder = 'Overview and sequence of work...';
-  methTa.value = msbState.job.methodology || '';
-  methTa.oninput = function() { msbState.job.methodology = methTa.value; };
-  methWrap.appendChild(methTa);
-  var methNote = document.createElement('div');
-  methNote.style.cssText = 'font-size:11px;color:#999;margin-top:6px;';
-  methNote.textContent = 'The points below are always included underneath what you write above — keep, edit, or remove any of them.';
-  methWrap.appendChild(methNote);
-  card.appendChild(methWrap);
 
   var methPointsWrap = _msbEl('<div class="msb-field" style="margin-top:14px;"><label>Standard Sequence of Work</label></div>');
   var methPointsList = _msbEl('<div id="msbMethPointsList" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>');
@@ -789,6 +831,7 @@ function renderMSBPlantStep(container) {
   commentsTa.placeholder = 'No comments required';
   commentsTa.value = msbState.job.siteControlComments || '';
   commentsTa.oninput = function() { msbState.job.siteControlComments = commentsTa.value; };
+  commentsWrap.appendChild(_msbFormatToolbar(commentsTa, commentsTa.oninput));
   commentsWrap.appendChild(commentsTa);
   ctrlCard.appendChild(commentsWrap);
 
@@ -1358,7 +1401,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
   var siteControlImagesMap = {};
   siteControlImages.forEach(function(img, i) { siteControlImagesMap['siteCtrlImg' + i] = img; });
   var siteControlsContent = [
-    { text: msbState.job.siteControlComments || 'No comments required', style: 'body', margin: [0,0,0,siteControlImages.length ? 8 : 0] }
+    { text: _msbRichText(msbState.job.siteControlComments) || 'No comments required', style: 'body', margin: [0,0,0,siteControlImages.length ? 8 : 0] }
   ];
   if (siteControlImages.length) {
     siteControlsContent.push({ columns: siteControlImages.map(function(img, i) { return { image: 'siteCtrlImg' + i, width: 120 }; }), columnGap: 10 });
@@ -1424,7 +1467,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
     _msbBoxed('Job Details', { table: { widths: ['30%','70%'], body: [
       ['Title of Document', msbState.job.titleOfDocument || '—'],
       ['Client', msbState.job.client || '—'],
-      ['Scope of Work', msbState.job.scope || '—'],
+      ['Scope of Work', { text: _msbRichText(msbState.job.scope) || '—' }],
       ['Contractor', MSB_CONTRACTOR_LINES.join('\n')],
       ['Site Address', msbState.job.siteAddress || '—'],
       ['What3Words for Access', msbState.job.what3words || '—'],
@@ -1440,9 +1483,9 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('1.0  Introduction', { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body' }),
 
-    _msbBoxed('2.0  Work Methodology', [
-      { text: msbState.job.methodology || 'No work methodology overview entered.', style: 'body' }
-    ].concat(methodologyPointsList.length ? [{ ul: methodologyPointsList, style: 'body', margin: [0,10,0,0] }] : [])),
+    _msbBoxed('2.0  Work Methodology', methodologyPointsList.length
+      ? [{ ul: methodologyPointsList, style: 'body' }]
+      : [{ text: 'No standard sequence of work points selected for this job.', style: 'body' }]),
 
     _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], body: teamTableBody }, layout: 'lightHorizontalLines' }),
 
