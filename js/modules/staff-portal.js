@@ -583,7 +583,7 @@ function spRenderClockReport() {
       var dateStr = new Date(r.work_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
       var ot = r.overtime_claimed || 0;
       var otCell = ot > 0
-        ? ot + '<br><input type="number" step="0.25" min="0" style="width:56px;" id="spOtInput' + i + '" value="' + (r.overtime_approved || 0) + '"> <button class="sp-btn-approve" style="padding:2px 8px;font-size:11px;" onclick="spSaveOvertime(' + i + ')">Save</button>'
+        ? spFmtHoursMins(ot) + '<br><input type="number" step="0.25" min="0" style="width:56px;" id="spOtInput' + i + '" value="' + (r.overtime_approved || 0) + '"> <button class="sp-btn-approve" style="padding:2px 8px;font-size:11px;" onclick="spSaveOvertime(' + i + ')">Save</button>'
         : '—';
       return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td><td>' + otCell + '</td></tr>';
     }).join('');
@@ -607,6 +607,17 @@ function spRenderClockReport() {
 // Monday would misreport as the preceding Sunday.
 function spLocalDateStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Decimal hours -> "1h 15m" / "37m" / "2h", for the on-screen overtime
+// column. The Excel export keeps plain decimal hours instead, since that's
+// more useful for spreadsheet formulas.
+function spFmtHoursMins(h) {
+  var totalMin = Math.round(h * 60);
+  var hh = Math.floor(totalMin / 60), mm = totalMin % 60;
+  if (hh === 0) return mm + 'm';
+  if (mm === 0) return hh + 'h';
+  return hh + 'h ' + mm + 'm';
 }
 function spComputeWeeklyHours(rows) {
   var map = {};
