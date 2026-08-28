@@ -7153,9 +7153,19 @@ function spCheckLateEarlyAlert(action, when) {
   if (!isLateIn && !isEarlyOut) return;
   var timeStr = String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0');
   var dateStr = when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  // The EmailJS template's Subject field is stuck on its original hardcoded
+  // "Holiday request from {{staff_name}}" — repeated attempts to change it
+  // to {{subject}} haven't actually saved on EmailJS's end (a dashboard
+  // quirk, confirmed by sending a diagnostic email and checking what showed
+  // up). Rather than depend on that edit ever landing, staff_name itself
+  // carries the alert text so the subject line is still useful even
+  // wrapped in that fixed prefix — still sending `subject` too, so this
+  // starts working the normal way for free if the template ever does get
+  // fixed on their end.
+  var alertLabel = (isLateIn ? 'LATE CLOCK-IN' : 'EARLY CLOCK-OUT') + ' — ' + spSessionName + ' at ' + timeStr;
   spNotifyClockAlert({
     subject: (isLateIn ? 'Late clock-in — ' : 'Early clock-out — ') + spSessionName,
-    staff_name: spSessionName,
+    staff_name: alertLabel,
     name: spSessionName,
     time: timeStr,
     date_range: dateStr,
