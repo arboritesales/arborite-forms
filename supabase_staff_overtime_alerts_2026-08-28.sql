@@ -53,7 +53,11 @@ as $$
   left join staff_overtime_approvals soa
     on soa.staff_id = s.id and soa.work_date = (sce.ts at time zone 'Europe/London')::date
   where date_trunc('month', sce.ts at time zone 'Europe/London') = make_date(p_year, p_month, 1)
-  group by s.id, s.name, work_date
+  -- Grouping by the bare alias "work_date" is ambiguous now that
+  -- staff_overtime_approvals (soa) also has a real work_date column —
+  -- Postgres resolves the name to soa.work_date instead of this expression,
+  -- so it has to be spelled out explicitly here.
+  group by s.id, s.name, (sce.ts at time zone 'Europe/London')::date
   order by s.name asc, work_date asc;
 $$;
 grant execute on function sp_clock_report(int, int) to authenticated;
