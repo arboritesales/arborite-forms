@@ -559,6 +559,13 @@ function clrSig(id) {
     if (p.ctx && p.sized) p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height);
     p.dataUrl = null;
   }
+  // Clearing is a completed action, just like signing — save it right away.
+  // Without this, Clear only wipes the canvas on screen; nothing persists
+  // it, so the old signature is still on the server and comes straight
+  // back the next time this job is loaded.
+  var canvas = (p && p.canvas) || document.getElementById(id);
+  var panel = canvas && canvas.closest && canvas.closest('.panel');
+  if (panel) scheduleAutoSave(panel.id, true);
 }
 function initAllSigs() {
   var cs = document.querySelectorAll('.sig-wrap canvas');
