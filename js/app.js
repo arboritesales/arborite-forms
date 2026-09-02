@@ -660,6 +660,11 @@ function clearAllForms() {
   for (var id in pads) {
     var pd = pads[id];
     if (pd && pd.ctx && pd.sized) pd.ctx.clearRect(0, 0, pd.canvas.width, pd.canvas.height);
+    // Also drop the cached dataUrl — collectFormData() trusts pads[id].dataUrl
+    // ahead of the live canvas, so leaving a previous job's signature cached
+    // here causes it to get saved onto whichever job is opened next even
+    // though the canvas itself was cleared.
+    if (pd) pd.dataUrl = null;
   }
   CUSTOM_STAFF = []; CUSTOM_MACHINES = [];
   // Wipe any custom names added during the previous job's session — without
@@ -1813,9 +1818,15 @@ function restoreSig(id, dataUrl) {
       .then(function(blob) {
         var reader = new FileReader();
         reader.onload = function(e) {
+          // This fetch can take seconds on a poor connection — if the user
+          // has since hit Clear or drawn a new signature, pads[id].dataUrl
+          // will no longer match what we started fetching. Applying it
+          // anyway would silently undo the Clear (or overwrite their new
+          // signature) once this stale fetch finally resolves.
+          if (!pads[id] || pads[id].dataUrl !== dataUrl) return;
           var b64 = e.target.result;
           sigCache[id] = b64;
-          if (pads[id]) pads[id].dataUrl = dataUrl; // keep storage ref, not base64
+          pads[id].dataUrl = dataUrl; // keep storage ref, not base64
           drawSigFromCache_b64(id, b64);
         };
         reader.readAsDataURL(blob);
