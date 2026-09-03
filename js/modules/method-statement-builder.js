@@ -1530,25 +1530,25 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ? [{ ul: methodologyPointsList, style: 'body' }]
       : [{ text: 'No standard sequence of work points selected for this job.', style: 'body' }]),
 
-    _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], headerRows: 1, body: teamTableBody }, layout: 'lightHorizontalLines' }),
+    _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: teamTableBody }, layout: 'lightHorizontalLines' }),
 
-    _msbBoxed('4.0  Competency', { table: { widths: ['35%','65%'], headerRows: 1, body: compTableBody }, layout: 'lightHorizontalLines' }),
+    _msbBoxed('4.0  Competency', { table: { widths: ['35%','65%'], headerRows: 1, dontBreakRows: true, body: compTableBody }, layout: 'lightHorizontalLines' }),
 
-    _msbBoxed('5.0  Plant and Machinery', { table: { widths: ['*','*','*'], headerRows: 1, body: equipTableBody }, layout: 'lightHorizontalLines' }),
+    _msbBoxed('5.0  Plant and Machinery', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: equipTableBody }, layout: 'lightHorizontalLines' }),
 
     _msbBoxed('5.5  Site Specific Controls', siteControlsContent),
 
     _msbBoxed('6.0  Exclusion Zones', selectedEZ.length
-      ? { table: { widths: ['40%','60%'], headerRows: 1, body: ezTableBody }, layout: 'lightHorizontalLines' }
+      ? { table: { widths: ['40%','60%'], headerRows: 1, dontBreakRows: true, body: ezTableBody }, layout: 'lightHorizontalLines' }
       : { text: 'No exclusion zones selected for this job.', style: 'body' }),
 
-    _msbBoxed('7.0  Permits Required', { table: { widths: ['40%','60%'], headerRows: 1, body: [
+    _msbBoxed('7.0  Permits Required', { table: { widths: ['40%','60%'], headerRows: 1, dontBreakRows: true, body: [
       [{text:'Permit Type',bold:true},{text:'Issued By',bold:true}],
       ['Highways Traffic Management', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.highways) || '—'],
       ['Breaking Ground', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.breakingGround) || '—']
     ]}, layout: 'lightHorizontalLines' }),
 
-    _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, headerRows: 1, body: ppeTableBody }, layout: 'lightHorizontalLines' }),
+    _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, headerRows: 1, dontBreakRows: true, body: ppeTableBody }, layout: 'lightHorizontalLines' }),
 
     _msbBoxed('9.0  Standard Operating Procedures', [
       { text: 'Only the SOPs relevant to this job are listed below.', style: 'noteText', margin: [0,0,0,8] }
