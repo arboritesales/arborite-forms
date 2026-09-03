@@ -1454,9 +1454,13 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
   var ppeTableBody, ppeWidths;
   if (msbState.team.length && derivedPPE.length) {
+    // A narrow column forces pdfmake to break a name mid-word (e.g. "Challi"/
+    // "nor") once no word boundary fits — dropping the font size for a large
+    // team gives each name room to wrap at whole words instead.
+    var ppeHeaderFontSize = msbState.team.length > 6 ? 7 : 10.5;
     var headerRow = [{text:'PPE Item',bold:true}].concat(msbState.team.map(function(t) {
       var p = _msbFindStaff(t.staffId);
-      return { text: p ? p.name : t.staffId, bold: true };
+      return { text: p ? p.name : t.staffId, bold: true, fontSize: ppeHeaderFontSize };
     }));
     ppeTableBody = [headerRow];
     derivedPPE.forEach(function(p) {
@@ -1466,7 +1470,14 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       });
       ppeTableBody.push(row);
     });
-    ppeWidths = ['*'].concat(msbState.team.map(function() { return 'auto'; }));
+    // 'auto' columns size to their unwrapped content width and don't shrink
+    // to fit — with a large team that pushes the table wider than the page,
+    // clipping the right-hand columns off the edge instead of wrapping them.
+    // Percentage widths always sum to exactly the printable page width, so
+    // pdfmake wraps the cell text instead of overflowing the page.
+    var ppeLabelPct = msbState.team.length > 6 ? 14 : 20;
+    var ppeStaffPct = ((100 - ppeLabelPct) / msbState.team.length).toFixed(2) + '%';
+    ppeWidths = [ppeLabelPct + '%'].concat(msbState.team.map(function() { return ppeStaffPct; }));
   } else {
     ppeTableBody = [[{text:'PPE Item',bold:true}]];
     derivedPPE.forEach(function(p) { ppeTableBody.push([p.name]); });
