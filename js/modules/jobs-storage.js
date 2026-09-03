@@ -93,6 +93,11 @@ function clearAllForms() {
   for (var id in pads) {
     var pd = pads[id];
     if (pd && pd.ctx && pd.sized) pd.ctx.clearRect(0, 0, pd.canvas.width, pd.canvas.height);
+    // Also drop the cached dataUrl — collectFormData() trusts pads[id].dataUrl
+    // ahead of the live canvas, so leaving a previous job's signature cached
+    // here causes it to get saved onto whichever job is opened next even
+    // though the canvas itself was cleared.
+    if (pd) pd.dataUrl = null;
   }
   CUSTOM_STAFF = []; CUSTOM_MACHINES = [];
   // Wipe any custom names added during the previous job's session — without

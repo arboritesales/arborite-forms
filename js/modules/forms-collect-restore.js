@@ -182,9 +182,15 @@ function restoreSig(id, dataUrl) {
       .then(function(blob) {
         var reader = new FileReader();
         reader.onload = function(e) {
+          // This fetch can take seconds on a poor connection — if the user
+          // has since hit Clear or drawn a new signature, pads[id].dataUrl
+          // will no longer match what we started fetching. Applying it
+          // anyway would silently undo the Clear (or overwrite their new
+          // signature) once this stale fetch finally resolves.
+          if (!pads[id] || pads[id].dataUrl !== dataUrl) return;
           var b64 = e.target.result;
           sigCache[id] = b64;
-          if (pads[id]) pads[id].dataUrl = dataUrl; // keep storage ref, not base64
+          pads[id].dataUrl = dataUrl; // keep storage ref, not base64
           drawSigFromCache_b64(id, b64);
         };
         reader.readAsDataURL(blob);
