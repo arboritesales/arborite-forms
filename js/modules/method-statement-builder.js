@@ -1369,7 +1369,26 @@ function _loadPdfMake(cb) {
 function _msbBulletBlock(lines, marginBottom) {
   return { text: lines.map(function(l) { return '-  ' + l; }).join('\n'), style: 'body', margin: [0,0,0,marginBottom||0], lineHeight: 1.35 };
 }
-// Wraps a section's heading + content in a bordered box with a shaded title bar
+// Full enclosing grid (outer border + every row/column divider) so a table's
+// lines always meet its own edge instead of floating lines with open sides.
+function _msbGridLayout() {
+  return {
+    hLineWidth: function() { return 1; },
+    vLineWidth: function() { return 1; },
+    hLineColor: function() { return '#c4d0bd'; },
+    vLineColor: function() { return '#c4d0bd'; },
+    paddingLeft: function(i) { return i === 0 ? 4 : 8; },
+    paddingRight: function(i, node) { return (i === node.table.widths.length - 1) ? 4 : 8; },
+    paddingTop: function() { return 4; },
+    paddingBottom: function() { return 4; }
+  };
+}
+// Wraps a section's heading + content in a bordered box with a shaded title bar.
+// Unbreakable by default so a section either fits whole on the current page or
+// moves whole to the next one, instead of splitting its title/header onto one
+// page and its content onto another — pass {unbreakable:false} for sections
+// that are legitimately long (fixed policy text, SOP lists) and may need to
+// span pages.
 function _msbBoxed(titleText, body, opts) {
   var bodyStack = Array.isArray(body) ? body : [body];
   var box = {
@@ -1390,13 +1409,14 @@ function _msbBoxed(titleText, body, opts) {
     margin: [0,0,0,16]
   };
   if (opts && opts.pageBreak) box.pageBreak = opts.pageBreak;
+  if (!opts || opts.unbreakable !== false) box.unbreakable = true;
   return box;
 }
 function _msbFixedSectionBox(sectionNumber) {
   var sec = null;
   for (var i = 0; i < msbRefLib.fixedSections.length; i++) if (msbRefLib.fixedSections[i].n === sectionNumber) sec = msbRefLib.fixedSections[i];
   if (!sec) return null;
-  return _msbBoxed(sec.n + '  ' + sec.title, _msbBulletBlock(sec.paragraphs, 0));
+  return _msbBoxed(sec.n + '  ' + sec.title, _msbBulletBlock(sec.paragraphs, 0), { unbreakable: false });
 }
 
 function _msbFmtDateDotted(d) {
@@ -1514,7 +1534,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ['Name of On-Site Client Contact', msbState.job.clientContactName || '—'],
       ['Contact Telephone', msbState.job.clientContactPhone || '—'],
       ['Contact Email', msbState.job.clientContactEmail || '—']
-    ]}, layout: 'lightHorizontalLines' }),
+    ]}, layout: _msbGridLayout() }),
 
     _msbSignOffTable('Prepared by', 'Sarah Haste', 'Office Coordinator', msbState.job.signOffDate),
     _msbSignOffTable('Reviewed by', 'Joel Cripps', 'Contracts Manager', msbState.job.signOffDate),
@@ -1524,45 +1544,31 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('2.0  Work Methodology', methodologyPointsList.length
       ? [{ ul: methodologyPointsList, style: 'body' }]
-      : [{ text: 'No standard sequence of work points selected for this job.', style: 'body' }]),
+      : [{ text: 'No standard sequence of work points selected for this job.', style: 'body' }], { unbreakable: false }),
 
-    _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: teamTableBody }, layout: 'lightHorizontalLines' }),
+    _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: teamTableBody }, layout: _msbGridLayout() }),
 
-    _msbBoxed('4.0  Competency', { table: { widths: ['35%','65%'], headerRows: 1, dontBreakRows: true, body: compTableBody }, layout: {
-      hLineWidth: function(i, node) { return (i === 0 || i === node.table.headerRows || i === node.table.body.length) ? 1 : 0.5; },
-      vLineWidth: function(i) { return i === 1 ? 1 : 0; },
-      hLineColor: function() { return '#c4d0bd'; },
-      vLineColor: function() { return '#c4d0bd'; },
-      paddingLeft: function(i) { return i === 0 ? 0 : 8; },
-      paddingRight: function(i, node) { return (i === node.table.widths.length - 1) ? 0 : 8; }
-    } }),
+    _msbBoxed('4.0  Competency', { table: { widths: ['35%','65%'], headerRows: 1, dontBreakRows: true, body: compTableBody }, layout: _msbGridLayout() }),
 
-    _msbBoxed('5.0  Plant and Machinery', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: equipTableBody }, layout: 'lightHorizontalLines' }),
+    _msbBoxed('5.0  Plant and Machinery', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: equipTableBody }, layout: _msbGridLayout() }),
 
     _msbBoxed('5.5  Site Specific Controls', siteControlsContent),
 
     _msbBoxed('6.0  Exclusion Zones', selectedEZ.length
-      ? { table: { widths: ['40%','60%'], headerRows: 1, dontBreakRows: true, body: ezTableBody }, layout: 'lightHorizontalLines' }
+      ? { table: { widths: ['40%','60%'], headerRows: 1, dontBreakRows: true, body: ezTableBody }, layout: _msbGridLayout() }
       : { text: 'No exclusion zones selected for this job.', style: 'body' }),
 
     _msbBoxed('7.0  Permits Required', { table: { widths: ['40%','60%'], headerRows: 1, dontBreakRows: true, body: [
       [{text:'Permit Type',bold:true},{text:'Issued By',bold:true}],
       ['Highways Traffic Management', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.highways) || '—'],
       ['Breaking Ground', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.breakingGround) || '—']
-    ]}, layout: 'lightHorizontalLines' }),
+    ]}, layout: _msbGridLayout() }),
 
-    _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, headerRows: 1, dontBreakRows: true, body: ppeTableBody }, layout: {
-      hLineWidth: function(i, node) { return (i === 0 || i === node.table.headerRows || i === node.table.body.length) ? 1 : 0.5; },
-      vLineWidth: function(i) { return i === 1 ? 1 : 0; },
-      hLineColor: function() { return '#c4d0bd'; },
-      vLineColor: function() { return '#c4d0bd'; },
-      paddingLeft: function(i) { return i === 0 ? 0 : 8; },
-      paddingRight: function(i, node) { return (i === node.table.widths.length - 1) ? 0 : 8; }
-    } }),
+    _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, headerRows: 1, dontBreakRows: true, body: ppeTableBody }, layout: _msbGridLayout() }),
 
     _msbBoxed('9.0  Standard Operating Procedures', [
       { text: 'Only the SOPs relevant to this job are listed below.', style: 'noteText', margin: [0,0,0,8] }
-    ].concat(sopContent), { pageBreak: 'before' })
+    ].concat(sopContent), { pageBreak: 'before', unbreakable: false })
   ];
 
   ['11.0','12.0','13.0','14.0'].forEach(function(n) { var b = _msbFixedSectionBox(n); if (b) content.push(b); });
@@ -1572,14 +1578,14 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ['Nearest A&E Hospital', msbState.emergency.hospitalName || 'Not entered'],
       ['Address', msbState.emergency.hospitalAddress || '—'],
       ['Phone', msbState.emergency.hospitalPhone || '—']
-    ]}, layout: 'lightHorizontalLines', margin: [0,0,0,12] },
+    ]}, layout: _msbGridLayout(), margin: [0,0,0,12] },
     { text: 'Route Map', style: 'sopHeading', margin: [0,0,0,6] }
   ].concat(routeMapContent).concat([
     { table: { widths: ['40%','60%'], body: [
       ['Distance from site to Urgent Care Service', msbState.emergency.routeDistance || '—'],
       ['Time from site to Urgent Care', msbState.emergency.routeTime || '—']
-    ]}, layout: 'lightHorizontalLines' }
-  ])));
+    ]}, layout: _msbGridLayout() }
+  ]), { unbreakable: false }));
 
   ['16.0','17.0','18.0','19.0','20.0','21.0','22.0','23.0','24.0','25.0','26.0','27.0','28.0','29.0'].forEach(function(n) {
     var b = _msbFixedSectionBox(n); if (b) content.push(b);
