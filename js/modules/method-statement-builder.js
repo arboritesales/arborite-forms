@@ -1524,31 +1524,32 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
     { text: 'Method Statement', style: 'title' },
     { text: msbState.job.client || 'Client not specified', style: 'subtitle', margin: [0,0,0,20] },
 
-    // Scope of Work is user-typed and can run to several paragraphs, so it's
-    // kept OUT of this table and given its own section below — that keeps
-    // everything here fixed-length and small enough to safely bundle with
-    // the sign-off blocks into one unbreakable unit (see below) without
-    // risking the "unbreakable content taller than a page gets silently
-    // dropped" pdfmake bug that ruled out doing the same with Scope of Work.
-    { unbreakable: true, stack: [
-      _msbBoxed('Job Details', { table: { widths: ['30%','70%'], body: [
-        ['Title of Document', msbState.job.titleOfDocument || '—'],
-        ['Client', msbState.job.client || '—'],
-        ['Contractor', MSB_CONTRACTOR_LINES.join('\n')],
-        ['Site Address', msbState.job.siteAddress || '—'],
-        ['What3Words for Access', msbState.job.what3words || '—'],
-        ['Number of Working Days on Site', msbState.job.workingDays || '—'],
-        ['Name of On-Site Client Contact', msbState.job.clientContactName || '—'],
-        ['Contact Telephone', msbState.job.clientContactPhone || '—'],
-        ['Contact Email', msbState.job.clientContactEmail || '—']
-      ]}, layout: _msbGridLayout() }),
+    _msbBoxed('Job Details', { table: { widths: ['30%','70%'], body: [
+      ['Title of Document', msbState.job.titleOfDocument || '—'],
+      ['Client', msbState.job.client || '—'],
+      [{ colSpan: 2, stack: [
+        { text: 'Scope of Work', bold: true, margin: [0,0,0,4] },
+        { text: _msbHtmlToRuns(msbState.job.scope) || '—' }
+      ] }, {}],
+      ['Contractor', MSB_CONTRACTOR_LINES.join('\n')],
+      ['Site Address', msbState.job.siteAddress || '—'],
+      ['What3Words for Access', msbState.job.what3words || '—'],
+      ['Number of Working Days on Site', msbState.job.workingDays || '—'],
+      ['Name of On-Site Client Contact', msbState.job.clientContactName || '—'],
+      ['Contact Telephone', msbState.job.clientContactPhone || '—'],
+      ['Contact Email', msbState.job.clientContactEmail || '—']
+    ]}, layout: _msbGridLayout() }),
 
+    // Bundled unbreakable so the three sign-off blocks land together instead
+    // of splitting from each other on a page break — safe to force here
+    // (unlike Job Details, which holds an unbounded user-typed Scope of
+    // Work) because this content is fixed and small: 3 tables x 2 short
+    // rows, which can never grow past a fraction of a page.
+    { unbreakable: true, stack: [
       _msbSignOffTable('Prepared by', 'Sarah Haste', 'Office Coordinator', msbState.job.signOffDate),
       _msbSignOffTable('Reviewed by', 'Joel Cripps', 'Contracts Manager', msbState.job.signOffDate),
       _msbSignOffTable('Approved by', 'Jon Challinor', 'Managing Director', msbState.job.signOffDate)
     ] },
-
-    _msbBoxed('Scope of Work', { text: _msbHtmlToRuns(msbState.job.scope) || '—', style: 'body' }),
 
     _msbBoxed('1.0  Introduction', { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body' }),
 
