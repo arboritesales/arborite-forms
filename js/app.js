@@ -6559,16 +6559,20 @@ function _loadPdfMake(cb) {
 function _msbBulletBlock(lines, marginBottom) {
   return { text: lines.map(function(l) { return '-  ' + l; }).join('\n'), style: 'body', margin: [0,0,0,marginBottom||0], lineHeight: 1.35 };
 }
-// Full enclosing grid (outer border + every row/column divider) so a table's
-// lines always meet its own edge instead of floating lines with open sides.
+// Full-width horizontal lines on every row plus internal column dividers.
+// Deliberately does NOT draw the table's own outer left/right edge — the
+// surrounding _msbBoxed already draws a border around the whole section, and
+// a second outer edge ~10pt inside it caused a "table on top of a table"
+// glitch where a section broke across a page (the two borders' continuations
+// didn't line up). One border per section, drawn by the box, is enough.
 function _msbGridLayout() {
   return {
     hLineWidth: function() { return 1; },
-    vLineWidth: function() { return 1; },
+    vLineWidth: function(i, node) { return (i === 0 || i === node.table.widths.length) ? 0 : 1; },
     hLineColor: function() { return '#c4d0bd'; },
     vLineColor: function() { return '#c4d0bd'; },
-    paddingLeft: function(i) { return i === 0 ? 4 : 8; },
-    paddingRight: function(i, node) { return (i === node.table.widths.length - 1) ? 4 : 8; },
+    paddingLeft: function(i) { return i === 0 ? 0 : 8; },
+    paddingRight: function(i, node) { return (i === node.table.widths.length - 1) ? 0 : 8; },
     paddingTop: function() { return 4; },
     paddingBottom: function() { return 4; }
   };
@@ -6726,9 +6730,16 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ['Contact Email', msbState.job.clientContactEmail || '—']
     ]}, layout: _msbGridLayout() }),
 
-    _msbSignOffTable('Prepared by', 'Sarah Haste', 'Office Coordinator', msbState.job.signOffDate),
-    _msbSignOffTable('Reviewed by', 'Joel Cripps', 'Contracts Manager', msbState.job.signOffDate),
-    _msbSignOffTable('Approved by', 'Jon Challinor', 'Managing Director', msbState.job.signOffDate),
+    // Bundled unbreakable so the three sign-off blocks land together instead
+    // of splitting from each other on a page break — safe to force here
+    // (unlike Job Details, which holds an unbounded user-typed Scope of
+    // Work) because this content is fixed and small: 3 tables x 2 short
+    // rows, which can never grow past a fraction of a page.
+    { unbreakable: true, stack: [
+      _msbSignOffTable('Prepared by', 'Sarah Haste', 'Office Coordinator', msbState.job.signOffDate),
+      _msbSignOffTable('Reviewed by', 'Joel Cripps', 'Contracts Manager', msbState.job.signOffDate),
+      _msbSignOffTable('Approved by', 'Jon Challinor', 'Managing Director', msbState.job.signOffDate)
+    ] },
 
     _msbBoxed('1.0  Introduction', { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body' }),
 
