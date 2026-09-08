@@ -6574,11 +6574,12 @@ function _msbGridLayout() {
   };
 }
 // Wraps a section's heading + content in a bordered box with a shaded title bar.
-// Unbreakable by default so a section either fits whole on the current page or
-// moves whole to the next one, instead of splitting its title/header onto one
-// page and its content onto another — pass {unbreakable:false} for sections
-// that are legitimately long (fixed policy text, SOP lists) and may need to
-// span pages.
+// NOTE: deliberately NOT unbreakable — pdfmake silently truncates or drops an
+// unbreakable block's content when it's taller than a single page (verified:
+// a staff competency list of ~17 rows made the whole 4.0 Competency section
+// vanish, or cut off mid-list, since real per-person competency lists can
+// easily exceed a page). Losing safety-critical content is worse than the
+// cosmetic issue of a header being orphaned from its table on a page break.
 function _msbBoxed(titleText, body, opts) {
   var bodyStack = Array.isArray(body) ? body : [body];
   var box = {
@@ -6599,14 +6600,13 @@ function _msbBoxed(titleText, body, opts) {
     margin: [0,0,0,16]
   };
   if (opts && opts.pageBreak) box.pageBreak = opts.pageBreak;
-  if (!opts || opts.unbreakable !== false) box.unbreakable = true;
   return box;
 }
 function _msbFixedSectionBox(sectionNumber) {
   var sec = null;
   for (var i = 0; i < msbRefLib.fixedSections.length; i++) if (msbRefLib.fixedSections[i].n === sectionNumber) sec = msbRefLib.fixedSections[i];
   if (!sec) return null;
-  return _msbBoxed(sec.n + '  ' + sec.title, _msbBulletBlock(sec.paragraphs, 0), { unbreakable: false });
+  return _msbBoxed(sec.n + '  ' + sec.title, _msbBulletBlock(sec.paragraphs, 0));
 }
 
 function _msbFmtDateDotted(d) {
@@ -6734,7 +6734,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('2.0  Work Methodology', methodologyPointsList.length
       ? [{ ul: methodologyPointsList, style: 'body' }]
-      : [{ text: 'No standard sequence of work points selected for this job.', style: 'body' }], { unbreakable: false }),
+      : [{ text: 'No standard sequence of work points selected for this job.', style: 'body' }]),
 
     _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: teamTableBody }, layout: _msbGridLayout() }),
 
@@ -6758,7 +6758,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('9.0  Standard Operating Procedures', [
       { text: 'Only the SOPs relevant to this job are listed below.', style: 'noteText', margin: [0,0,0,8] }
-    ].concat(sopContent), { pageBreak: 'before', unbreakable: false })
+    ].concat(sopContent), { pageBreak: 'before' })
   ];
 
   ['11.0','12.0','13.0','14.0'].forEach(function(n) { var b = _msbFixedSectionBox(n); if (b) content.push(b); });
@@ -6775,7 +6775,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ['Distance from site to Urgent Care Service', msbState.emergency.routeDistance || '—'],
       ['Time from site to Urgent Care', msbState.emergency.routeTime || '—']
     ]}, layout: _msbGridLayout() }
-  ]), { unbreakable: false }));
+  ])));
 
   ['16.0','17.0','18.0','19.0','20.0','21.0','22.0','23.0','24.0','25.0','26.0','27.0','28.0','29.0'].forEach(function(n) {
     var b = _msbFixedSectionBox(n); if (b) content.push(b);
