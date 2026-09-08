@@ -1535,9 +1535,22 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ['Site Address', msbState.job.siteAddress || '—'],
       ['What3Words for Access', msbState.job.what3words || '—'],
       ['Number of Working Days on Site', msbState.job.workingDays || '—'],
-      ['Name of On-Site Client Contact', msbState.job.clientContactName || '—'],
-      ['Contact Telephone', msbState.job.clientContactPhone || '—'],
-      ['Contact Email', msbState.job.clientContactEmail || '—']
+      // Grouped into one row — three short, related contact fields that
+      // must never split apart onto separate pages from each other.
+      [{ colSpan: 2, columns: [
+        { width: '33%', stack: [
+          { text: 'Name of On-Site Client Contact', bold: true, margin: [0,0,0,4] },
+          { text: msbState.job.clientContactName || '—' }
+        ] },
+        { width: '33%', stack: [
+          { text: 'Contact Telephone', bold: true, margin: [0,0,0,4] },
+          { text: msbState.job.clientContactPhone || '—' }
+        ] },
+        { width: '34%', stack: [
+          { text: 'Contact Email', bold: true, margin: [0,0,0,4] },
+          { text: msbState.job.clientContactEmail || '—' }
+        ] }
+      ] }, {}]
     ]}, layout: _msbGridLayout() }),
 
     // Bundled unbreakable so the three sign-off blocks land together instead
@@ -1617,7 +1630,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
     },
     content: content,
     styles: {
-      title: { fontSize:24, bold:true, color:'#20342c' },
+      title: { fontSize:18, bold:true, color:'#20342c' },
       subtitle: { fontSize:13, color:'#5a625c' },
       boxTitle: { fontSize:12.5, bold:true, color:'#20342c', margin:[10,7,10,7] },
       sopHeading: { fontSize:12.5, bold:true, color:'#5b4636' },
