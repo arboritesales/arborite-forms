@@ -1369,20 +1369,21 @@ function _loadPdfMake(cb) {
 function _msbBulletBlock(lines, marginBottom) {
   return { text: lines.map(function(l) { return '-  ' + l; }).join('\n'), style: 'body', margin: [0,0,0,marginBottom||0], lineHeight: 1.35 };
 }
-// Full-width horizontal lines on every row plus internal column dividers.
-// Deliberately does NOT draw the table's own outer left/right edge — the
-// surrounding _msbBoxed already draws a border around the whole section, and
-// a second outer edge ~10pt inside it caused a "table on top of a table"
-// glitch where a section broke across a page (the two borders' continuations
-// didn't line up). One border per section, drawn by the box, is enough.
+// Full grid: outer border plus every row/column divider. The table sits
+// flush against _msbBoxed's own border (see the zero left/right content
+// margin below) so this outer edge lands exactly on top of the box's border
+// instead of ~10pt inside it — that gap was the earlier "lines don't reach
+// the edge" complaint, and drawing a second, offset outer edge to fix it
+// caused a "table on top of a table" glitch when a section broke across a
+// page. Coinciding exactly avoids both.
 function _msbGridLayout() {
   return {
     hLineWidth: function() { return 1; },
-    vLineWidth: function(i, node) { return (i === 0 || i === node.table.widths.length) ? 0 : 1; },
+    vLineWidth: function() { return 1; },
     hLineColor: function() { return '#c4d0bd'; },
     vLineColor: function() { return '#c4d0bd'; },
-    paddingLeft: function(i) { return i === 0 ? 0 : 8; },
-    paddingRight: function(i, node) { return (i === node.table.widths.length - 1) ? 0 : 8; },
+    paddingLeft: function() { return 8; },
+    paddingRight: function() { return 8; },
     paddingTop: function() { return 4; },
     paddingBottom: function() { return 4; }
   };
@@ -1396,10 +1397,15 @@ function _msbGridLayout() {
 // cosmetic issue of a header being orphaned from its table on a page break.
 function _msbBoxed(titleText, body, opts) {
   var bodyStack = Array.isArray(body) ? body : [body];
+  // A lone table gets no left/right margin — its own layout supplies the
+  // matching border and cell padding (see _msbGridLayout above). Anything
+  // else (plain text, bullet lists, mixed content) keeps the normal padding.
+  var isSingleTable = !Array.isArray(body) && body && body.table;
+  var contentMargin = isSingleTable ? [0,10,0,10] : [10,10,10,10];
   var box = {
     table: { widths: ['*'], body: [
       [{ text: titleText, style: 'boxTitle', fillColor: '#e3ead9' }],
-      [{ stack: bodyStack, margin: [10,10,10,10] }]
+      [{ stack: bodyStack, margin: contentMargin }]
     ]},
     layout: {
       hLineWidth: function() { return 1; },
