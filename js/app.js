@@ -6642,37 +6642,19 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
     siteControlsContent = [{ text: 'No site specific control images or comments added for this job.', style: 'body' }];
   }
 
-  var ppeTableBody, ppeWidths;
-  if (msbState.team.length && derivedPPE.length) {
-    // A narrow column forces pdfmake to break a name mid-word (e.g. "Challi"/
-    // "nor") once no word boundary fits — dropping the font size for a large
-    // team gives each name room to wrap at whole words instead.
-    var ppeHeaderFontSize = msbState.team.length > 6 ? 7 : 10.5;
-    var headerRow = [{text:'PPE Item',bold:true}].concat(msbState.team.map(function(t) {
-      var p = _msbFindStaff(t.staffId);
-      return { text: p ? p.name : t.staffId, bold: true, fontSize: ppeHeaderFontSize };
-    }));
-    ppeTableBody = [headerRow];
-    derivedPPE.forEach(function(p) {
-      var row = [p.name];
-      msbState.team.forEach(function(t) {
-        row.push(msbState.ppeAssignments[t.staffId] && msbState.ppeAssignments[t.staffId][p.id] ? 'Yes' : '');
-      });
-      ppeTableBody.push(row);
-    });
-    // 'auto' columns size to their unwrapped content width and don't shrink
-    // to fit — with a large team that pushes the table wider than the page,
-    // clipping the right-hand columns off the edge instead of wrapping them.
-    // Percentage widths always sum to exactly the printable page width, so
-    // pdfmake wraps the cell text instead of overflowing the page.
-    var ppeLabelPct = msbState.team.length > 6 ? 14 : 20;
-    var ppeStaffPct = ((100 - ppeLabelPct) / msbState.team.length).toFixed(2) + '%';
-    ppeWidths = [ppeLabelPct + '%'].concat(msbState.team.map(function() { return ppeStaffPct; }));
-  } else {
-    ppeTableBody = [[{text:'PPE Item',bold:true}]];
-    derivedPPE.forEach(function(p) { ppeTableBody.push([p.name]); });
-    ppeWidths = ['*'];
+  // One row per required PPE item with a checkbox mark — a per-operator grid
+  // of names got squished/overflowed with a large team, so PPE needed for the
+  // job is shown as a simple checklist instead of a per-person breakdown.
+  function _msbPPECheckbox() {
+    return { alignment: 'center', margin: [0,3,0,0], canvas: [
+      { type: 'rect', x: 0, y: 0, w: 11, h: 11, r: 2, lineWidth: 1, lineColor: '#20342c' },
+      { type: 'line', x1: 2.3, y1: 6, x2: 4.6, y2: 8.7, lineWidth: 1.3, lineColor: '#20342c' },
+      { type: 'line', x1: 4.6, y1: 8.7, x2: 9, y2: 1.8, lineWidth: 1.3, lineColor: '#20342c' }
+    ] };
   }
+  var ppeTableBody = [[{text:'PPE Item',bold:true},{text:'Required',bold:true}]];
+  derivedPPE.forEach(function(p) { ppeTableBody.push([{ text: p.name, margin: [0,3,0,3] }, _msbPPECheckbox()]); });
+  var ppeWidths = ['80%','20%'];
 
   var ezTableBody = [[{text:'Activity',bold:true},{text:'Minimum Safe Working Distance',bold:true}]];
   selectedEZ.forEach(function(z) { ezTableBody.push([z.activity, z.distance]); });
@@ -6711,7 +6693,10 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
     _msbBoxed('Job Details', { table: { widths: ['30%','70%'], body: [
       ['Title of Document', msbState.job.titleOfDocument || '—'],
       ['Client', msbState.job.client || '—'],
-      ['Scope of Work', { text: _msbHtmlToRuns(msbState.job.scope) || '—' }],
+      [{ colSpan: 2, stack: [
+        { text: 'Scope of Work', bold: true, margin: [0,0,0,4] },
+        { text: _msbHtmlToRuns(msbState.job.scope) || '—' }
+      ] }, {}],
       ['Contractor', MSB_CONTRACTOR_LINES.join('\n')],
       ['Site Address', msbState.job.siteAddress || '—'],
       ['What3Words for Access', msbState.job.what3words || '—'],
@@ -6733,7 +6718,14 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: teamTableBody }, layout: 'lightHorizontalLines' }),
 
-    _msbBoxed('4.0  Competency', { table: { widths: ['35%','65%'], headerRows: 1, dontBreakRows: true, body: compTableBody }, layout: 'lightHorizontalLines' }),
+    _msbBoxed('4.0  Competency', { table: { widths: ['35%','65%'], headerRows: 1, dontBreakRows: true, body: compTableBody }, layout: {
+      hLineWidth: function(i, node) { return (i === 0 || i === node.table.headerRows || i === node.table.body.length) ? 1 : 0.5; },
+      vLineWidth: function(i) { return i === 1 ? 1 : 0; },
+      hLineColor: function() { return '#c4d0bd'; },
+      vLineColor: function() { return '#c4d0bd'; },
+      paddingLeft: function(i) { return i === 0 ? 0 : 8; },
+      paddingRight: function(i, node) { return (i === node.table.widths.length - 1) ? 0 : 8; }
+    } }),
 
     _msbBoxed('5.0  Plant and Machinery', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: equipTableBody }, layout: 'lightHorizontalLines' }),
 
@@ -6749,7 +6741,14 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ['Breaking Ground', (msbState.job.permitsIssuedBy && msbState.job.permitsIssuedBy.breakingGround) || '—']
     ]}, layout: 'lightHorizontalLines' }),
 
-    _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, headerRows: 1, dontBreakRows: true, body: ppeTableBody }, layout: 'lightHorizontalLines' }),
+    _msbBoxed('8.0  PPE Requirements', { table: { widths: ppeWidths, headerRows: 1, dontBreakRows: true, body: ppeTableBody }, layout: {
+      hLineWidth: function(i, node) { return (i === 0 || i === node.table.headerRows || i === node.table.body.length) ? 1 : 0.5; },
+      vLineWidth: function(i) { return i === 1 ? 1 : 0; },
+      hLineColor: function() { return '#c4d0bd'; },
+      vLineColor: function() { return '#c4d0bd'; },
+      paddingLeft: function(i) { return i === 0 ? 0 : 8; },
+      paddingRight: function(i, node) { return (i === node.table.widths.length - 1) ? 0 : 8; }
+    } }),
 
     _msbBoxed('9.0  Standard Operating Procedures', [
       { text: 'Only the SOPs relevant to this job are listed below.', style: 'noteText', margin: [0,0,0,8] }
