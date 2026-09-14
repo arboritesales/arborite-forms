@@ -5,19 +5,7 @@
 // ./build-app-js.sh from the project root to regenerate this file.
 // ============================================================================
 
-// ── AUTO-UPDATE: when a new service worker takes over, reload to get latest files ──
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.ready.then(function(reg) {
-    reg.update();
-    // Check for updates every time the user switches back to the tab
-    document.addEventListener('visibilitychange', function() {
-      if (document.visibilityState === 'visible') reg.update();
-    });
-  });
-  navigator.serviceWorker.addEventListener('controllerchange', function() {
-    window.location.reload();
-  });
-}
+// (Service worker registration/auto-update lives in audits.js — keep it in one place)
 
 // ── iOS COMPATIBILITY ──
 if (typeof console === 'undefined') {
@@ -4797,6 +4785,101 @@ function renderWeeklyReport(entries, tables) {
 // ── TOOLBOX TALKS ──
 var currentTBTRef = null;
 
+// ── TBT photos (reuses the defect-photos upload/storage helpers from
+// defects-shared.js — same bucket, its own 'tbt/<ref>/' path prefix) ──
+var TBT_PHOTOS_MAX = 6;
+var tbtPhotos = [];
+
+function resetTBTPhotos() {
+  tbtPhotos = [];
+  var input = document.getElementById('tbt_photoInput');
+  if (input) input.value = '';
+  renderTBTPhotos();
+}
+
+function renderTBTPhotos() {
+  var wrap = document.getElementById('tbt_photos');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (var i = 0; i < tbtPhotos.length; i++) {
+    (function(idx) {
+      var p = tbtPhotos[idx];
+      var tile = document.createElement('div');
+      tile.style.cssText = 'width:72px;height:72px;border-radius:6px;border:2px solid var(--green);cursor:pointer;overflow:hidden;background:#fafafa;position:relative;';
+      if (p.previewUrl) {
+        var img = document.createElement('img');
+        img.src = p.previewUrl;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        img.onclick = function() { openDefectLightbox(img); };
+        tile.appendChild(img);
+      } else {
+        tile.textContent = '…';
+        tile.style.display = 'flex'; tile.style.alignItems = 'center'; tile.style.justifyContent = 'center'; tile.style.color = '#999';
+      }
+      if (p.status === 'error') tile.style.borderColor = '#c62828';
+      var del = document.createElement('div');
+      del.className = 'tbt-no-print';
+      del.textContent = '×';
+      del.style.cssText = 'position:absolute;top:0;right:0;width:20px;height:20px;background:rgba(0,0,0,.6);color:white;display:flex;align-items:center;justify-content:center;font-size:14px;border-bottom-left-radius:6px;cursor:pointer;';
+      del.onclick = function(e) {
+        e.stopPropagation();
+        if (!confirm('Remove this photo?')) return;
+        tbtPhotos.splice(idx, 1);
+        renderTBTPhotos();
+      };
+      tile.appendChild(del);
+      wrap.appendChild(tile);
+    })(i);
+  }
+  if (tbtPhotos.length < TBT_PHOTOS_MAX) {
+    var addTile = document.createElement('div');
+    addTile.className = 'tbt-no-print';
+    addTile.style.cssText = 'width:72px;height:72px;border-radius:6px;border:2px dashed var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:24px;color:#999;background:#fafafa;';
+    addTile.textContent = '+';
+    addTile.onclick = function() {
+      var inp = document.getElementById('tbt_photoInput');
+      if (inp) inp.click();
+    };
+    wrap.appendChild(addTile);
+  }
+}
+
+function tbtPhotoUpload(input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (tbtPhotos.length >= TBT_PHOTOS_MAX) return;
+  var slot = {previewUrl: '', storagePath: '', status: 'processing'};
+  tbtPhotos.push(slot);
+  renderTBTPhotos();
+  _resizeImageToJpeg(file, 1600, 0.8, function(dataUrl) {
+    if (!dataUrl) { slot.status = 'error'; renderTBTPhotos(); return; }
+    slot.previewUrl = dataUrl;
+    renderTBTPhotos();
+    var path = 'tbt/' + (currentTBTRef || 'unfiled') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.jpg';
+    _uploadDefectPhoto(path, dataUrl, 'image/jpeg').then(function(r) {
+      if (r.ok) { slot.storagePath = path; slot.status = 'saved'; }
+      else { slot.status = 'error'; }
+      renderTBTPhotos();
+    }).catch(function(){ slot.status = 'error'; renderTBTPhotos(); });
+  });
+}
+
+function _tbtPhotoAuthUrl(path) {
+  return SUPA_URL + '/storage/v1/object/authenticated/' + DEFECT_BUCKET + '/' + path;
+}
+
+function loadTBTPhotos(paths) {
+  tbtPhotos = (paths || []).map(function(p) { return {previewUrl: '', storagePath: p, status: 'saved'}; });
+  renderTBTPhotos();
+  tbtPhotos.forEach(function(p) {
+    fetch(_tbtPhotoAuthUrl(p.storagePath), {headers: {apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken()}})
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
+      .then(function(blob) { p.previewUrl = URL.createObjectURL(blob); renderTBTPhotos(); })
+      .catch(function() {});
+  });
+}
+
 function openTBTView() {
   document.getElementById('tbtView').style.display = 'block';
   fetchTBTList();
@@ -4884,6 +4967,7 @@ function clearTBTFormFields() {
     var p = pads[id];
     if (p && p.ctx && p.canvas) { p.ctx.clearRect(0, 0, p.canvas.width, p.canvas.height); p.dataUrl = null; }
   }
+  resetTBTPhotos();
 }
 
 function loadTBT(ref) {
@@ -4909,6 +4993,7 @@ function loadTBT(ref) {
           }
         }, 80);
       }
+      loadTBTPhotos(data.tbt_photos);
     })
     .catch(function() { showTBTForm(); });
 }
@@ -4921,6 +5006,7 @@ function saveTBT() {
   var data = { signatures: {} };
   var inputs = panel.querySelectorAll('input[type="text"][id], input[type="date"][id], textarea[id]');
   for (var i = 0; i < inputs.length; i++) data[inputs[i].id] = inputs[i].value;
+  data.tbt_photos = tbtPhotos.filter(function(p) { return p.storagePath; }).map(function(p) { return p.storagePath; });
   for (var s = 1; s <= 20; s++) {
     var id = 'tbt_sig_' + s;
     var p = pads[id];
@@ -5161,7 +5247,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('./service-worker.js').then(function(reg) {
       // Force check for a new version every time the app loads
-      reg.update();
+      reg.update().catch(function() {});
       // Watch for a new SW being installed
       reg.addEventListener('updatefound', function() {
         var newWorker = reg.installing;
@@ -5183,7 +5269,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') {
       navigator.serviceWorker.getRegistration().then(function(reg) {
-        if (reg) reg.update();
+        if (reg) reg.update().catch(function() {});
       });
     }
   });

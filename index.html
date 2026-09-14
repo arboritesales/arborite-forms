@@ -2433,6 +2433,15 @@
         <div class="field-row"><div class="fc" style="padding:0;"><textarea id="tbt_action_points" rows="5" style="width:100%;border:none;padding:10px 14px;font-size:12.5px;font-family:inherit;resize:vertical;outline:none;background:transparent;" placeholder="List any actions arising from this talk..."></textarea></div></div>
       </div>
 
+      <div class="sec-head">Photos</div>
+      <div class="field-grid">
+        <div class="field-row"><div class="fc" style="padding:14px;display:block;">
+          <div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:8px;">Photos from this talk — hazards discussed, site conditions, etc. (tap a photo to view full size)</div>
+          <div id="tbt_photos" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+          <input type="file" id="tbt_photoInput" accept="image/*" style="display:none;" onchange="tbtPhotoUpload(this)">
+        </div></div>
+      </div>
+
       <div class="sec-head">Employee Acknowledgements</div>
       <div style="border-bottom:1px solid var(--border);">
         <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid var(--green);background:var(--green-light);">

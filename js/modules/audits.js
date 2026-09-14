@@ -200,7 +200,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('./service-worker.js').then(function(reg) {
       // Force check for a new version every time the app loads
-      reg.update();
+      reg.update().catch(function() {});
       // Watch for a new SW being installed
       reg.addEventListener('updatefound', function() {
         var newWorker = reg.installing;
@@ -222,7 +222,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') {
       navigator.serviceWorker.getRegistration().then(function(reg) {
-        if (reg) reg.update();
+        if (reg) reg.update().catch(function() {});
       });
     }
   });

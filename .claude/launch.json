@@ -9,9 +9,69 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "C:\\Users\\Sales\\AppData\\Local\\Temp\\claude\\C--Users-Sales-OneDrive---Arborite-Tree-Services-Ltd-Desktop-App-details-arborite-app\\2e8ff85d-a2b5-42a7-a863-5c12dd2174e4\\scratchpad\\static-server.ps1"
+        "C:\\Users\\ARBORI~1\\AppData\\Local\\Temp\\claude\\C--Users-ArboriteSales-OneDrive---Arborite-Tree-Services-Ltd-Desktop-App-details-arborite-app\\59b7203f-4330-4a13-a239-44b5b3e70ed3\\scratchpad\\static-server.ps1"
       ],
       "port": 8787
+    },
+    {
+      "name": "static-local-993fab82",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\ARBORI~1\\AppData\\Local\\Temp\\claude\\C--Users-ArboriteSales-OneDrive---Arborite-Tree-Services-Ltd-Desktop-App-details-arborite-app\\993fab82-34d7-464f-a78e-e97b695eda03\\scratchpad\\static-server.ps1"
+      ],
+      "port": 8790
+    },
+    {
+      "name": "static-local-e1dfa446",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\ARBORI~1\\AppData\\Local\\Temp\\claude\\C--Users-ArboriteSales-OneDrive---Arborite-Tree-Services-Ltd-Desktop-App-details-arborite-app\\e1dfa446-ae69-4db1-958e-bbdaa75f9605\\scratchpad\\static-server.ps1"
+      ],
+      "port": 8791
+    },
+    {
+      "name": "static-local-17c8307c",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\ARBORI~1\\AppData\\Local\\Temp\\claude\\C--Users-ArboriteSales-OneDrive---Arborite-Tree-Services-Ltd-Desktop-App-details-arborite-app\\17c8307c-5d73-416e-865e-64412356dd39\\scratchpad\\static-server.ps1"
+      ],
+      "port": 8792
+    },
+    {
+      "name": "static-local-c6d698c8",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\ARBORI~1\\AppData\\Local\\Temp\\claude\\C--Users-ArboriteSales-OneDrive---Arborite-Tree-Services-Ltd-Desktop-App-details-arborite-app\\c6d698c8-5bb6-4213-836c-eaa7d2199c11\\scratchpad\\static-server.ps1"
+      ],
+      "port": 8793
+    },
+    {
+      "name": "static-local-9f546303",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\ARBORI~1\\AppData\\Local\\Temp\\claude\\C--Users-ArboriteSales-OneDrive---Arborite-Tree-Services-Ltd-Desktop-App-details-arborite-app\\9f546303-663c-4c33-ba42-beef5438bf07\\scratchpad\\static-server.ps1"
+      ],
+      "port": 8794
     }
   ]
 }

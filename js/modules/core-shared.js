@@ -5,19 +5,7 @@
 // ./build-app-js.sh from the project root to regenerate this file.
 // ============================================================================
 
-// ── AUTO-UPDATE: when a new service worker takes over, reload to get latest files ──
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.ready.then(function(reg) {
-    reg.update();
-    // Check for updates every time the user switches back to the tab
-    document.addEventListener('visibilitychange', function() {
-      if (document.visibilityState === 'visible') reg.update();
-    });
-  });
-  navigator.serviceWorker.addEventListener('controllerchange', function() {
-    window.location.reload();
-  });
-}
+// (Service worker registration/auto-update lives in audits.js — keep it in one place)
 
 // ── iOS COMPATIBILITY ──
 if (typeof console === 'undefined') {
