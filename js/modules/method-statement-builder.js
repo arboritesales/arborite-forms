@@ -75,11 +75,9 @@ function _getMSBOfflinePending() {
   try { return localStorage.getItem('msb_offline_pending'); } catch (e) { return null; }
 }
 window.addEventListener('online', function() {
-  var pending = _getMSBOfflinePending();
-  if (!pending || !currentMSBRef || currentMSBRef !== pending) return;
-  setTimeout(function() {
-    saveMSBRecord().then(function() { _clearMSBOfflinePending(); }).catch(function() {});
-  }, 800);
+  // _msbResyncPendingOnOpen() (defined below) handles this generically —
+  // no need for the pending ref to be the record currently open.
+  setTimeout(function() { _msbResyncPendingOnOpen(); }, 800);
 });
 
 function _msbEl(html) {
@@ -270,11 +268,13 @@ function openMSBView() {
   document.getElementById('msbView').style.display = 'block';
   ensureMSBRefLibrary().catch(function() {});
   showMSBList();
+  _msbResyncPendingOnOpen();
 }
 function closeMSBView() {
   document.getElementById('msbView').style.display = 'none';
 }
 function showMSBList() {
+  _msbCancelPendingAutoSave();
   document.getElementById('msbListPanel').style.display = 'block';
   document.getElementById('msbDeletedListPanel').style.display = 'none';
   document.getElementById('msbFormPanel').style.display = 'none';
@@ -392,6 +392,7 @@ function generateMSBRef() {
 }
 
 function newMSB() {
+  _msbCancelPendingAutoSave();
   showMSBForm();
   document.getElementById('msbStepNav').innerHTML = '';
   document.getElementById('msbStepContent').innerHTML = '<div class="msb-main"><div class="msb-note">Loading reference data…</div></div>';
@@ -407,6 +408,7 @@ function newMSB() {
 }
 
 function loadMSB(ref) {
+  _msbCancelPendingAutoSave();
   currentMSBRef = ref;
   showMSBForm();
   document.getElementById('msbRef').textContent = ref;
@@ -514,6 +516,17 @@ function scheduleMSBAutoSave() {
     saveMSBRecord().catch(function() {}); // silent — Save Draft/Generate PDF still surface real errors
   }, 2000);
 }
+// Cross-document contamination guard: loadMSB() sets currentMSBRef to the
+// NEW ref synchronously, then loads that record's data asynchronously — if a
+// pending auto-save timer from editing a DIFFERENT, previously-open record
+// fires in that gap, it would POST the old (still-loaded) msbState under the
+// new currentMSBRef, silently overwriting whatever's being opened. Must be
+// called before currentMSBRef changes, any time navigation could leave a
+// stale timer armed (opening a record, starting a new one, or leaving the
+// form entirely).
+function _msbCancelPendingAutoSave() {
+  if (_msbAutoSaveTimer) { clearTimeout(_msbAutoSaveTimer); _msbAutoSaveTimer = null; }
+}
 function attachMSBAutoSave() {
   var root = document.getElementById('msbStepContent');
   if (!root || root._autoSaveWired) return;
@@ -540,27 +553,67 @@ function saveMSBRecord() {
       return _msbDoSaveRecord();
     });
 }
-function _msbDoSaveRecord() {
-  // Strip transient in-flight upload state (_localPreview is a full base64 image —
-  // never let it reach the saved JSON, only the storagePath once uploaded).
-  var cleanImages = (msbState.job.siteControlImages || []).map(function(p) {
+// Strip transient in-flight upload state (_localPreview is a full base64 image —
+// never let it reach the saved JSON, only the storagePath once uploaded).
+// Shared by the normal save path and _msbResyncPendingOnOpen() below, so a
+// cached-offline snapshot gets the same treatment before it's pushed.
+function _msbCleanFormData(state) {
+  var cleanImages = (state.job.siteControlImages || []).map(function(p) {
     return { storagePath: p.storagePath || '', status: p.storagePath ? 'saved' : 'pending' };
   }).filter(function(p) { return p.storagePath; });
   var cleanJob = {};
-  for (var k in msbState.job) cleanJob[k] = msbState.job[k];
+  for (var k in state.job) cleanJob[k] = state.job[k];
   cleanJob.siteControlImages = cleanImages;
-  var rm = msbState.emergency.routeMap || {};
+  var rm = state.emergency.routeMap || {};
   var cleanEmergency = {};
-  for (var ek in msbState.emergency) cleanEmergency[ek] = msbState.emergency[ek];
+  for (var ek in state.emergency) cleanEmergency[ek] = state.emergency[ek];
   cleanEmergency.routeMap = { storagePath: rm.storagePath || '', status: rm.storagePath ? 'saved' : '' };
-  var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: {
-    job: cleanJob, team: msbState.team, equipment: msbState.equipment, selectedSOPs: msbState.selectedSOPs,
-    selectedExclusionZones: msbState.selectedExclusionZones, ppeAssignments: msbState.ppeAssignments,
-    emergency: cleanEmergency, status: msbState.status, sentAt: msbState.sentAt
-  }};
+  return {
+    job: cleanJob, team: state.team, equipment: state.equipment, selectedSOPs: state.selectedSOPs,
+    selectedExclusionZones: state.selectedExclusionZones, ppeAssignments: state.ppeAssignments,
+    emergency: cleanEmergency, status: state.status, sentAt: state.sentAt
+  };
+}
+function _msbDoSaveRecord() {
+  var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(msbState) };
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
     if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('Save failed (' + r.status + ')');
   });
+}
+
+// A save that couldn't reach the server (real offline, or the expired-login
+// 401 case — see supaFetch's reactive refresh) gets cached to localStorage
+// with a "your work is safe, it'll sync automatically" promise. That's only
+// true if the browser genuinely goes offline then online again — an
+// expired-login 401 never trips that, since the connection was up the whole
+// time, so the cache just sat there untouched. Actually push it the next
+// time the MSB tool is opened, on ANY device where that pending cache
+// exists, instead of relying solely on the online-event listener.
+function _msbResyncPendingOnOpen() {
+  var ref = _getMSBOfflinePending();
+  if (!ref) return;
+  var cached = _loadMSBLocalCache(ref);
+  if (!cached) { _clearMSBOfflinePending(); return; }
+  var job = cached.job || {};
+  var cachedLooksBlank = !job.titleOfDocument && !job.client && !job.siteAddress && !(cached.team || []).length;
+  var push = function() {
+    var payload = { quote_ref: ref, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(cached) };
+    return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
+      if (r.ok || r.status === 201 || r.status === 204) _clearMSBOfflinePending();
+    });
+  };
+  if (!cachedLooksBlank) { push().catch(function() {}); return; }
+  // Cached snapshot itself looks blank — apply the same guard saveMSBRecord()
+  // uses before pushing over whatever's already on the server.
+  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1')
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .then(function(rows) {
+      var serverJob = rows && rows[0] && rows[0].form_data && rows[0].form_data.job;
+      var serverHasRealContent = serverJob && (serverJob.titleOfDocument || serverJob.client || serverJob.siteAddress);
+      if (serverHasRealContent) return;
+      return push();
+    })
+    .catch(function() {}); // still unreachable — leave cached, try again next time the tool is opened
 }
 
 function saveMSBDraft() {

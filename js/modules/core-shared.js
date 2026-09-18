@@ -17,16 +17,54 @@ if (typeof console.assert !== 'function') { console.assert = function(){}; }
 var AUDIT_PASS = 'audit2024';
 var auditUnlocked = false;
 var _supaSession = null;
+var _supaSessionRefreshTimer = null;
 function _storeSession(data) {
   _supaSession = data;
+  _scheduleSupaSessionRefresh();
 }
 
 function _clearSession() {
   _supaSession = null;
+  if (_supaSessionRefreshTimer) { clearTimeout(_supaSessionRefreshTimer); _supaSessionRefreshTimer = null; }
 }
 
 function _authToken() {
   return (_supaSession && _supaSession.access_token) ? _supaSession.access_token : SUPA_KEY;
+}
+
+// Supabase login tokens expire (~1hr by default) and nothing was ever
+// refreshing them — a session left open past that started failing every
+// save with a misleading "check your connection" 401, with no way back
+// short of a full reload (which loses whatever was on screen). Refresh
+// proactively, well before expiry, so a normal working session never hits
+// this at all.
+function _scheduleSupaSessionRefresh() {
+  if (_supaSessionRefreshTimer) { clearTimeout(_supaSessionRefreshTimer); _supaSessionRefreshTimer = null; }
+  if (!_supaSession || !_supaSession.expires_at || !_supaSession.refresh_token) return;
+  var msUntilExpiry = (_supaSession.expires_at * 1000) - Date.now();
+  var delay = Math.max(msUntilExpiry - 5 * 60 * 1000, 10 * 1000);
+  _supaSessionRefreshTimer = setTimeout(function() {
+    _refreshSupaSession().catch(function() {}); // silent — supaFetch's reactive retry is the fallback if this is missed (e.g. laptop asleep)
+  }, delay);
+}
+
+// Also used reactively by supaFetch() on a 401, in case the proactive
+// refresh above was missed (computer asleep through the refresh window, etc).
+function _refreshSupaSession() {
+  if (!_supaSession || !_supaSession.refresh_token) return Promise.reject(new Error('No session to refresh'));
+  var refreshToken = _supaSession.refresh_token;
+  return fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY},
+    body: JSON.stringify({refresh_token: refreshToken}),
+    credentials: 'omit', mode: 'cors'
+  })
+  .then(function(r) { return r.json().then(function(d) { return {ok:r.ok, data:d}; }); })
+  .then(function(res) {
+    if (!res.ok || !res.data.access_token) throw new Error('refresh failed');
+    _supaSession = {access_token: res.data.access_token, refresh_token: res.data.refresh_token || refreshToken, expires_at: res.data.expires_at};
+    _scheduleSupaSessionRefresh();
+  });
 }
 
 // Lock screen has two modes: 'team' (the shared login every field user uses)

@@ -265,17 +265,33 @@ function _docDbLoadData(id, cb) {
 
 // ── SUPABASE ──
 function supaFetch(method, path, body) {
-  var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
-  if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
-  // credentials:'omit' required for iOS Safari cross-origin fetch to work correctly
-  var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
-  if (body) {
-    var bodyStr = JSON.stringify(body);
-    opts.body = bodyStr;
-    // iOS Safari: set explicit content-length hint
-    opts.headers['Content-Length'] = String((new TextEncoder().encode(bodyStr)).length);
+  var bodyStr = body ? JSON.stringify(body) : null;
+  function mkOpts() {
+    var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
+    if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+    // credentials:'omit' required for iOS Safari cross-origin fetch to work correctly
+    var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
+    if (bodyStr) {
+      opts.body = bodyStr;
+      // iOS Safari: set explicit content-length hint
+      opts.headers['Content-Length'] = String((new TextEncoder().encode(bodyStr)).length);
+    }
+    return opts;
   }
-  return fetch(SUPA_URL + '/rest/v1/' + path, opts);
+  return fetch(SUPA_URL + '/rest/v1/' + path, mkOpts()).then(function(r) {
+    // A 401 here almost always means the login token expired mid-session —
+    // _scheduleSupaSessionRefresh() above should have refreshed it before
+    // this could happen, but covers the case where that was missed (laptop
+    // asleep through the refresh window, etc). Refresh once and retry the
+    // same request instead of surfacing a misleading "check your
+    // connection" error for what is really an expired login.
+    if (r.status === 401 && _supaSession && _supaSession.refresh_token) {
+      return _refreshSupaSession()
+        .then(function() { return fetch(SUPA_URL + '/rest/v1/' + path, mkOpts()); })
+        .catch(function() { return r; }); // refresh failed — surface the original 401
+    }
+    return r;
+  });
 }
 
 function setStatus(msg, type) {

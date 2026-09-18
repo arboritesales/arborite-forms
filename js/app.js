@@ -17,16 +17,54 @@ if (typeof console.assert !== 'function') { console.assert = function(){}; }
 var AUDIT_PASS = 'audit2024';
 var auditUnlocked = false;
 var _supaSession = null;
+var _supaSessionRefreshTimer = null;
 function _storeSession(data) {
   _supaSession = data;
+  _scheduleSupaSessionRefresh();
 }
 
 function _clearSession() {
   _supaSession = null;
+  if (_supaSessionRefreshTimer) { clearTimeout(_supaSessionRefreshTimer); _supaSessionRefreshTimer = null; }
 }
 
 function _authToken() {
   return (_supaSession && _supaSession.access_token) ? _supaSession.access_token : SUPA_KEY;
+}
+
+// Supabase login tokens expire (~1hr by default) and nothing was ever
+// refreshing them — a session left open past that started failing every
+// save with a misleading "check your connection" 401, with no way back
+// short of a full reload (which loses whatever was on screen). Refresh
+// proactively, well before expiry, so a normal working session never hits
+// this at all.
+function _scheduleSupaSessionRefresh() {
+  if (_supaSessionRefreshTimer) { clearTimeout(_supaSessionRefreshTimer); _supaSessionRefreshTimer = null; }
+  if (!_supaSession || !_supaSession.expires_at || !_supaSession.refresh_token) return;
+  var msUntilExpiry = (_supaSession.expires_at * 1000) - Date.now();
+  var delay = Math.max(msUntilExpiry - 5 * 60 * 1000, 10 * 1000);
+  _supaSessionRefreshTimer = setTimeout(function() {
+    _refreshSupaSession().catch(function() {}); // silent — supaFetch's reactive retry is the fallback if this is missed (e.g. laptop asleep)
+  }, delay);
+}
+
+// Also used reactively by supaFetch() on a 401, in case the proactive
+// refresh above was missed (computer asleep through the refresh window, etc).
+function _refreshSupaSession() {
+  if (!_supaSession || !_supaSession.refresh_token) return Promise.reject(new Error('No session to refresh'));
+  var refreshToken = _supaSession.refresh_token;
+  return fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY},
+    body: JSON.stringify({refresh_token: refreshToken}),
+    credentials: 'omit', mode: 'cors'
+  })
+  .then(function(r) { return r.json().then(function(d) { return {ok:r.ok, data:d}; }); })
+  .then(function(res) {
+    if (!res.ok || !res.data.access_token) throw new Error('refresh failed');
+    _supaSession = {access_token: res.data.access_token, refresh_token: res.data.refresh_token || refreshToken, expires_at: res.data.expires_at};
+    _scheduleSupaSessionRefresh();
+  });
 }
 
 // Lock screen has two modes: 'team' (the shared login every field user uses)
@@ -827,17 +865,33 @@ function _docDbLoadData(id, cb) {
 
 // ── SUPABASE ──
 function supaFetch(method, path, body) {
-  var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
-  if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
-  // credentials:'omit' required for iOS Safari cross-origin fetch to work correctly
-  var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
-  if (body) {
-    var bodyStr = JSON.stringify(body);
-    opts.body = bodyStr;
-    // iOS Safari: set explicit content-length hint
-    opts.headers['Content-Length'] = String((new TextEncoder().encode(bodyStr)).length);
+  var bodyStr = body ? JSON.stringify(body) : null;
+  function mkOpts() {
+    var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
+    if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+    // credentials:'omit' required for iOS Safari cross-origin fetch to work correctly
+    var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
+    if (bodyStr) {
+      opts.body = bodyStr;
+      // iOS Safari: set explicit content-length hint
+      opts.headers['Content-Length'] = String((new TextEncoder().encode(bodyStr)).length);
+    }
+    return opts;
   }
-  return fetch(SUPA_URL + '/rest/v1/' + path, opts);
+  return fetch(SUPA_URL + '/rest/v1/' + path, mkOpts()).then(function(r) {
+    // A 401 here almost always means the login token expired mid-session —
+    // _scheduleSupaSessionRefresh() above should have refreshed it before
+    // this could happen, but covers the case where that was missed (laptop
+    // asleep through the refresh window, etc). Refresh once and retry the
+    // same request instead of surfacing a misleading "check your
+    // connection" error for what is really an expired login.
+    if (r.status === 401 && _supaSession && _supaSession.refresh_token) {
+      return _refreshSupaSession()
+        .then(function() { return fetch(SUPA_URL + '/rest/v1/' + path, mkOpts()); })
+        .catch(function() { return r; }); // refresh failed — surface the original 401
+    }
+    return r;
+  });
 }
 
 function setStatus(msg, type) {
@@ -5351,11 +5405,9 @@ function _getMSBOfflinePending() {
   try { return localStorage.getItem('msb_offline_pending'); } catch (e) { return null; }
 }
 window.addEventListener('online', function() {
-  var pending = _getMSBOfflinePending();
-  if (!pending || !currentMSBRef || currentMSBRef !== pending) return;
-  setTimeout(function() {
-    saveMSBRecord().then(function() { _clearMSBOfflinePending(); }).catch(function() {});
-  }, 800);
+  // _msbResyncPendingOnOpen() (defined below) handles this generically —
+  // no need for the pending ref to be the record currently open.
+  setTimeout(function() { _msbResyncPendingOnOpen(); }, 800);
 });
 
 function _msbEl(html) {
@@ -5546,11 +5598,13 @@ function openMSBView() {
   document.getElementById('msbView').style.display = 'block';
   ensureMSBRefLibrary().catch(function() {});
   showMSBList();
+  _msbResyncPendingOnOpen();
 }
 function closeMSBView() {
   document.getElementById('msbView').style.display = 'none';
 }
 function showMSBList() {
+  _msbCancelPendingAutoSave();
   document.getElementById('msbListPanel').style.display = 'block';
   document.getElementById('msbDeletedListPanel').style.display = 'none';
   document.getElementById('msbFormPanel').style.display = 'none';
@@ -5668,6 +5722,7 @@ function generateMSBRef() {
 }
 
 function newMSB() {
+  _msbCancelPendingAutoSave();
   showMSBForm();
   document.getElementById('msbStepNav').innerHTML = '';
   document.getElementById('msbStepContent').innerHTML = '<div class="msb-main"><div class="msb-note">Loading reference data…</div></div>';
@@ -5683,6 +5738,7 @@ function newMSB() {
 }
 
 function loadMSB(ref) {
+  _msbCancelPendingAutoSave();
   currentMSBRef = ref;
   showMSBForm();
   document.getElementById('msbRef').textContent = ref;
@@ -5790,6 +5846,17 @@ function scheduleMSBAutoSave() {
     saveMSBRecord().catch(function() {}); // silent — Save Draft/Generate PDF still surface real errors
   }, 2000);
 }
+// Cross-document contamination guard: loadMSB() sets currentMSBRef to the
+// NEW ref synchronously, then loads that record's data asynchronously — if a
+// pending auto-save timer from editing a DIFFERENT, previously-open record
+// fires in that gap, it would POST the old (still-loaded) msbState under the
+// new currentMSBRef, silently overwriting whatever's being opened. Must be
+// called before currentMSBRef changes, any time navigation could leave a
+// stale timer armed (opening a record, starting a new one, or leaving the
+// form entirely).
+function _msbCancelPendingAutoSave() {
+  if (_msbAutoSaveTimer) { clearTimeout(_msbAutoSaveTimer); _msbAutoSaveTimer = null; }
+}
 function attachMSBAutoSave() {
   var root = document.getElementById('msbStepContent');
   if (!root || root._autoSaveWired) return;
@@ -5816,27 +5883,67 @@ function saveMSBRecord() {
       return _msbDoSaveRecord();
     });
 }
-function _msbDoSaveRecord() {
-  // Strip transient in-flight upload state (_localPreview is a full base64 image —
-  // never let it reach the saved JSON, only the storagePath once uploaded).
-  var cleanImages = (msbState.job.siteControlImages || []).map(function(p) {
+// Strip transient in-flight upload state (_localPreview is a full base64 image —
+// never let it reach the saved JSON, only the storagePath once uploaded).
+// Shared by the normal save path and _msbResyncPendingOnOpen() below, so a
+// cached-offline snapshot gets the same treatment before it's pushed.
+function _msbCleanFormData(state) {
+  var cleanImages = (state.job.siteControlImages || []).map(function(p) {
     return { storagePath: p.storagePath || '', status: p.storagePath ? 'saved' : 'pending' };
   }).filter(function(p) { return p.storagePath; });
   var cleanJob = {};
-  for (var k in msbState.job) cleanJob[k] = msbState.job[k];
+  for (var k in state.job) cleanJob[k] = state.job[k];
   cleanJob.siteControlImages = cleanImages;
-  var rm = msbState.emergency.routeMap || {};
+  var rm = state.emergency.routeMap || {};
   var cleanEmergency = {};
-  for (var ek in msbState.emergency) cleanEmergency[ek] = msbState.emergency[ek];
+  for (var ek in state.emergency) cleanEmergency[ek] = state.emergency[ek];
   cleanEmergency.routeMap = { storagePath: rm.storagePath || '', status: rm.storagePath ? 'saved' : '' };
-  var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: {
-    job: cleanJob, team: msbState.team, equipment: msbState.equipment, selectedSOPs: msbState.selectedSOPs,
-    selectedExclusionZones: msbState.selectedExclusionZones, ppeAssignments: msbState.ppeAssignments,
-    emergency: cleanEmergency, status: msbState.status, sentAt: msbState.sentAt
-  }};
+  return {
+    job: cleanJob, team: state.team, equipment: state.equipment, selectedSOPs: state.selectedSOPs,
+    selectedExclusionZones: state.selectedExclusionZones, ppeAssignments: state.ppeAssignments,
+    emergency: cleanEmergency, status: state.status, sentAt: state.sentAt
+  };
+}
+function _msbDoSaveRecord() {
+  var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(msbState) };
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
     if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('Save failed (' + r.status + ')');
   });
+}
+
+// A save that couldn't reach the server (real offline, or the expired-login
+// 401 case — see supaFetch's reactive refresh) gets cached to localStorage
+// with a "your work is safe, it'll sync automatically" promise. That's only
+// true if the browser genuinely goes offline then online again — an
+// expired-login 401 never trips that, since the connection was up the whole
+// time, so the cache just sat there untouched. Actually push it the next
+// time the MSB tool is opened, on ANY device where that pending cache
+// exists, instead of relying solely on the online-event listener.
+function _msbResyncPendingOnOpen() {
+  var ref = _getMSBOfflinePending();
+  if (!ref) return;
+  var cached = _loadMSBLocalCache(ref);
+  if (!cached) { _clearMSBOfflinePending(); return; }
+  var job = cached.job || {};
+  var cachedLooksBlank = !job.titleOfDocument && !job.client && !job.siteAddress && !(cached.team || []).length;
+  var push = function() {
+    var payload = { quote_ref: ref, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(cached) };
+    return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
+      if (r.ok || r.status === 201 || r.status === 204) _clearMSBOfflinePending();
+    });
+  };
+  if (!cachedLooksBlank) { push().catch(function() {}); return; }
+  // Cached snapshot itself looks blank — apply the same guard saveMSBRecord()
+  // uses before pushing over whatever's already on the server.
+  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1')
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .then(function(rows) {
+      var serverJob = rows && rows[0] && rows[0].form_data && rows[0].form_data.job;
+      var serverHasRealContent = serverJob && (serverJob.titleOfDocument || serverJob.client || serverJob.siteAddress);
+      if (serverHasRealContent) return;
+      return push();
+    })
+    .catch(function() {}); // still unreachable — leave cached, try again next time the tool is opened
 }
 
 function saveMSBDraft() {
