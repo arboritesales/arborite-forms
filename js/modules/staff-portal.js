@@ -575,21 +575,53 @@ function spShiftReportMonth(delta) {
 
 var spLastClockReportRows = [];
 
+// Same directory-then-drill-down pattern as "Recent clock activity" above —
+// one long table covering everyone for the whole month got hard to scan, so
+// this now shows a plain list of names first and the day-by-day table only
+// once a manager picks one. Selection resets are deliberately NOT tied to
+// the month nav — staying on the same person while flipping months is the
+// common case (checking one employee's last few months).
+var spReportSelectedStaff = null;
+function spSelectReportStaff(name) { spReportSelectedStaff = name; spRenderClockReport(); }
+function spBackToReportDirectory() { spReportSelectedStaff = null; spRenderClockReport(); }
+
 function spRenderClockReport() {
   var el = document.getElementById('spClockReport');
   if (!el) return;
   var y = spReportMonth.getFullYear(), m = spReportMonth.getMonth();
   document.getElementById('spReportTitle').textContent = spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+  var weeklyEl = document.getElementById('spWeeklyHours');
   spRpc('sp_clock_report', { p_year: y, p_month: m + 1 }).then(function(res) {
     var rows = res.ok && Array.isArray(res.data) ? res.data : [];
     spLastClockReportRows = rows;
-    var weeklyEl = document.getElementById('spWeeklyHours');
-    if (!rows.length) {
-      el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No clock activity this month.</div>';
+
+    if (!spReportSelectedStaff) {
+      spEnsureStaffNamesLoaded(function(names) {
+        if (!names.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No staff found.</div>'; if (weeklyEl) weeklyEl.innerHTML = ''; return; }
+        el.innerHTML = names.map(function(n) {
+          var count = rows.filter(function(r) { return r.name === n; }).length;
+          return '<div class="sp-onsite-row" style="cursor:pointer;" onclick="spSelectReportStaff(\'' + spJsStr(n) + '\')"><span>' + spEsc(n)
+            + '<br><span class="sp-onsite-time">' + (count ? count + ' day' + (count === 1 ? '' : 's') + ' worked' : 'No activity this month') + '</span></span><span>&rsaquo;</span></div>';
+        }).join('');
+      });
       if (weeklyEl) weeklyEl.innerHTML = '';
       return;
     }
+
+    var header = '<button class="sp-btn-approve" style="padding:4px 10px;font-size:11px;margin-bottom:10px;" onclick="spBackToReportDirectory()">&larr; All employees</button>'
+      + '<h4 style="margin:4px 0 10px;">' + spEsc(spReportSelectedStaff) + '</h4>';
+    var personRows = rows.filter(function(r) { return r.name === spReportSelectedStaff; });
+    if (!personRows.length) {
+      el.innerHTML = header + '<div style="color:var(--mid);font-size:12px;">No clock activity this month.</div>';
+      if (weeklyEl) weeklyEl.innerHTML = '';
+      return;
+    }
+    // Maps over the FULL rows array (not personRows) so index i still lines
+    // up with spLastClockReportRows — spSaveOvertime looks entries up by
+    // that index, and rows not belonging to the selected person just render
+    // as an empty string.
     var body = rows.map(function(r, i) {
+      if (r.name !== spReportSelectedStaff) return '';
       var dateStr = new Date(r.work_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
       var ot = r.overtime_claimed || 0;
       var otCell = ot > 0
@@ -597,15 +629,16 @@ function spRenderClockReport() {
         : '—';
       return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td><td>' + otCell + '</td></tr>';
     }).join('');
-    el.innerHTML = '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Overtime (claimed / approve)</th></tr>' + body + '</table>';
+    el.innerHTML = header + '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Overtime (claimed / approve)</th></tr>' + body + '</table>';
     if (weeklyEl) {
-      var weekly = spComputeWeeklyHours(rows);
+      var weekly = spComputeWeeklyHours(personRows);
       weeklyEl.innerHTML = '<h3 style="margin:14px 0 8px;">Hours per week</h3><table class="sp-dash-table"><tr><th>Name</th><th>Week starting</th><th>Hours</th></tr>'
         + weekly.map(function(w) {
             var wDateStr = new Date(w.weekStart + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             return '<tr><td>' + spEsc(w.name) + '</td><td>' + wDateStr + '</td><td>' + Math.round(w.hours * 100) / 100 + '</td></tr>';
           }).join('')
-        + '</table>';
+        + '</table>'
+        + '<button class="sp-btn sp-btn-primary" style="margin-top:10px;" onclick="spExportClockReportPerson()">Export ' + spEsc(spReportSelectedStaff) + ' to Excel</button>';
     }
   });
 }
@@ -659,9 +692,9 @@ function spSaveOvertime(i) {
   });
 }
 
-function spExportClockReport() {
-  var rows = spLastClockReportRows;
-  if (!rows.length) { spToast('Nothing to export for this month.'); return; }
+// Shared by both the "everyone" and "one person" export buttons — just
+// varies which rows it's handed.
+function spClockReportWorkbook(rows) {
   var daily = rows.map(function(r) {
     return {
       Name: r.name,
@@ -679,7 +712,22 @@ function spExportClockReport() {
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(daily), 'Daily');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(weekly), 'Weekly Hours');
+  return wb;
+}
+
+function spExportClockReport() {
+  var rows = spLastClockReportRows;
+  if (!rows.length) { spToast('Nothing to export for this month.'); return; }
+  var wb = spClockReportWorkbook(rows);
   XLSX.writeFile(wb, 'Clock Report - ' + spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + '.xlsx');
+}
+
+function spExportClockReportPerson() {
+  if (!spReportSelectedStaff) return;
+  var rows = spLastClockReportRows.filter(function(r) { return r.name === spReportSelectedStaff; });
+  if (!rows.length) { spToast('Nothing to export for ' + spReportSelectedStaff + ' this month.'); return; }
+  var wb = spClockReportWorkbook(rows);
+  XLSX.writeFile(wb, 'Clock Report - ' + spReportSelectedStaff + ' - ' + spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + '.xlsx');
 }
 
 function spMapLink(lat, lng) {
@@ -687,20 +735,60 @@ function spMapLink(lat, lng) {
   return ' &middot; <a href="https://maps.google.com/?q=' + lat + ',' + lng + '" target="_blank" rel="noopener" style="color:var(--green);text-decoration:underline;">view on map</a>';
 }
 
+// Shared by the "Recent clock activity" and "Monthly clock report" directory
+// views below — both drill down from a plain list of employee names, so both
+// need the full active-staff roster (not just names with activity this
+// period). Fetched once per Staff Dashboards session and cached.
+var spAllStaffNames = null;
+function spEnsureStaffNamesLoaded(cb) {
+  if (spAllStaffNames) { cb(spAllStaffNames); return; }
+  spRpc('sp_list_staff_names', {}).then(function(res) {
+    spAllStaffNames = (res.ok && Array.isArray(res.data)) ? res.data.map(function(r) { return r.name; }).sort() : [];
+    cb(spAllStaffNames);
+  }).catch(function() { spAllStaffNames = []; cb([]); });
+}
+
+// Escapes a name for safe embedding inside a single-quoted onclick="..."
+// attribute — only needed because names (unlike ids) can contain a quote.
+function spJsStr(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
 // Manager-only: every recent clock in/out event with location — separate from
 // the quick "who's on site now" summary above, since that one (shared with
 // the employee-facing Clock screen) deliberately never shows location.
+// Shows a directory of employees first (click a name to drill in) rather
+// than one long site-wide feed, which got unwieldy once there were more than
+// a handful of staff logging in/out every day.
+var spClockActivitySelected = null;
+function spSelectClockActivity(name) { spClockActivitySelected = name; spRenderClockActivity(); }
+function spBackToClockActivityDirectory() { spClockActivitySelected = null; spRenderClockActivity(); }
+
 function spRenderClockActivity() {
   var el = document.getElementById('spClockActivity');
   if (!el) return;
-  spRpc('sp_clock_activity', { p_limit: 100 }).then(function(res) {
+  spRpc('sp_clock_activity', { p_limit: 300 }).then(function(res) {
     var rows = res.ok && Array.isArray(res.data) ? res.data : [];
-    if (!rows.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No clock activity yet.</div>'; return; }
-    el.innerHTML = rows.map(function(r) {
+
+    if (!spClockActivitySelected) {
+      spEnsureStaffNamesLoaded(function(names) {
+        if (!names.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No staff found.</div>'; return; }
+        el.innerHTML = names.map(function(n) {
+          var count = rows.filter(function(r) { return r.name === n; }).length;
+          return '<div class="sp-onsite-row" style="cursor:pointer;" onclick="spSelectClockActivity(\'' + spJsStr(n) + '\')"><span>' + spEsc(n)
+            + '<br><span class="sp-onsite-time">' + (count ? count + ' recent event' + (count === 1 ? '' : 's') : 'No recent activity') + '</span></span><span>&rsaquo;</span></div>';
+        }).join('');
+      });
+      return;
+    }
+
+    var personRows = rows.filter(function(r) { return r.name === spClockActivitySelected; });
+    var header = '<button class="sp-btn-approve" style="padding:4px 10px;font-size:11px;margin-bottom:10px;" onclick="spBackToClockActivityDirectory()">&larr; All employees</button>'
+      + '<h4 style="margin:4px 0 10px;">' + spEsc(spClockActivitySelected) + '</h4>';
+    if (!personRows.length) { el.innerHTML = header + '<div style="color:var(--mid);font-size:12px;">No recent clock activity.</div>'; return; }
+    el.innerHTML = header + personRows.map(function(r) {
       var t = new Date(r.ts);
       var when = t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
       var label = r.action === 'in' ? 'Clocked in' : 'Clocked out';
-      return '<div class="sp-onsite-row"><span>' + spEsc(r.name) + ' — ' + label
+      return '<div class="sp-onsite-row"><span>' + label
         + '<br><span class="sp-onsite-time">' + when + (r.lat != null ? spMapLink(r.lat, r.lng) : ' &middot; no location') + '</span></span>'
         + '<button class="sp-clock-del-btn" title="Delete this entry" onclick="spDeleteClockEvent(\'' + r.id + '\')">&times;</button></div>';
     }).join('');
