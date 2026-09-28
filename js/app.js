@@ -7747,7 +7747,7 @@ function spLocalDateStr(d) {
 }
 
 // Decimal hours -> "1h 15m" / "37m" / "2h", for the on-screen overtime
-// column. The Excel export writes real Excel time values formatted h:mm
+// column. The Excel export writes real Excel time values formatted "1h 15m"
 // instead (see spMinsColsToTime), so they still add up with SUM().
 function spFmtHoursMins(h) {
   var totalMin = Math.round(h * 60);
@@ -7809,52 +7809,46 @@ function spSplitOvertime(r) {
 }
 
 // Turns every numeric cell in the given columns (0-based, below the header
-// row) from minutes into an Excel time shown as h:mm, e.g. 75 -> "1:15".
+// row) from minutes into an Excel time shown as e.g. "1h 15m" / "100h 14m".
 // They stay real time values, so SUM() still works; [h] keeps totals over 24
-// hours as e.g. "37:30" rather than wrapping round to "13:30".
+// hours as e.g. "37h 30m" rather than wrapping round to "13h 30m".
 function spMinsColsToTime(ws, cols) {
   var range = XLSX.utils.decode_range(ws['!ref']);
   for (var row = 1; row <= range.e.r; row++) {
     cols.forEach(function(c) {
       var cell = ws[XLSX.utils.encode_cell({ r: row, c: c })];
-      if (cell && typeof cell.v === 'number') { cell.v = cell.v / 1440; cell.t = 'n'; cell.z = '[h]:mm'; }
+      if (cell && typeof cell.v === 'number') { cell.v = cell.v / 1440; cell.t = 'n'; cell.z = '[h]"h" mm"m"'; }
     });
   }
 }
 
 // Shared by both the "everyone" and "one person" export buttons — just
-// varies which rows it's handed. Rows arrive sorted by name then date; a
-// TOTAL row follows each person's days. Durations are worked in whole
-// minutes and written as h:mm, so the TOTAL row is an exact sum of the
-// days above it.
+// varies which rows it's handed. Rows arrive sorted by name then date.
+// Three tabs:
+//   Summary      — one row per person for the month (the payroll view)
+//   Daily        — every day worked, with a TOTAL row after each person
+//   Weekly Hours — hours per Monday-starting week
+// Durations are worked in whole minutes, so every total is an exact sum of
+// the days it covers.
 function spClockReportWorkbook(rows) {
-  var daily = [], tot = null;
-  function pushTotal() {
-    if (!tot) return;
-    daily.push({
-      Name: tot.name + ' — TOTAL', Date: '', 'Clock In': '', 'Clock Out': '',
-      Hours: tot.hours,
-      'Morning Overtime (before 07:00)': tot.morning,
-      'Evening Overtime (after 16:00)': tot.evening,
-      'Total Overtime Claimed': tot.total,
-      'Overtime Approved': tot.approved
-    });
-    daily.push({});
-  }
+  var people = [], byName = {}, daily = [];
   rows.forEach(function(r) {
-    if (!tot || tot.name !== r.name) {
-      pushTotal();
-      tot = { name: r.name, hours: 0, morning: 0, evening: 0, total: 0, approved: 0 };
+    var p = byName[r.name];
+    if (!p) {
+      p = byName[r.name] = { name: r.name, days: [], worked: 0, noOut: 0, hours: 0, morning: 0, evening: 0, total: 0, approved: 0 };
+      people.push(p);
     }
     var ot = spSplitOvertime(r);
     var hours = r.hours != null ? spHoursToMins(r.hours) : null;
     var approved = spHoursToMins(r.overtime_approved);
-    tot.hours += hours || 0;
-    tot.morning += ot.morning;
-    tot.evening += ot.evening;
-    tot.total += ot.total;
-    tot.approved += approved;
-    daily.push({
+    p.worked++;
+    if (!r.clock_out) p.noOut++;
+    p.hours += hours || 0;
+    p.morning += ot.morning;
+    p.evening += ot.evening;
+    p.total += ot.total;
+    p.approved += approved;
+    p.days.push({
       Name: r.name,
       Date: r.work_date,
       'Clock In': r.clock_in ? r.clock_in.slice(0, 5) : '',
@@ -7866,18 +7860,49 @@ function spClockReportWorkbook(rows) {
       'Overtime Approved': approved
     });
   });
-  pushTotal();
-  if (daily.length && !Object.keys(daily[daily.length - 1]).length) daily.pop();
+
+  var summary = people.map(function(p) {
+    return {
+      Name: p.name,
+      'Days Worked': p.worked,
+      'Days Missing Clock-Out': p.noOut,
+      'Total Hours': p.hours,
+      'Morning Overtime (before 07:00)': p.morning,
+      'Evening Overtime (after 16:00)': p.evening,
+      'Total Overtime Claimed': p.total,
+      'Overtime Approved': p.approved
+    };
+  });
+
+  people.forEach(function(p, i) {
+    if (i) daily.push({});
+    daily.push.apply(daily, p.days);
+    daily.push({
+      Name: p.name + ' — TOTAL', Date: '', 'Clock In': '', 'Clock Out': '',
+      Hours: p.hours,
+      'Morning Overtime (before 07:00)': p.morning,
+      'Evening Overtime (after 16:00)': p.evening,
+      'Total Overtime Claimed': p.total,
+      'Overtime Approved': p.approved
+    });
+  });
+
   var weekly = spComputeWeeklyHours(rows).map(function(w) {
     return { Name: w.name, 'Week Starting': w.weekStart, Hours: spHoursToMins(w.hours) };
   });
+
   var wb = XLSX.utils.book_new();
+  var summarySheet = XLSX.utils.json_to_sheet(summary);
+  spMinsColsToTime(summarySheet, [3, 4, 5, 6, 7]);
+  summarySheet['!cols'] = [{ wch: 24 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 30 }, { wch: 29 }, { wch: 22 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
   var dailySheet = XLSX.utils.json_to_sheet(daily);
   spMinsColsToTime(dailySheet, [4, 5, 6, 7, 8]);
-  dailySheet['!cols'] = [{ wch: 28 }, { wch: 11 }, { wch: 9 }, { wch: 9 }, { wch: 8 }, { wch: 30 }, { wch: 29 }, { wch: 22 }, { wch: 18 }];
+  dailySheet['!cols'] = [{ wch: 28 }, { wch: 11 }, { wch: 9 }, { wch: 9 }, { wch: 10 }, { wch: 30 }, { wch: 29 }, { wch: 22 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, dailySheet, 'Daily');
   var weeklySheet = XLSX.utils.json_to_sheet(weekly);
   spMinsColsToTime(weeklySheet, [2]);
+  weeklySheet['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 10 }];
   XLSX.utils.book_append_sheet(wb, weeklySheet, 'Weekly Hours');
   return wb;
 }
