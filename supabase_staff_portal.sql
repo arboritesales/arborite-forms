@@ -524,6 +524,70 @@ begin
 end;
 $$;
 
+-- Duplicate/overlap guard (added 2026-09-28 after a data script was run twice
+-- and double-charged two people). Returns null when the entry is fine,
+-- otherwise a message explaining the clash:
+--   - holiday/sick/other can't overlap another non-declined holiday/sick/other
+--     entry for the same person;
+--   - holiday can't overlap the company shutdown (already counted).
+-- Historical-import / balance-adjustment rows (days <= 0) are ignored. Called
+-- by sp_submit_leave_request, sp_decide_leave_request (on approve),
+-- sp_manager_add_leave_entry and sp_manager_edit_leave_entry.
+create or replace function sp_leave_conflict(p_staff_id uuid, p_start_date date, p_end_date date, p_type text, p_exclude_id uuid default null)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public, extensions
+as $$
+declare
+  r record;
+begin
+  if p_type not in ('holiday', 'sick', 'other') then
+    return null;
+  end if;
+
+  select slr.type, slr.status, slr.start_date, slr.end_date into r
+  from staff_leave_requests slr
+  where slr.staff_id = p_staff_id
+    and slr.id is distinct from p_exclude_id
+    and slr.type in ('holiday', 'sick', 'other')
+    and slr.status <> 'declined'
+    and slr.days > 0
+    and coalesce(slr.note, '') not like 'Historical balance import%'
+    and slr.start_date <= p_end_date
+    and slr.end_date >= p_start_date
+  order by slr.start_date
+  limit 1;
+  if found then
+    return format('Already has %s (%s) booked for %s — edit or delete that entry instead of adding another.',
+      r.type, r.status,
+      case when r.start_date = r.end_date then to_char(r.start_date, 'DD Mon YYYY')
+           else to_char(r.start_date, 'DD Mon') || ' – ' || to_char(r.end_date, 'DD Mon YYYY') end);
+  end if;
+
+  if p_type = 'holiday' then
+    select slr.start_date into r
+    from staff_leave_requests slr
+    where slr.staff_id = p_staff_id
+      and slr.type = 'shutdown'
+      and slr.start_date <= p_end_date
+      and slr.end_date >= p_start_date
+    order by slr.start_date
+    limit 1;
+    if found then
+      return format('%s is already covered by the company shutdown, which is counted automatically — leave the shutdown days out of this holiday.',
+        to_char(r.start_date, 'DD Mon YYYY'));
+    end if;
+  end if;
+
+  return null;
+end;
+$$;
+
+-- Internal helper only — called from the security-definer RPCs.
+revoke execute on function sp_leave_conflict(uuid, date, date, text, uuid) from public, anon, authenticated;
+
 -- p_type restricted to what an employee can actually request — bank_holiday
 -- and shutdown are system-applied only, never submitted by hand.
 create or replace function sp_submit_leave_request(p_token text, p_start_date date, p_end_date date, p_days numeric, p_type text, p_note text default null)
@@ -534,6 +598,7 @@ set search_path = public, extensions
 as $$
 declare
   v_staff staff;
+  v_conflict text;
 begin
   if p_type not in ('holiday', 'sick', 'other') then
     raise exception 'Invalid leave type';
@@ -542,6 +607,10 @@ begin
     raise exception 'End date is before start date';
   end if;
   v_staff := sp_staff_from_token(p_token);
+  v_conflict := sp_leave_conflict(v_staff.id, p_start_date, p_end_date, p_type);
+  if v_conflict is not null then
+    raise exception '%', v_conflict;
+  end if;
   insert into staff_leave_requests (staff_id, start_date, end_date, days, type, note)
     values (v_staff.id, p_start_date, p_end_date, p_days, p_type, p_note);
   return true;
@@ -643,15 +712,25 @@ language plpgsql
 security definer
 set search_path = public, extensions
 as $$
+declare
+  v_req staff_leave_requests;
+  v_conflict text;
 begin
   if p_status not in ('approved', 'declined') then
     raise exception 'Invalid status';
   end if;
-  update staff_leave_requests set status = p_status, decided_at = now()
-    where id = p_request_id and status = 'pending';
+  select * into v_req from staff_leave_requests where id = p_request_id and status = 'pending';
   if not found then
     raise exception 'Request not found or already decided';
   end if;
+  if p_status = 'approved' then
+    v_conflict := sp_leave_conflict(v_req.staff_id, v_req.start_date, v_req.end_date, v_req.type, v_req.id);
+    if v_conflict is not null then
+      raise exception '%', v_conflict;
+    end if;
+  end if;
+  update staff_leave_requests set status = p_status, decided_at = now()
+    where id = p_request_id and status = 'pending';
   return true;
 end;
 $$;
@@ -685,6 +764,7 @@ set search_path = public, extensions
 as $$
 declare
   v_staff_id uuid;
+  v_conflict text;
 begin
   select id into v_staff_id from staff where name = p_staff_name and active = true;
   if v_staff_id is null then
@@ -692,6 +772,12 @@ begin
   end if;
   if p_end_date < p_start_date then
     raise exception 'End date is before start date';
+  end if;
+  if p_days > 0 and coalesce(p_note, '') not like 'Historical balance import%' then
+    v_conflict := sp_leave_conflict(v_staff_id, p_start_date, p_end_date, p_type);
+    if v_conflict is not null then
+      raise exception '%', v_conflict;
+    end if;
   end if;
   insert into staff_leave_requests (staff_id, start_date, end_date, days, type, note, status, decided_at)
     values (v_staff_id, p_start_date, p_end_date, p_days, p_type, p_note, 'approved', now());
@@ -707,7 +793,9 @@ returns boolean
 language plpgsql
 security definer
 set search_path = public, extensions
-as $$
+declare
+  v_staff_id uuid;
+  v_conflict text;
 begin
   if p_end_date < p_start_date then
     raise exception 'End date is before start date';
@@ -715,12 +803,19 @@ begin
   if p_status not in ('pending', 'approved', 'declined') then
     raise exception 'Invalid status';
   end if;
-  update staff_leave_requests
-    set start_date = p_start_date, end_date = p_end_date, days = p_days, type = p_type, note = p_note, status = p_status
-    where id = p_id;
+  select staff_id into v_staff_id from staff_leave_requests where id = p_id;
   if not found then
     raise exception 'Entry not found';
   end if;
+  if p_status <> 'declined' and p_days > 0 and coalesce(p_note, '') not like 'Historical balance import%' then
+    v_conflict := sp_leave_conflict(v_staff_id, p_start_date, p_end_date, p_type, p_id);
+    if v_conflict is not null then
+      raise exception '%', v_conflict;
+    end if;
+  end if;
+  update staff_leave_requests
+    set start_date = p_start_date, end_date = p_end_date, days = p_days, type = p_type, note = p_note, status = p_status
+    where id = p_id;
   return true;
 end;
 $$;
