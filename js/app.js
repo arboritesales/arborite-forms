@@ -7781,25 +7781,75 @@ function spSaveOvertime(i) {
   });
 }
 
+// "HH:MM[:SS...]" -> minutes past midnight, or null.
+function spTimeToMins(t) {
+  if (!t) return null;
+  var p = t.split(':');
+  return parseInt(p[0], 10) * 60 + parseInt(p[1], 10) + (parseFloat(p[2]) || 0) / 60;
+}
+function spRound2(n) { return Math.round(n * 100) / 100; }
+
+// Splits the claimed overtime into its two halves, using the same rule as
+// sp_clock_report's overtime_claimed (normal hours 07:00-16:00): morning =
+// clocked in before 07:00, evening = clocked out after 16:00. Total is
+// rounded from the unrounded sum so it matches the server's figure exactly.
+function spSplitOvertime(r) {
+  var inM = spTimeToMins(r.clock_in), outM = spTimeToMins(r.clock_out);
+  var morning = inM != null ? Math.max(0, 7 * 60 - inM) / 60 : 0;
+  var evening = outM != null ? Math.max(0, outM - 16 * 60) / 60 : 0;
+  return { morning: spRound2(morning), evening: spRound2(evening), total: spRound2(morning + evening) };
+}
+
 // Shared by both the "everyone" and "one person" export buttons — just
-// varies which rows it's handed.
+// varies which rows it's handed. Rows arrive sorted by name then date; a
+// TOTAL row follows each person's days.
 function spClockReportWorkbook(rows) {
-  var daily = rows.map(function(r) {
-    return {
+  var daily = [], tot = null;
+  function pushTotal() {
+    if (!tot) return;
+    daily.push({
+      Name: tot.name + ' — TOTAL', Date: '', 'Clock In': '', 'Clock Out': '',
+      Hours: spRound2(tot.hours),
+      'Morning Overtime (before 07:00)': spRound2(tot.morning),
+      'Evening Overtime (after 16:00)': spRound2(tot.evening),
+      'Total Overtime Claimed': spRound2(tot.total),
+      'Overtime Approved': spRound2(tot.approved)
+    });
+    daily.push({});
+  }
+  rows.forEach(function(r) {
+    if (!tot || tot.name !== r.name) {
+      pushTotal();
+      tot = { name: r.name, hours: 0, morning: 0, evening: 0, total: 0, approved: 0 };
+    }
+    var ot = spSplitOvertime(r);
+    var approved = r.overtime_approved || 0;
+    tot.hours += r.hours || 0;
+    tot.morning += ot.morning;
+    tot.evening += ot.evening;
+    tot.total += ot.total;
+    tot.approved += approved;
+    daily.push({
       Name: r.name,
       Date: r.work_date,
       'Clock In': r.clock_in ? r.clock_in.slice(0, 5) : '',
       'Clock Out': r.clock_out ? r.clock_out.slice(0, 5) : '',
       Hours: r.hours != null ? r.hours : '',
-      'Overtime Claimed': r.overtime_claimed || 0,
-      'Overtime Approved': r.overtime_approved || 0
-    };
+      'Morning Overtime (before 07:00)': ot.morning,
+      'Evening Overtime (after 16:00)': ot.evening,
+      'Total Overtime Claimed': ot.total,
+      'Overtime Approved': approved
+    });
   });
+  pushTotal();
+  if (daily.length && !Object.keys(daily[daily.length - 1]).length) daily.pop();
   var weekly = spComputeWeeklyHours(rows).map(function(w) {
     return { Name: w.name, 'Week Starting': w.weekStart, Hours: Math.round(w.hours * 100) / 100 };
   });
   var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(daily), 'Daily');
+  var dailySheet = XLSX.utils.json_to_sheet(daily);
+  dailySheet['!cols'] = [{ wch: 28 }, { wch: 11 }, { wch: 9 }, { wch: 9 }, { wch: 8 }, { wch: 30 }, { wch: 29 }, { wch: 22 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, dailySheet, 'Daily');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(weekly), 'Weekly Hours');
   return wb;
 }
