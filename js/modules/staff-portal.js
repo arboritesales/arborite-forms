@@ -1,5 +1,5 @@
 // ── STAFF PORTAL — clock in/out, leave requests, team calendar ──
-// Reached only from the main lock screen ("Staff Portal" link) or, for
+// Reached only from the main lock screen ("Staff Portal" box) or, for
 // managers, the Staff Dashboards tile inside Office — there is no separate
 // URL. Session is per-employee (password-per-person, set on first login),
 // completely independent of the shared team/manager login used everywhere
@@ -79,12 +79,19 @@ function spOpen(id) {
   for (var i = 0; i < views.length; i++) views[i].classList.remove('active');
   if (id === 'spClose') { root.style.display = 'none'; return; }
   if (SP_PORTAL_VIEWS.indexOf(id) !== -1 && !spSessionToken) id = 'spPortalLogin';
+  // The sign-in form is the Staff Portal box on the main lock screen.
+  if (id === 'spPortalLogin') {
+    root.style.display = 'none';
+    var ls = document.getElementById('lockScreen');
+    if (ls) ls.style.display = '';
+    spLoadStaffList();
+    return;
+  }
   var target = document.getElementById(id);
   if (!target) return;
   target.classList.add('active');
   window.scrollTo(0, 0);
   if (SP_PORTAL_VIEWS.indexOf(id) !== -1) spTouchSession();
-  if (id === 'spPortalLogin') spLoadStaffList();
   if (id === 'spClock') { document.getElementById('spClockWho').textContent = spSessionName; spAttemptGPS(); spRenderOnsite(); }
   if (id === 'spLeave') spRenderLeave();
   if (id === 'spCalendar') { spCalMonth = new Date(); spCalMonth.setDate(1); spRenderCalendar(); }
@@ -93,6 +100,9 @@ function spOpen(id) {
 function spOpenManagerDash() { spOpen('spManagerDash'); }
 
 // ── STAFF PICKER ──
+// Filled as soon as the page loads, since the picker sits on the lock screen.
+window.addEventListener('load', function() { spLoadStaffList(); });
+
 function spLoadStaffList() {
   var sel = document.getElementById('spName');
   if (!sel || sel.dataset.loaded) return;

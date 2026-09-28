@@ -67,45 +67,29 @@ function _refreshSupaSession() {
   });
 }
 
-// Lock screen has two modes: 'team' (the shared login every field user uses)
-// and 'manager' (a separate Supabase Auth account with the same UI/password
+// Lock screen has separate boxes: 'team' (the shared login every field user
+// uses) and 'manager' (a separate Supabase Auth account with the same UI/password
 // gates, but managerUnlocked=true — see openVehRecord/openCatRecord/Survey Report).
-var lockScreenMode = 'team';
-
-function toggleManagerLogin() {
-  lockScreenMode = (lockScreenMode === 'team') ? 'manager' : 'team';
-  var sub = document.getElementById('lockSubtitle');
-  var link = document.getElementById('lockModeLink');
-  var inp = document.getElementById('lockPass');
-  var err = document.getElementById('lockErr');
-  if (lockScreenMode === 'manager') {
-    if (sub) sub.textContent = 'Enter the manager password to continue';
-    if (link) link.textContent = '← Team login';
-  } else {
-    if (sub) sub.textContent = 'Enter the team password to continue';
-    if (link) link.textContent = 'Manager login';
-  }
-  if (inp) { inp.value = ''; inp.focus(); }
-  if (err) err.textContent = '';
-}
+// The third box, Staff Portal, is handled in staff-portal.js.
+var LOCK_FIELDS = {
+  team:    { inp: 'lockPass',    err: 'lockErr',    email: 'login' + '@arborite.app' },
+  manager: { inp: 'lockMgrPass', err: 'lockMgrErr', email: 'manager' + '@arborite.app' }
+};
 
 // Log Out button on the Welcome screen — used by both team and manager
 // sessions. The session var is never persisted (no localStorage), so this
-// just resets in-memory state and re-shows the lock screen in team mode;
+// just resets in-memory state and re-shows the lock screen;
 // a page reload would do the same.
 function logoutToTeamLogin() {
   if (!confirm('Log out and return to the employee login screen?')) return;
   managerUnlocked = false;
   _clearSession();
-  lockScreenMode = 'team';
-  var sub = document.getElementById('lockSubtitle');
-  var link = document.getElementById('lockModeLink');
-  var pass = document.getElementById('lockPass');
-  var err = document.getElementById('lockErr');
-  if (sub) sub.textContent = 'Enter the team password to continue';
-  if (link) link.textContent = 'Manager login';
-  if (pass) pass.value = '';
-  if (err) err.textContent = '';
+  ['team', 'manager'].forEach(function(mode) {
+    var pass = document.getElementById(LOCK_FIELDS[mode].inp);
+    var err = document.getElementById(LOCK_FIELDS[mode].err);
+    if (pass) pass.value = '';
+    if (err) err.textContent = '';
+  });
   var jss = document.getElementById('jobSelectScreen');
   var dash = document.getElementById('dashboard');
   if (jss) jss.style.display = 'none';
@@ -114,15 +98,16 @@ function logoutToTeamLogin() {
   if (ls) ls.style.display = '';
 }
 
-function checkPass() {
-  var inp = document.getElementById('lockPass');
-  var err = document.getElementById('lockErr');
+function checkPass(mode) {
+  if (mode !== 'manager') mode = 'team';
+  var inp = document.getElementById(LOCK_FIELDS[mode].inp);
+  var err = document.getElementById(LOCK_FIELDS[mode].err);
   if (!inp) return;
   var password = inp.value;
   if (!password) return;
   inp.disabled = true;
   if (err) err.textContent = '';
-  var email = (lockScreenMode === 'manager') ? ('manager' + '@arborite.app') : ('login' + '@arborite.app');
+  var email = LOCK_FIELDS[mode].email;
   fetch(SUPA_URL + '/auth/v1/token?grant_type=password', {
     method: 'POST',
     headers: {'Content-Type':'application/json','apikey':SUPA_KEY},
@@ -134,7 +119,8 @@ function checkPass() {
     inp.disabled = false;
     if (res.ok && res.data.access_token) {
       _storeSession({access_token:res.data.access_token, refresh_token:res.data.refresh_token, expires_at:res.data.expires_at});
-      managerUnlocked = (lockScreenMode === 'manager');
+      managerUnlocked = (mode === 'manager');
+      inp.value = '';
       var ls = document.getElementById('lockScreen');
       if (ls) ls.style.display = 'none';
       showJobSelectScreen();
@@ -7088,7 +7074,7 @@ function generateMSBPDF() {
   });
 }
 // ── STAFF PORTAL — clock in/out, leave requests, team calendar ──
-// Reached only from the main lock screen ("Staff Portal" link) or, for
+// Reached only from the main lock screen ("Staff Portal" box) or, for
 // managers, the Staff Dashboards tile inside Office — there is no separate
 // URL. Session is per-employee (password-per-person, set on first login),
 // completely independent of the shared team/manager login used everywhere
@@ -7168,12 +7154,19 @@ function spOpen(id) {
   for (var i = 0; i < views.length; i++) views[i].classList.remove('active');
   if (id === 'spClose') { root.style.display = 'none'; return; }
   if (SP_PORTAL_VIEWS.indexOf(id) !== -1 && !spSessionToken) id = 'spPortalLogin';
+  // The sign-in form is the Staff Portal box on the main lock screen.
+  if (id === 'spPortalLogin') {
+    root.style.display = 'none';
+    var ls = document.getElementById('lockScreen');
+    if (ls) ls.style.display = '';
+    spLoadStaffList();
+    return;
+  }
   var target = document.getElementById(id);
   if (!target) return;
   target.classList.add('active');
   window.scrollTo(0, 0);
   if (SP_PORTAL_VIEWS.indexOf(id) !== -1) spTouchSession();
-  if (id === 'spPortalLogin') spLoadStaffList();
   if (id === 'spClock') { document.getElementById('spClockWho').textContent = spSessionName; spAttemptGPS(); spRenderOnsite(); }
   if (id === 'spLeave') spRenderLeave();
   if (id === 'spCalendar') { spCalMonth = new Date(); spCalMonth.setDate(1); spRenderCalendar(); }
@@ -7182,6 +7175,9 @@ function spOpen(id) {
 function spOpenManagerDash() { spOpen('spManagerDash'); }
 
 // ── STAFF PICKER ──
+// Filled as soon as the page loads, since the picker sits on the lock screen.
+window.addEventListener('load', function() { spLoadStaffList(); });
+
 function spLoadStaffList() {
   var sel = document.getElementById('spName');
   if (!sel || sel.dataset.loaded) return;
