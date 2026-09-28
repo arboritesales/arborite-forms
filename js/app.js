@@ -7713,8 +7713,13 @@ function spRenderClockReport() {
       if (r.name !== spReportSelectedStaff) return '';
       var dateStr = new Date(r.work_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
       var ot = r.overtime_claimed || 0;
+      // Approved overtime is entered as hours + minutes; stored as decimal
+      // hours (staff_overtime_approvals.hours_approved) exactly as before.
+      var apprMins = Math.round((r.overtime_approved || 0) * 60);
       var otCell = ot > 0
-        ? spFmtHoursMins(ot) + '<br><input type="number" step="0.25" min="0" style="width:56px;" id="spOtInput' + i + '" value="' + (r.overtime_approved || 0) + '"> <button class="sp-btn-approve" style="padding:2px 8px;font-size:11px;" onclick="spSaveOvertime(' + i + ')">Save</button>'
+        ? spFmtHoursMins(ot) + '<br><input type="number" step="1" min="0" style="width:44px;" id="spOtHrs' + i + '" value="' + Math.floor(apprMins / 60) + '"> h '
+          + '<input type="number" step="1" min="0" max="59" style="width:44px;" id="spOtMins' + i + '" value="' + (apprMins % 60) + '"> m '
+          + '<button class="sp-btn-approve" style="padding:2px 8px;font-size:11px;" onclick="spSaveOvertime(' + i + ')">Save</button>'
         : '—';
       return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td><td>' + otCell + '</td></tr>';
     }).join('');
@@ -7771,9 +7776,11 @@ function spComputeWeeklyHours(rows) {
 function spSaveOvertime(i) {
   var r = spLastClockReportRows[i];
   if (!r) return;
-  var input = document.getElementById('spOtInput' + i);
-  var hrs = parseFloat(input.value);
-  if (isNaN(hrs) || hrs < 0) { spToast('Enter a valid number of hours.'); return; }
+  var hVal = document.getElementById('spOtHrs' + i).value.trim();
+  var mVal = document.getElementById('spOtMins' + i).value.trim();
+  var h = hVal === '' ? 0 : Number(hVal), m = mVal === '' ? 0 : Number(mVal);
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || m < 0 || m > 59) { spToast('Enter whole hours, and minutes from 0 to 59.'); return; }
+  var hrs = h + m / 60;
   spRpc('sp_manager_set_overtime', { p_staff_name: r.name, p_work_date: r.work_date, p_hours_approved: hrs }).then(function(res) {
     if (!res.ok) { spToast((res.data && res.data.message) || 'Could not save overtime.'); return; }
     spToast('Overtime approved.');
