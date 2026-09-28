@@ -152,7 +152,7 @@ var JOB_LINK_TOKEN = null;
 
 function init() {
   CUSTOM_STAFF = []; CUSTOM_MACHINES = []; allJobs = []; currentJobRef = ''; pads = {}; drCount = 0; docStore = {};
-  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware", "Olly Key"];
+  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware", "Olly Key", "George Sim"];
   MACHINES = ["ARB Team", "Kubota 2.7", "CC145", "Cutter", "LV800", "Climber", "MEWP", "Hinowa 2010", "TPF", "FSID74", "Sub Contractor"];
 }
 
