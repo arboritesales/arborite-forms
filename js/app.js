@@ -3462,7 +3462,7 @@ var CHECK_CATEGORIES = {
   stump: {
     label: 'Stump Grinder', icon: '🪵', table: 'stump_grinder_checks',
     machineLabel: 'Serial / Reference / Model / Reg No',
-    machines: ['50RX', 'RG13-II', 'FSI D74'],
+    machines: ['FSI D74'],
     fields: [
       {key:'used_since_last', label:'Has the machine been used since its last inspection?', options:['Yes','No']},
       {key:'teeth_condition', label:'In what condition are the teeth?', options:['Good','Fair','Poor']},
@@ -3485,7 +3485,7 @@ var CHECK_CATEGORIES = {
   chipper: {
     label: 'Woodchippers', icon: '🪚', table: 'woodchipper_checks',
     machineLabel: 'Serial / Reference / Model / Reg No',
-    machines: ['Forst - TR8', 'Forst - ST6P', 'Tracked TR6', 'Forst - TR8 (Old)', 'Forst - TR8 (New)'],
+    machines: ['Forst - ST6P', 'Forst - TR8 (Old)', 'Forst - TR8 (New)'],
     hasMileage: true, mileageLabel: 'Mileage or Hours (if applicable)',
     fields: [
       {key:'used_since_last', label:'Has this item of equipment been used since its last inspection?', options:['Yes','No']},
@@ -3564,7 +3564,14 @@ var CHECK_CATEGORIES = {
   handheld: {
     label: 'Hand Held Tools', icon: '🔧', table: 'handheld_tool_checks',
     machineLabel: 'Serial / Reference / Model / Reg No',
-    machines: ['BR600', '170BT', 'Hand blower stihl', 'Hand blower', 'BG88C', 'Br700', 'Br800', 'Stihl FS 94RC - Jack', 'Stihl FS 94RC - Luke', 'Stihl FS 94RC - Jason', 'Stihl FS 94RC - Dave', 'Stihl FS 94RC - Spare', 'Stihl HS 81TC - 1 (Handheld)', 'Sthil HS 81TC - 2 (Handheld)', 'Luke BR600', 'Jason BR700', 'Liam BR600', 'Jack BR800c', 'Liam Couling BR600', 'Stihl FS 561 E', 'Sthil FS 360 C'],
+    // Grouped in the machine dropdown (as <optgroup>s); `machines` is the flat
+    // list derived from these below, used by the schedule and everything else.
+    machineGroups: {
+      'Hedgetrimmers': ['Stihl HS 81TC - 1 (Handheld)', 'Sthil HS 81TC - 2 (Handheld)'],
+      'Brushcutters': ['Stihl FS 94RC - Jack', 'Stihl FS 94RC - Luke', 'Stihl FS 94RC - Jason', 'Stihl FS 94RC - Dave', 'Stihl FS 94RC - Spare', 'Stihl FS 561 E', 'Sthil FS 360 C'],
+      'Blowers': ['BR600', 'Luke BR600', 'Liam BR600', 'Liam Couling BR600', 'Br700', 'Jason BR700', 'Br800', 'Jack BR800c', 'BG88C', 'Hand blower stihl', 'Hand blower'],
+      'Other': ['170BT']
+    },
     fields: [
       {key:'used_since_last', label:'Has this machine been used since its last inspection?', options:['Yes','No']},
       {key:'guards', label:'Are all the machine guards in place?', options:['Yes','No']},
@@ -3628,8 +3635,36 @@ var CHECK_CATEGORIES = {
       {key:'platform_controls', label:'Function check of platform controls completed?', options:['Yes','No']},
       {key:'ground_controls', label:'Function check of ground controls completed?', options:['Yes','No']}
     ]
+  },
+  rigging: {
+    label: 'Rigging Kit', icon: '⛩️', table: 'rigging_kit_checks',
+    // One kit, each item is checked individually below — no machine picker.
+    hideMachine: true, machines: ['Rigging Kit'],
+    checksHeading: 'LOLER Interim Inspection',
+    fields: [
+      {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
+      {key:'notch_harness_gv0162021', label:'Notch Harness - GV0162021', options:['Good','Fair','Poor']},
+      {key:'art_ropeguide_032101484', label:'ART Ropeguide - 03.2101484', options:['Good','Fair','Poor']},
+      {key:'isc_fig8_descender_211341770101', label:'ISC UK Figure 8 descender - 211341770101', options:['Good','Fair','Poor']},
+      {key:'petzl_zigzag_2530649719968', label:'Petzl Zigzag - 2530649719968', options:['Good','Fair','Poor']},
+      {key:'petzl_ok_krab_18g0147431547', label:'Petzl OK 3-Way Alu Krab - 18G0147431547', options:['Good','Fair','Poor']},
+      {key:'petzl_ok_krab_21f0335559864', label:'Petzl OK 3-Way Alu Krab - 21F0335559864', options:['Good','Fair','Poor']},
+      {key:'petzl_ok_krab_21f0335559821', label:'Petzl OK 3-Way Alu Krab - 21F0335559821', options:['Good','Fair','Poor']},
+      {key:'dmm_ultra_o_krab_190022004e', label:'DMM Ultra O 3-Way Alu Krab - 190022004E', options:['Good','Fair','Poor']},
+      {key:'isc_oval_krab_241887580022', label:'ISC UK Oval 3-way Alu Krab - 241887580022', options:['Good','Fair','Poor']},
+      {key:'isc_oval_krab_241884990014', label:'ISC UK Oval 3-way Alu Krab - 241884990014', options:['Good','Fair','Poor']},
+      {key:'notch_tool_lanyard_00457', label:'Notch Tool Lanyard - 00457', options:['Good','Fair','Poor']},
+      {key:'bumblebee_flipline_rbl9blcoitn0747cw478', label:'Bumblebee Wire Core Flipline - RBL9BLCOITN0747CW478', options:['Good','Fair','Poor']}
+    ]
   }
 };
+
+Object.keys(CHECK_CATEGORIES).forEach(function(cat) {
+  var cfg = CHECK_CATEGORIES[cat];
+  if (cfg.machineGroups) {
+    cfg.machines = [].concat.apply([], Object.keys(cfg.machineGroups).map(function(g){ return cfg.machineGroups[g]; }));
+  }
+});
 
 var _catState = {};
 function catState(cat) {
@@ -3684,7 +3719,11 @@ function catGetRating(cat) {
 }
 
 function catMachineSelectHtml(cat, cfg) {
-  var opts = cfg.machines.map(function(m){ return '<option>' + m + '</option>'; }).join('');
+  var opts = cfg.machineGroups
+    ? Object.keys(cfg.machineGroups).map(function(g) {
+        return '<optgroup label="' + g + '">' + cfg.machineGroups[g].map(function(m){ return '<option>' + m + '</option>'; }).join('') + '</optgroup>';
+      }).join('')
+    : cfg.machines.map(function(m){ return '<option>' + m + '</option>'; }).join('');
   var selStyle = "width:100%;border:none;border-bottom:1.5px solid var(--border);padding:6px 0;font-size:13px;font-family:'Barlow',sans-serif;outline:none;background:transparent;color:var(--dark);";
   var inpStyle = "width:100%;border:none;border-bottom:1.5px solid var(--border);padding:6px 0;font-size:13px;font-family:'Barlow',sans-serif;outline:none;background:transparent;margin-top:6px;display:none;";
   return '<select id="catMachine_' + cat + '" onchange="catMachineChange(\'' + cat + '\')" style="' + selStyle + '">'
@@ -3701,7 +3740,7 @@ function catMachineChange(cat) {
 
 function catGetMachine(cat) {
   var sel = document.getElementById('catMachine_' + cat);
-  if (!sel) return '';
+  if (!sel) return CHECK_CATEGORIES[cat].hideMachine ? CHECK_CATEGORIES[cat].machines[0] : '';
   if (sel.value === '__other__') {
     var other = document.getElementById('catMachineOther_' + cat);
     return other ? other.value : '';
@@ -3741,13 +3780,14 @@ function renderCategoryPanel(cat) {
 
     + '<div id="catFormPanel_' + cat + '" style="display:none;">'
     + '<div style="background:rgba(126,200,32,.1);border:1px solid rgba(126,200,32,.3);border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:rgba(255,255,255,.7);line-height:1.6;">Inspector: <strong id="catInspectorDisplay_' + cat + '" style="color:var(--lime);"></strong> &nbsp;|&nbsp; Date: <strong id="catDateDisplay_' + cat + '" style="color:var(--lime);"></strong></div>'
+    + (cfg.hideMachine ? '' :
+      '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
+      + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">' + cfg.icon + ' ' + cfg.label + ' Details</div>'
+      + '<div class="field-row lw"><div class="fc lbl">' + cfg.machineLabel + '</div><div class="fc">' + catMachineSelectHtml(cat, cfg) + '</div></div>'
+      + mileageHtml
+      + '</div>')
     + '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
-    + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">' + cfg.icon + ' ' + cfg.label + ' Details</div>'
-    + '<div class="field-row lw"><div class="fc lbl">' + cfg.machineLabel + '</div><div class="fc">' + catMachineSelectHtml(cat, cfg) + '</div></div>'
-    + mileageHtml
-    + '</div>'
-    + '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
-    + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9989; Checks</div>'
+    + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9989; ' + (cfg.checksHeading || 'Checks') + '</div>'
     + fieldsHtml
     + '</div>'
     + '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
