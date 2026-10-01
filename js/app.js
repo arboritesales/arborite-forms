@@ -3564,14 +3564,7 @@ var CHECK_CATEGORIES = {
   handheld: {
     label: 'Hand Held Tools', icon: '🔧', table: 'handheld_tool_checks',
     machineLabel: 'Serial / Reference / Model / Reg No',
-    // Grouped in the machine dropdown (as <optgroup>s); `machines` is the flat
-    // list derived from these below, used by the schedule and everything else.
-    machineGroups: {
-      'Hedgetrimmers': ['Stihl HS 81TC - 1 (Handheld)', 'Sthil HS 81TC - 2 (Handheld)'],
-      'Brushcutters': ['Stihl FS 94RC - Jack', 'Stihl FS 94RC - Luke', 'Stihl FS 94RC - Jason', 'Stihl FS 94RC - Dave', 'Stihl FS 94RC - Spare', 'Stihl FS 561 E', 'Sthil FS 360 C'],
-      'Blowers': ['BR600', 'Luke BR600', 'Liam BR600', 'Liam Couling BR600', 'Br700', 'Jason BR700', 'Br800', 'Jack BR800c', 'BG88C', 'Hand blower stihl', 'Hand blower'],
-      'Other': ['170BT']
-    },
+    machines: ['Hedgetrimmer', 'Brushcutter', 'Blower'],
     fields: [
       {key:'used_since_last', label:'Has this machine been used since its last inspection?', options:['Yes','No']},
       {key:'guards', label:'Are all the machine guards in place?', options:['Yes','No']},
@@ -3659,13 +3652,6 @@ var CHECK_CATEGORIES = {
   }
 };
 
-Object.keys(CHECK_CATEGORIES).forEach(function(cat) {
-  var cfg = CHECK_CATEGORIES[cat];
-  if (cfg.machineGroups) {
-    cfg.machines = [].concat.apply([], Object.keys(cfg.machineGroups).map(function(g){ return cfg.machineGroups[g]; }));
-  }
-});
-
 var _catState = {};
 function catState(cat) {
   if (!_catState[cat]) _catState[cat] = { inspector: null, currentId: null, autoSaveTimer: null };
@@ -3719,11 +3705,7 @@ function catGetRating(cat) {
 }
 
 function catMachineSelectHtml(cat, cfg) {
-  var opts = cfg.machineGroups
-    ? Object.keys(cfg.machineGroups).map(function(g) {
-        return '<optgroup label="' + g + '">' + cfg.machineGroups[g].map(function(m){ return '<option>' + m + '</option>'; }).join('') + '</optgroup>';
-      }).join('')
-    : cfg.machines.map(function(m){ return '<option>' + m + '</option>'; }).join('');
+  var opts = cfg.machines.map(function(m){ return '<option>' + m + '</option>'; }).join('');
   var selStyle = "width:100%;border:none;border-bottom:1.5px solid var(--border);padding:6px 0;font-size:13px;font-family:'Barlow',sans-serif;outline:none;background:transparent;color:var(--dark);";
   var inpStyle = "width:100%;border:none;border-bottom:1.5px solid var(--border);padding:6px 0;font-size:13px;font-family:'Barlow',sans-serif;outline:none;background:transparent;margin-top:6px;display:none;";
   return '<select id="catMachine_' + cat + '" onchange="catMachineChange(\'' + cat + '\')" style="' + selStyle + '">'
