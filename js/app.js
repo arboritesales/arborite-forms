@@ -5503,7 +5503,7 @@ function _msbHtmlToRuns(html) {
 
 function resetMSBState() {
   msbState = {
-    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', workingDays:'', scope:'', methodology:'', methodologyPoints: MSB_METHODOLOGY_FIXED_POINTS.slice(), signOffDate:'', permitsIssuedBy: { highways:'', breakingGround:'' }, clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
+    job: { titleOfDocument:'', client:'', siteAddress:'', what3words:'', startDate:'', scope:'', methodology:'', methodologyPoints: MSB_METHODOLOGY_FIXED_POINTS.slice(), methodologyImages:[], signOffDate:'', permitsIssuedBy: { highways:'', breakingGround:'' }, clientContactName:'', clientContactPhone:'', clientContactEmail:'', siteControlImages:[], siteControlComments:'' },
     team: [], equipment: [], selectedSOPs: [], selectedExclusionZones: [], ppeAssignments: {},
     emergency: { hospitalName:'', hospitalAddress:'', hospitalPhone:'', routeMap:{storagePath:'',status:''}, routeDistance:'', routeTime:'' },
     status: 'draft', sentAt: null
@@ -5546,9 +5546,19 @@ function fetchMSBRefLibrary() {
   });
 }
 
+// Also resolves people added by hand on the Team step (not in ms_staff) — their
+// details live on the team entry itself, so every caller treats them the same.
 function _msbFindStaff(id) {
   for (var i = 0; i < msbRefLib.staff.length; i++) if (msbRefLib.staff[i].id === id) return msbRefLib.staff[i];
+  var team = (msbState && msbState.team) || [];
+  for (var j = 0; j < team.length; j++) if (team[j].custom && team[j].staffId === id) return _msbCustomPerson(team[j]);
   return null;
+}
+function _msbCustomPerson(t) {
+  return {
+    id: t.staffId, name: t.name || '(name not entered)', defaultRole: t.roleOverride || '', firstAider: !!t.firstAider,
+    competencies: (t.competenciesText || '').split('\n').map(function(c) { return c.trim(); }).filter(Boolean).map(function(c) { return { name: c }; })
+  };
 }
 function _msbFindSop(id) {
   for (var i = 0; i < msbRefLib.sops.length; i++) if (msbRefLib.sops[i].id === id) return msbRefLib.sops[i];
@@ -5661,8 +5671,8 @@ function fetchMSBList() {
         var job = fd.job || {};
         var d = row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
         var ref = row.quote_ref;
-        var mainLine = job.client || job.titleOfDocument || ref;
-        var subLine = (job.siteAddress ? job.siteAddress + ' &nbsp;·&nbsp; ' : '') + d;
+        var mainLine = job.titleOfDocument || job.client || ref;
+        var subLine = (job.titleOfDocument && job.client ? job.client + ' &nbsp;·&nbsp; ' : '') + (job.siteAddress ? job.siteAddress + ' &nbsp;·&nbsp; ' : '') + d;
         var badge = fd.status === 'sent'
           ? '<span class="msb-badge sent">Sent to Customer' + (fd.sentAt ? ' — ' + _msbFmtDate(fd.sentAt) : '') + '</span>'
           : '<span class="msb-badge draft">Draft</span>';
@@ -5701,7 +5711,7 @@ function fetchMSBDeletedList() {
         var fd = row.form_data || {};
         var job = fd.job || {};
         var ref = row.quote_ref;
-        var mainLine = job.client || job.titleOfDocument || ref;
+        var mainLine = job.titleOfDocument || job.client || ref;
         var deletedWhen = fd.deletedAt ? _msbFmtDate(fd.deletedAt) : '—';
         html += '<div style="background:#3a2010;border:1px solid rgba(255,150,80,.35);border-radius:8px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
           + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#ffb066;letter-spacing:.5px;">' + mainLine + '</div>'
@@ -5896,12 +5906,15 @@ function saveMSBRecord() {
 // Shared by the normal save path and _msbResyncPendingOnOpen() below, so a
 // cached-offline snapshot gets the same treatment before it's pushed.
 function _msbCleanFormData(state) {
-  var cleanImages = (state.job.siteControlImages || []).map(function(p) {
-    return { storagePath: p.storagePath || '', status: p.storagePath ? 'saved' : 'pending' };
-  }).filter(function(p) { return p.storagePath; });
+  var cleanImageList = function(list) {
+    return (list || []).map(function(p) {
+      return { storagePath: p.storagePath || '', status: p.storagePath ? 'saved' : 'pending' };
+    }).filter(function(p) { return p.storagePath; });
+  };
   var cleanJob = {};
   for (var k in state.job) cleanJob[k] = state.job[k];
-  cleanJob.siteControlImages = cleanImages;
+  cleanJob.siteControlImages = cleanImageList(state.job.siteControlImages);
+  cleanJob.methodologyImages = cleanImageList(state.job.methodologyImages);
   var rm = state.emergency.routeMap || {};
   var cleanEmergency = {};
   for (var ek in state.emergency) cleanEmergency[ek] = state.emergency[ek];
@@ -6022,6 +6035,7 @@ function renderMSBMethodologyPoints(listEl) {
   }
   points.forEach(function(pt, i) {
     var row = _msbEl('<div style="display:flex;gap:8px;align-items:flex-start;"></div>');
+    row.appendChild(_msbEl('<div style="min-width:22px;padding-top:10px;font-weight:700;font-size:13px;color:var(--mid);text-align:right;">' + (i + 1) + '.</div>'));
     var ta = document.createElement('textarea');
     ta.style.cssText = 'flex:1;min-height:44px;';
     ta.value = pt;
@@ -6051,7 +6065,7 @@ function renderMSBJobStep(container) {
     ['titleOfDocument','Title of Document'],
     ['client','Client'],
     ['siteAddress','Site Address'], ['what3words','What3Words for Access'],
-    ['workingDays','Number of Working Days on Site']
+    ['startDate','Start Date','date']
   ];
   var grid = _msbEl('<div class="msb-grid2"></div>');
   fields.forEach(function(f) {
@@ -6079,6 +6093,11 @@ function renderMSBJobStep(container) {
   methWrap.appendChild(_msbEl('<label>Work Methodology (Section 2.0)</label>'));
 
   var methPointsWrap = _msbEl('<div class="msb-field" style="margin-top:14px;"><label>Standard Sequence of Work</label></div>');
+  methPointsWrap.appendChild(_msbEl('<div class="msb-desc" style="margin:4px 0 8px;">Photos (optional, up to 8) — numbered so you can refer to them in the points below (e.g. "see Photo 1"). Shown at the top of Section 2.0 in the PDF.</div>'));
+  var methImgWrap = _msbEl('<div id="msbMethImages" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>');
+  methPointsWrap.appendChild(methImgWrap);
+  methPointsWrap.appendChild(_msbPhotoSetFileInput('methodology'));
+  renderMSBPhotoSet('methodology', methImgWrap);
   var methPointsList = _msbEl('<div id="msbMethPointsList" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>');
   methPointsWrap.appendChild(methPointsList);
   var addPointBtn = _msbEl('<button class="btn btn-clear" style="margin-top:8px;" type="button">+ Add point</button>');
@@ -6181,6 +6200,63 @@ function renderMSBTeamStep(container) {
   });
   wrap.appendChild(card);
 
+  // People not in the staff list (subcontractors, agency, new starters) —
+  // entered by hand for this document only.
+  var extraCard = _msbEl('<div class="msb-card"><h3>Additional People</h3></div>');
+  extraCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Add anyone not in the list above. Enter one competency per line.</div>'));
+  msbState.team.filter(function(t) { return t.custom; }).forEach(function(t) {
+    var row = _msbEl('<div class="msb-staff-row selected" style="align-items:flex-start;"></div>');
+    var fields = _msbEl('<div style="flex:1;min-width:220px;"></div>');
+    var grid = _msbEl('<div class="msb-grid2"></div>');
+    [['name','Name'],['roleOverride','Role']].forEach(function(f) {
+      var fwrap = _msbEl('<div class="msb-field" style="margin-bottom:8px;"><label>' + f[1] + '</label></div>');
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = t[f[0]] || '';
+      input.oninput = function() { t[f[0]] = input.value; };
+      fwrap.appendChild(input);
+      grid.appendChild(fwrap);
+    });
+    fields.appendChild(grid);
+    var faLabel = _msbEl('<label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:8px;cursor:pointer;"></label>');
+    var faCb = document.createElement('input');
+    faCb.type = 'checkbox';
+    faCb.checked = !!t.firstAider;
+    faCb.onchange = function() { t.firstAider = faCb.checked; };
+    faLabel.appendChild(faCb);
+    faLabel.appendChild(document.createTextNode('First Aider'));
+    fields.appendChild(faLabel);
+    var compWrap = _msbEl('<div class="msb-field" style="margin-bottom:0;"><label>Competencies (one per line)</label></div>');
+    var compTa = document.createElement('textarea');
+    compTa.value = t.competenciesText || '';
+    compTa.placeholder = 'e.g. NPTC CS30/31 Chainsaw Maintenance & Cross-cutting';
+    compTa.oninput = function() { t.competenciesText = compTa.value; };
+    compWrap.appendChild(compTa);
+    fields.appendChild(compWrap);
+    row.appendChild(fields);
+    var rmBtn = document.createElement('button');
+    rmBtn.type = 'button';
+    rmBtn.textContent = '✕';
+    rmBtn.title = 'Remove this person';
+    rmBtn.style.cssText = 'background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#c62828;font-size:14px;padding:6px 10px;cursor:pointer;flex-shrink:0;';
+    rmBtn.onclick = function() {
+      if (!confirm('Remove ' + (t.name || 'this person') + '?')) return;
+      msbState.team = msbState.team.filter(function(x) { return x !== t; });
+      delete msbState.ppeAssignments[t.staffId];
+      renderMSBAll();
+      scheduleMSBAutoSave();
+    };
+    row.appendChild(rmBtn);
+    extraCard.appendChild(row);
+  });
+  var addPersonBtn = _msbEl('<button class="btn btn-clear" type="button">+ Add person</button>');
+  addPersonBtn.onclick = function() {
+    msbState.team.push({ custom: true, staffId: 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), name: '', roleOverride: '', firstAider: false, competenciesText: '' });
+    renderMSBAll();
+  };
+  extraCard.appendChild(addPersonBtn);
+  wrap.appendChild(extraCard);
+
   if (msbState.team.length) {
     var compCard = _msbEl('<div class="msb-card"><h3>Competencies on this job (auto-populated — Section 4.0)</h3></div>');
     var table = _msbEl('<table class="msb-comp-table"><thead><tr><th>Name</th><th>Role</th><th>Competency</th></tr></thead><tbody></tbody></table>');
@@ -6188,7 +6264,7 @@ function renderMSBTeamStep(container) {
     msbState.team.forEach(function(t) {
       var person = _msbFindStaff(t.staffId);
       if (!person) return;
-      person.competencies.forEach(function(c, i) {
+      (person.competencies.length ? person.competencies : [{ name: '—' }]).forEach(function(c, i) {
         // <tr>/<td> built via document.createElement, NOT _msbEl — browsers
         // silently drop bare table-row tags set through innerHTML on a div.
         var tr = document.createElement('tr');
@@ -6250,18 +6326,47 @@ function renderMSBPlantStep(container) {
 
   wrap.appendChild(card);
 
-  var ctrlCard = _msbEl('<div class="msb-card"><h3>Site Specific Controls (Section 5.5)</h3></div>');
-  ctrlCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Add up to 4 photos showing site-specific controls (e.g. barriers, signage, access points).</div>'));
+  // One-off machinery not in the equipment library — entered by hand for
+  // this document only.
+  var extraCard = _msbEl('<div class="msb-card"><h3>Additional Machinery</h3></div>');
+  extraCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Add any machinery not listed above (e.g. hired-in plant).</div>'));
+  msbState.equipment.filter(function(e) { return e.custom; }).forEach(function(eq) {
+    var row = _msbEl('<div class="msb-equip-row"></div>');
+    var rmBtn = document.createElement('button');
+    rmBtn.type = 'button';
+    rmBtn.textContent = '✕';
+    rmBtn.title = 'Remove this machine';
+    rmBtn.style.cssText = 'background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#c62828;font-size:12px;padding:3px 7px;cursor:pointer;';
+    rmBtn.onclick = function() {
+      msbState.equipment = msbState.equipment.filter(function(e) { return e !== eq; });
+      renderMSBAll();
+      scheduleMSBAutoSave();
+    };
+    row.appendChild(rmBtn);
+    [['name','Machine name'],['sound','Sound pressure (e.g. 110 dB)'],['vibration','Vibration (e.g. 0.5 m/s² or N/A)']].forEach(function(f) {
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = f[1];
+      input.value = eq[f[0]] || '';
+      input.oninput = function() { eq[f[0]] = input.value; };
+      row.appendChild(input);
+    });
+    extraCard.appendChild(row);
+  });
+  var addEqBtn = _msbEl('<button class="btn btn-clear" type="button">+ Add machinery</button>');
+  addEqBtn.onclick = function() {
+    msbState.equipment.push({ custom: true, id: 'custom_eq_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), name: '', sound: '', vibration: '' });
+    renderMSBAll();
+  };
+  extraCard.appendChild(addEqBtn);
+  wrap.appendChild(extraCard);
+
+  var ctrlCard =_msbEl('<div class="msb-card"><h3>Site Specific Controls (Section 5.5)</h3></div>');
+  ctrlCard.appendChild(_msbEl('<div class="msb-desc" style="margin:0 0 10px;">Add up to 4 photos showing site-specific controls (e.g. barriers, signage, access points). Photos are numbered so you can refer to them in the comments (e.g. "see Photo 2").</div>'));
   var imgWrap = _msbEl('<div id="msbSiteCtrlImages" style="display:flex;gap:10px;flex-wrap:wrap;"></div>');
   ctrlCard.appendChild(imgWrap);
-  var fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = 'image/*';
-  fileInput.style.display = 'none';
-  fileInput.id = 'msbSiteCtrlInput';
-  fileInput.onchange = function() { msbSiteControlImageUpload(fileInput); };
-  ctrlCard.appendChild(fileInput);
-  renderMSBSiteControlImages(imgWrap);
+  ctrlCard.appendChild(_msbPhotoSetFileInput('siteControl'));
+  renderMSBPhotoSet('siteControl', imgWrap);
 
   var commentsWrap = _msbEl('<div class="msb-field" style="margin-top:12px;"><label>Comments</label></div>');
   var commentsBox = _msbCreateRichBox(msbState.job.siteControlComments, function(html) { msbState.job.siteControlComments = html; }, 'No comments required');
@@ -6333,12 +6438,31 @@ function _msbMigrateLegacySiteImages() {
   });
 }
 
-function renderMSBSiteControlImages(wrap) {
-  wrap = wrap || document.getElementById('msbSiteCtrlImages');
+// Numbered photo sets — each tile shows its photo number (matching the
+// "Photo N" caption printed under it in the PDF) so photos can be referred to
+// by number in comments/points. Numbering is per section.
+var MSB_PHOTO_SETS = {
+  siteControl: { stateKey: 'siteControlImages', max: 4, wrapId: 'msbSiteCtrlImages', inputId: 'msbSiteCtrlInput', pathPrefix: 'msb-site-controls/' },
+  methodology: { stateKey: 'methodologyImages', max: 8, wrapId: 'msbMethImages', inputId: 'msbMethInput', pathPrefix: 'msb-methodology/' }
+};
+function renderMSBSiteControlImages(wrap) { renderMSBPhotoSet('siteControl', wrap); }
+function _msbPhotoSetFileInput(setKey) {
+  var cfg = MSB_PHOTO_SETS[setKey];
+  var fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+  fileInput.style.display = 'none';
+  fileInput.id = cfg.inputId;
+  fileInput.onchange = function() { msbPhotoSetUpload(setKey, fileInput); };
+  return fileInput;
+}
+function renderMSBPhotoSet(setKey, wrap) {
+  var cfg = MSB_PHOTO_SETS[setKey];
+  wrap = wrap || document.getElementById(cfg.wrapId);
   if (!wrap) return;
-  var images = msbState.job.siteControlImages || (msbState.job.siteControlImages = []);
+  var images = msbState.job[cfg.stateKey] || (msbState.job[cfg.stateKey] = []);
   wrap.innerHTML = '';
-  for (var i = 0; i < 4; i++) {
+  for (var i = 0; i < cfg.max; i++) {
     var tile = document.createElement('div');
     if (images[i]) {
       var p = images[i];
@@ -6360,19 +6484,21 @@ function renderMSBSiteControlImages(wrap) {
         tile.style.display = 'flex'; tile.style.alignItems = 'center'; tile.style.justifyContent = 'center'; tile.style.color = '#999';
       }
       if (p.status === 'error') tile.style.borderColor = '#c62828';
+      tile.appendChild(_msbEl('<div style="position:absolute;top:3px;left:3px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--green);color:#fff;font-size:12px;font-weight:700;line-height:20px;text-align:center;">' + (i + 1) + '</div>'));
       (function(idx) {
         tile.onclick = function() {
           if (images[idx].status === 'processing') return;
-          if (!confirm('Remove this photo?')) return;
+          if (!confirm('Remove photo ' + (idx + 1) + '? Any photos after it will be renumbered.')) return;
           images.splice(idx, 1);
-          renderMSBSiteControlImages();
+          renderMSBPhotoSet(setKey);
+          scheduleMSBAutoSave();
         };
       })(i);
     } else if (i === images.length) {
       tile.style.cssText = 'width:84px;height:84px;border-radius:6px;border:2px dashed var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:24px;color:#999;background:#fafafa;';
       tile.textContent = '+';
       tile.onclick = function() {
-        var inp = document.getElementById('msbSiteCtrlInput');
+        var inp = document.getElementById(cfg.inputId);
         if (inp) inp.click();
       };
     } else {
@@ -6382,25 +6508,27 @@ function renderMSBSiteControlImages(wrap) {
   }
 }
 
-function msbSiteControlImageUpload(input) {
+function msbPhotoSetUpload(setKey, input) {
+  var cfg = MSB_PHOTO_SETS[setKey];
   var file = input.files[0];
   input.value = '';
   if (!file) return;
-  var images = msbState.job.siteControlImages || (msbState.job.siteControlImages = []);
-  if (images.length >= 4) return;
+  var images = msbState.job[cfg.stateKey] || (msbState.job[cfg.stateKey] = []);
+  if (images.length >= cfg.max) return;
   var slot = { storagePath: '', status: 'processing' };
   images.push(slot);
-  renderMSBSiteControlImages();
+  var rerender = function() { renderMSBPhotoSet(setKey); };
+  rerender();
   _resizeImageToJpeg(file, 1200, 0.7, function(dataUrl) {
-    if (!dataUrl) { slot.status = 'error'; renderMSBSiteControlImages(); return; }
+    if (!dataUrl) { slot.status = 'error'; rerender(); return; }
     slot._localPreview = dataUrl;
-    renderMSBSiteControlImages();
-    var path = 'msb-site-controls/' + (currentMSBRef || 'draft') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.jpg';
+    rerender();
+    var path = cfg.pathPrefix + (currentMSBRef || 'draft') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.jpg';
     _uploadMSBSiteImage(path, dataUrl, 'image/jpeg').then(function(r) {
-      if (r.ok) { slot.storagePath = path; slot.status = 'saved'; delete slot._localPreview; }
+      if (r.ok) { slot.storagePath = path; slot.status = 'saved'; delete slot._localPreview; scheduleMSBAutoSave(); }
       else { slot.status = 'error'; }
-      renderMSBSiteControlImages();
-    }).catch(function() { slot.status = 'error'; renderMSBSiteControlImages(); });
+      rerender();
+    }).catch(function() { slot.status = 'error'; rerender(); });
   });
 }
 
@@ -6656,7 +6784,7 @@ function renderMSBReviewStep(container) {
   jobSec.appendChild(_msbEl('<div class="row"><strong>Title of Document:</strong> ' + (msbState.job.titleOfDocument || '—') + '</div>'));
   jobSec.appendChild(_msbEl('<div class="row"><strong>Client:</strong> ' + (msbState.job.client || '—') + '</div>'));
   jobSec.appendChild(_msbEl('<div class="row"><strong>Site Address:</strong> ' + (msbState.job.siteAddress || '—') + '</div>'));
-  jobSec.appendChild(_msbEl('<div class="row"><strong>Working Days:</strong> ' + (msbState.job.workingDays || '—') + '</div>'));
+  jobSec.appendChild(_msbEl('<div class="row"><strong>Start Date:</strong> ' + _msbFmtDateDotted(msbState.job.startDate) + '</div>'));
   jobSec.appendChild(_msbEl('<div class="row"><strong>On-Site Client Contact:</strong> ' + (msbState.job.clientContactName || '—') + ' — ' + (msbState.job.clientContactPhone || '—') + ' — ' + (msbState.job.clientContactEmail || '—') + '</div>'));
   card.appendChild(jobSec);
 
@@ -6670,7 +6798,7 @@ function renderMSBReviewStep(container) {
 
   var eqSec = _msbEl('<div class="msb-review-section"><h4>Equipment (' + msbState.equipment.length + ')</h4></div>');
   msbState.equipment.forEach(function(eq) {
-    eqSec.appendChild(_msbEl('<div class="row">' + eq.name + ' — ' + eq.sound + ' / ' + eq.vibration + '</div>'));
+    if (eq.name) eqSec.appendChild(_msbEl('<div class="row">' + eq.name + ' — ' + (eq.sound || '—') + ' / ' + (eq.vibration || '—') + '</div>'));
   });
   if (!msbState.equipment.length) eqSec.appendChild(_msbEl('<div class="row">No equipment selected yet.</div>'));
   card.appendChild(eqSec);
@@ -6841,7 +6969,29 @@ function _msbSignOffTable(label, name, position, date) {
   }, margin: [0,0,0,10] };
 }
 
-function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
+// Lays photos out 3 per row, each captioned "Photo N" to match the number
+// shown on its tile in the app. `images` keeps its original order with null
+// for any photo that couldn't be fetched, so numbering never shifts. Registers
+// each image into `pdfImages` under keyPrefix + index.
+function _msbPhotoGrid(keyPrefix, images, pdfImages) {
+  var cells = [];
+  (images || []).forEach(function(img, i) {
+    if (!img) return;
+    pdfImages[keyPrefix + i] = img;
+    cells.push({ width: 150, stack: [
+      { image: keyPrefix + i, fit: [150, 150] },
+      { text: 'Photo ' + (i + 1), style: 'photoCaption', margin: [0,3,0,0] }
+    ] });
+  });
+  var rows = [];
+  for (var r = 0; r < cells.length; r += 3) {
+    rows.push({ columns: cells.slice(r, r + 3), columnGap: 15, margin: [0,0,0,10], unbreakable: true });
+  }
+  return rows;
+}
+
+function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage, resolvedMethImages) {
+  var pdfImages = { logo: msbLogoBase64 };
   var derivedPPE = derivePPEForMSB();
   var selectedEZ = msbState.selectedExclusionZones.map(_msbFindEZ).filter(Boolean);
 
@@ -6855,20 +7005,19 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
   msbState.team.forEach(function(t) {
     var p = _msbFindStaff(t.staffId);
     if (!p) return;
+    if (!p.competencies.length) { compTableBody.push([p.name, '—']); return; }
     p.competencies.forEach(function(c, i) { compTableBody.push([i === 0 ? p.name : '', c.name]); });
   });
 
   var equipTableBody = [[{text:'Plant/Machinery',bold:true},{text:'Sound Pressure',bold:true},{text:'Vibration Magnitude',bold:true}]];
-  msbState.equipment.forEach(function(eq) { equipTableBody.push([eq.name, eq.sound, eq.vibration]); });
+  msbState.equipment.forEach(function(eq) { if (eq.name) equipTableBody.push([eq.name, eq.sound || '—', eq.vibration || '—']); });
 
-  var siteControlImages = (resolvedSiteImages || []).slice(0, 4);
-  var siteControlImagesMap = {};
-  siteControlImages.forEach(function(img, i) { siteControlImagesMap['siteCtrlImg' + i] = img; });
+  var siteControlGrid = _msbPhotoGrid('siteCtrlImg', (resolvedSiteImages || []).slice(0, 4), pdfImages);
   var siteControlsContent = [
-    { text: _msbHtmlToRuns(msbState.job.siteControlComments) || 'No comments required', style: 'body', margin: [0,0,0,siteControlImages.length ? 8 : 0] }
+    { text: _msbHtmlToRuns(msbState.job.siteControlComments) || 'No comments required', style: 'body', margin: [0,0,0,siteControlGrid.length ? 8 : 0] }
   ];
-  if (siteControlImages.length) {
-    siteControlsContent.push({ columns: siteControlImages.map(function(img, i) { return { image: 'siteCtrlImg' + i, width: 120 }; }), columnGap: 10 });
+  if (siteControlGrid.length) {
+    siteControlsContent = siteControlsContent.concat(siteControlGrid);
   } else if (_msbHtmlIsEmpty(msbState.job.siteControlComments)) {
     siteControlsContent = [{ text: 'No site specific control images or comments added for this job.', style: 'body' }];
   }
@@ -6909,8 +7058,11 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
   var methodologyPointsList = (msbState.job.methodologyPoints || []).map(function(p) { return (p || '').trim(); }).filter(Boolean);
 
-  var pdfImages = { logo: msbLogoBase64 };
-  for (var _siteImgKey in siteControlImagesMap) pdfImages[_siteImgKey] = siteControlImagesMap[_siteImgKey];
+  var methodologyGrid = _msbPhotoGrid('methImg', resolvedMethImages, pdfImages);
+  var methodologyContent = methodologyGrid.slice();
+  if (methodologyPointsList.length) methodologyContent.push({ ol: methodologyPointsList, style: 'body', margin: [0, methodologyGrid.length ? 4 : 0, 0, 0] });
+  if (!methodologyContent.length) methodologyContent.push({ text: 'No standard sequence of work points selected for this job.', style: 'body' });
+
   if (resolvedRouteMapImage) pdfImages.routeMapImg = resolvedRouteMapImage;
 
   var routeMapContent = resolvedRouteMapImage
@@ -6919,7 +7071,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
   var content = [
     { text: 'Method Statement', style: 'title' },
-    { text: msbState.job.client || 'Client not specified', style: 'subtitle', margin: [0,0,0,20] },
+    { text: msbState.job.titleOfDocument || msbState.job.client || 'Untitled', style: 'subtitle', margin: [0,0,0,20] },
 
     _msbBoxed('Job Details', { table: { widths: ['30%','70%'], body: [
       ['Title of Document', msbState.job.titleOfDocument || '—'],
@@ -6931,7 +7083,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       ['Contractor', MSB_CONTRACTOR_LINES.join('\n')],
       ['Site Address', msbState.job.siteAddress || '—'],
       ['What3Words for Access', msbState.job.what3words || '—'],
-      ['Number of Working Days on Site', msbState.job.workingDays || '—'],
+      ['Start Date', _msbFmtDateDotted(msbState.job.startDate)],
       // Grouped into one row — three short, related contact fields that
       // must never split apart onto separate pages from each other.
       [{ colSpan: 2, columns: [
@@ -6963,9 +7115,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
 
     _msbBoxed('1.0  Introduction', { text: 'The following method statement has been developed to provide a Safe System of Works (SSoW) and must be always adhered to. Any significant deviation from this system of work must first be authorised by a member of the Senior Management Team (Point of contact for works or Managing Director). Please read the entire method statement before the commencement of work. If you have any questions, please speak with the site supervisor before proceeding with the works.', style: 'body' }),
 
-    _msbBoxed('2.0  Work Methodology', methodologyPointsList.length
-      ? [{ ul: methodologyPointsList, style: 'body' }]
-      : [{ text: 'No standard sequence of work points selected for this job.', style: 'body' }]),
+    _msbBoxed('2.0  Work Methodology', methodologyContent),
 
     _msbBoxed('3.0  Operational Team', { table: { widths: ['*','*','*'], headerRows: 1, dontBreakRows: true, body: teamTableBody }, layout: _msbGridLayout() }),
 
@@ -7013,6 +7163,7 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
   });
 
   return {
+    info: { title: msbState.job.titleOfDocument || 'Method Statement' },
     pageSize: 'A4',
     pageMargins: [40,80,40,50],
     images: pdfImages,
@@ -7032,7 +7183,8 @@ function buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage) {
       boxTitle: { fontSize:12.5, bold:true, color:'#20342c', margin:[10,7,10,7] },
       sopHeading: { fontSize:12.5, bold:true, color:'#5b4636' },
       body: { fontSize:10.5, color:'#20241f', lineHeight:1.3 },
-      noteText: { fontSize:9, italics:true, color:'#888' }
+      noteText: { fontSize:9, italics:true, color:'#888' },
+      photoCaption: { fontSize:9, bold:true, color:'#20342c' }
     },
     defaultStyle: { fontSize: 10.5 }
   };
@@ -7061,18 +7213,24 @@ function generateMSBPDF() {
     alert('Could not save the method statement — check your connection and try again. Your work is safe and saved on this device — it will sync automatically once you\'re back online.' + (e && e.message ? ' (' + e.message + ')' : ''));
     throw { _msbHandled: true };
   }).then(function() {
-    var savedImages = (msbState.job.siteControlImages || []).filter(function(p) { return p.storagePath; });
     var routeMapPath = msbState.emergency.routeMap && msbState.emergency.routeMap.storagePath;
-    // A single unreachable photo must not block the whole PDF — skip it, don't reject.
-    return Promise.all([
-      Promise.all(savedImages.map(function(p) {
+    // A single unreachable photo must not block the whole PDF — it resolves to
+    // null (skipped in the PDF) rather than rejecting, keeping the other
+    // photos' numbers unchanged.
+    var fetchSet = function(list) {
+      return Promise.all((list || []).filter(function(p) { return p.storagePath; }).map(function(p) {
         return _msbFetchAsDataUrl(_msbSiteImgAuthUrl(p.storagePath)).catch(function() { return null; });
-      })),
-      routeMapPath ? _msbFetchAsDataUrl(_msbSiteImgAuthUrl(routeMapPath)).catch(function() { return null; }) : Promise.resolve(null)
+      }));
+    };
+    return Promise.all([
+      fetchSet(msbState.job.siteControlImages),
+      routeMapPath ? _msbFetchAsDataUrl(_msbSiteImgAuthUrl(routeMapPath)).catch(function() { return null; }) : Promise.resolve(null),
+      fetchSet(msbState.job.methodologyImages)
     ]);
   }).then(function(results) {
-    var resolvedSiteImages = results[0].filter(Boolean);
+    var resolvedSiteImages = results[0];
     var resolvedRouteMapImage = results[1];
+    var resolvedMethImages = results[2];
     _loadPdfMake(function(err) {
       if (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
@@ -7080,8 +7238,9 @@ function generateMSBPDF() {
         return;
       }
       try {
-        var doc = buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage);
-        pdfMake.createPdf(doc).download('method-statement-' + (msbState.job.client || 'job').replace(/\s+/g,'-').toLowerCase() + '.pdf');
+        var doc = buildMSBDocDefinition(resolvedSiteImages, resolvedRouteMapImage, resolvedMethImages);
+        var fileTitle = (msbState.job.titleOfDocument || msbState.job.client || '').replace(/[\\\/:*?"<>|]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'job';
+        pdfMake.createPdf(doc).download('method-statement-' + fileTitle + '.pdf');
       } catch (e) {
         if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
         alert('Could not generate PDF: ' + (e && e.message ? e.message : 'unknown error'));
