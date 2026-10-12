@@ -301,3 +301,49 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
   #scheduleGrid .sched-day-cell .sched-day-pills{flex-direction:row!important;flex-wrap:wrap;flex:1;}
   #scheduleGrid .sched-day-cell .sched-day-action{margin-top:0!important;flex-shrink:0;white-space:nowrap;}
 }
+
+/* ── WELCOME SCREEN (job select) ── */
+.ic{width:1em;height:1em;flex-shrink:0;display:inline-block;vertical-align:middle;}
+.ws{position:fixed;top:0;left:0;right:0;bottom:0;background:#1b3310;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:900;padding:0 0 48px;color:#fff;font-family:'Barlow',sans-serif;}
+.ws-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.08);position:sticky;top:0;background:#1b3310;z-index:2;}
+.ws-brand{display:flex;align-items:center;gap:12px;min-width:0;}
+.ws-logo{height:40px;width:auto;background:#fff;padding:5px 8px;border-radius:10px;}
+.ws-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;letter-spacing:.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ws-ver{font-size:11.5px;color:rgba(255,255,255,.5);}
+.ws-icon-btn{display:inline-flex;align-items:center;gap:7px;background:transparent;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);border-radius:10px;padding:8px 12px;font-family:'Barlow',sans-serif;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.ws-icon-btn .ic{font-size:18px;}
+.ws-icon-btn:hover{background:rgba(255,255,255,.08);}
+.ws-body{max-width:560px;margin:0 auto;padding:28px 18px 0;}
+.ws-date{font-size:13px;color:#b6e06e;}
+.ws-greeting{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:34px;line-height:1.1;margin-top:2px;}
+.ws-sub{font-size:14px;color:rgba(255,255,255,.62);margin-top:2px;}
+.ws-main{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px;}
+.ws-big{background:#25441a;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:18px;cursor:pointer;transition:background .15s,transform .15s;-webkit-tap-highlight-color:transparent;}
+.ws-big:hover{background:#2c5020;}
+.ws-big:active,.ws-row:active{transform:scale(.98);}
+.ws-big .ws-name{margin-top:18px;font-size:20px;}
+.ws-big-primary{background:#a5d65a;border-color:#a5d65a;color:#1b3310;}
+.ws-big-primary:hover{background:#b3df6e;}
+.ws-big-primary .ws-ic{background:rgba(27,51,16,.12);color:#1b3310;}
+.ws-big-primary .ws-desc{color:rgba(27,51,16,.72);}
+.ws-ic{width:42px;height:42px;border-radius:12px;background:rgba(165,214,90,.16);color:#b6e06e;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ws-ic .ic{font-size:22px;}
+.ws-ic-solid{background:#a5d65a;color:#1b3310;}
+.ws-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;letter-spacing:.3px;line-height:1.15;}
+.ws-desc{font-size:13px;color:rgba(255,255,255,.62);line-height:1.35;margin-top:2px;}
+.ws-label{font-size:11.5px;letter-spacing:.9px;text-transform:uppercase;color:rgba(255,255,255,.5);margin:26px 2px 9px;}
+.ws-list{background:#25441a;border:1px solid rgba(255,255,255,.08);border-radius:16px;overflow:hidden;}
+.ws-list-manager{border-color:rgba(165,214,90,.35);}
+.ws-row{display:flex;align-items:center;gap:14px;padding:14px;cursor:pointer;transition:background .15s,transform .15s;-webkit-tap-highlight-color:transparent;}
+.ws-row:hover{background:#2c5020;}
+.ws-row+.ws-row{border-top:1px solid rgba(255,255,255,.07);}
+.ws-row-text{flex:1;min-width:0;}
+.ws-chev{font-size:18px;color:rgba(255,255,255,.4);}
+.ws-badge{display:inline-block;background:#c62828;color:#fff;font-size:12px;font-weight:600;padding:3px 9px;border-radius:12px;white-space:nowrap;}
+.ws-badge-due::after{content:' due';}
+@media (max-width:420px){
+  .ws-body{padding-top:22px;}
+  .ws-greeting{font-size:30px;}
+  .ws-icon-btn span{display:none;}
+  .ws-big{padding:15px;}
+}

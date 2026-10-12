@@ -12,10 +12,21 @@ function showJobSelectScreen() {
   if (off)  off.style.display  = 'none';
   var officeTile = document.getElementById('officeTile');
   if (officeTile) officeTile.style.display = managerUnlocked ? '' : 'none';
+  var role = document.getElementById('welcomeRole');
+  if (role) role.style.display = managerUnlocked ? '' : 'none';
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.style.display = '';
+  _renderWelcomeGreeting();
   refreshChecksBadge();
   refreshDefectsBadge();
+}
+
+function _renderWelcomeGreeting() {
+  var now = new Date(), h = now.getHours();
+  var g = document.getElementById('welcomeGreeting');
+  var d = document.getElementById('welcomeDate');
+  if (g) g.textContent = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  if (d) d.textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 function showNewJobFromSelect() {

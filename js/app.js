@@ -2122,10 +2122,21 @@ function showJobSelectScreen() {
   if (off)  off.style.display  = 'none';
   var officeTile = document.getElementById('officeTile');
   if (officeTile) officeTile.style.display = managerUnlocked ? '' : 'none';
+  var role = document.getElementById('welcomeRole');
+  if (role) role.style.display = managerUnlocked ? '' : 'none';
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.style.display = '';
+  _renderWelcomeGreeting();
   refreshChecksBadge();
   refreshDefectsBadge();
+}
+
+function _renderWelcomeGreeting() {
+  var now = new Date(), h = now.getHours();
+  var g = document.getElementById('welcomeGreeting');
+  var d = document.getElementById('welcomeDate');
+  if (g) g.textContent = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  if (d) d.textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 function showNewJobFromSelect() {
@@ -7415,7 +7426,7 @@ function generateMSBPDF() {
 var SP_SESSION_TIMEOUT_MS = 300000; // 5 minutes idle (server-side token lasts 30 min — see sp_staff_from_token)
 var spSessionToken = null, spSessionStaffId = null, spSessionName = null, spSessionIsManager = false;
 var spSessionExpiresAt = 0, spTickHandle = null;
-var SP_PORTAL_VIEWS = ['spPortalHome', 'spClock', 'spLeave', 'spCalendar'];
+var SP_PORTAL_VIEWS = ['spPortalHome', 'spLeave', 'spCalendar'];
 
 // ── HOLIDAY REQUEST EMAIL NOTIFICATIONS (EmailJS) ──
 // Fires-and-forgets an email to jon@arborite.co.uk / joel@arborite.co.uk (set
@@ -7495,12 +7506,19 @@ function spOpen(id) {
   target.classList.add('active');
   window.scrollTo(0, 0);
   if (SP_PORTAL_VIEWS.indexOf(id) !== -1) spTouchSession();
-  if (id === 'spClock') { document.getElementById('spClockWho').textContent = spSessionName; spAttemptGPS(); spRenderOnsite(); }
+  if (id === 'spPortalHome') { spRenderClockTime(); spAttemptGPS(); spRenderOnsite(); spRenderLeave(); }
   if (id === 'spLeave') spRenderLeave();
   if (id === 'spCalendar') { spCalMonth = new Date(); spCalMonth.setDate(1); spRenderCalendar(); }
   if (id === 'spManagerDash') spRenderMgr();
 }
 function spOpenManagerDash() { spOpen('spManagerDash'); }
+
+// "Request time off" on the staff home — opens My Leave at the request form.
+function spOpenRequestForm() {
+  spOpen('spLeave');
+  var card = document.getElementById('spReqCard');
+  if (card) setTimeout(function() { card.scrollIntoView({ block: 'start' }); }, 50);
+}
 
 // ── STAFF PICKER ──
 // Filled as soon as the page loads, since the picker sits on the lock screen.
@@ -7594,9 +7612,11 @@ function spShowErr(id, msg) { var el = document.getElementById(id); if (el) el.t
 function spTouchSession() {
   if (!spSessionToken) return;
   spSessionExpiresAt = Date.now() + SP_SESSION_TIMEOUT_MS;
-  ['spSessName1', 'spSessName2', 'spSessName3', 'spSessName4'].forEach(function(id) {
+  ['spSessName1', 'spSessName3', 'spSessName4'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.textContent = spSessionName;
   });
+  var avatar = document.getElementById('spAvatar');
+  if (avatar) avatar.textContent = (spSessionName || '').split(' ').map(function(w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase();
 }
 
 function spCurrentViewId() {
@@ -7617,7 +7637,8 @@ function spStartWatch() {
     var msLeft = spSessionExpiresAt - Date.now();
     if (msLeft <= 0) { spLogout('Session expired after a period of inactivity — please sign in again.'); return; }
     var secs = Math.ceil(msLeft / 1000);
-    ['spTimer1', 'spTimer2', 'spTimer3', 'spTimer4'].forEach(function(id) {
+    if (spCurrentViewId() === 'spPortalHome') spRenderClockTime();
+    ['spTimer1', 'spTimer3', 'spTimer4'].forEach(function(id) {
       var el = document.getElementById(id); if (!el) return;
       el.textContent = 'expires in ' + secs + 's';
       el.className = 'sp-timer' + (secs <= 20 ? ' low' : '');
@@ -7689,7 +7710,7 @@ function spGetFreshGPS(cb) {
 }
 
 function spDoClock(action) {
-  var btn1 = document.querySelector('#spClock .sp-btn-lime'), btn2 = document.querySelector('#spClock .sp-btn-out');
+  var btn1 = document.getElementById('spClockInBtn'), btn2 = document.getElementById('spClockOutBtn');
   var note = document.getElementById('spGpsNote');
   btn1.disabled = true; btn2.disabled = true;
   note.className = 'sp-gps-note';
@@ -7754,10 +7775,27 @@ function spCheckLateEarlyAlert(action, when) {
   });
 }
 
+// Both buttons stay usable either way (in case the on-site check is out of
+// date); whichever one is the expected next step is shown as the big button.
 function spRenderClockStatus(isOn) {
   var pill = document.getElementById('spClockPill');
   pill.className = 'sp-pill ' + (isOn ? 'on' : 'off');
   pill.textContent = isOn ? 'On site' : 'Clocked out';
+  var inBtn = document.getElementById('spClockInBtn'), outBtn = document.getElementById('spClockOutBtn');
+  if (inBtn && outBtn) {
+    inBtn.classList.toggle('sp-secondary', isOn);
+    outBtn.classList.toggle('sp-secondary', !isOn);
+    // Expected action first
+    if (isOn) inBtn.parentNode.insertBefore(outBtn, inBtn);
+    else inBtn.parentNode.insertBefore(inBtn, outBtn);
+  }
+}
+
+function spRenderClockTime() {
+  var now = new Date();
+  var t = document.getElementById('spClockTime'), d = document.getElementById('spClockDate');
+  if (t) t.textContent = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  if (d) d.textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 // "On site now": read-only, no token needed — visible to anyone on the
@@ -7791,23 +7829,39 @@ function spRenderLeave() {
     document.getElementById('spBalUsed').textContent = b.days_used;
     document.getElementById('spBalRemaining').textContent = b.days_remaining;
     document.getElementById('spBalSick').textContent = b.sick_days;
+    // Same numbers on the staff home's leave summary
+    document.getElementById('spHomeRemaining').textContent = b.days_remaining;
+    document.getElementById('spHomeLeftOf').textContent = 'holiday days left of ' + b.entitlement;
+    document.getElementById('spHomeSick').textContent = b.sick_days;
+    document.getElementById('spHomeUsed').textContent = b.days_used + ' used';
+    var pct = b.entitlement > 0 ? Math.min(100, Math.max(0, b.days_used / b.entitlement * 100)) : 0;
+    document.getElementById('spHomeBar').style.width = pct + '%';
   });
   spRenderMyRequests();
 }
 
+var SP_HOME_REQUESTS_SHOWN = 3;
+
+// Renders into My Leave (every request) and the staff home (latest few).
 function spRenderMyRequests() {
-  var el = document.getElementById('spMyRequests');
+  var full = document.getElementById('spMyRequests'), home = document.getElementById('spHomeRequests');
   spRpc('sp_my_leave_requests', { p_token: spSessionToken }).then(function(res) {
     var list = res.ok && Array.isArray(res.data) ? res.data : [];
-    if (!list.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No requests yet.</div>'; return; }
+    if (!list.length) {
+      full.innerHTML = home.innerHTML = '<div style="color:var(--mid);font-size:13px;">No requests yet.</div>';
+      return;
+    }
     // Label each line with its type — otherwise a sick entry a manager added
     // looks identical to an approved holiday.
     var typeLabels = { holiday: 'Holiday', sick: 'Sick', other: 'Other' };
-    el.innerHTML = list.map(function(r) {
-      var typeTag = '<span class="sp-pill off" style="margin-right:6px;">' + spEsc(typeLabels[r.type] || r.type) + '</span>';
+    function itemHtml(r) {
+      var typeTag = '<span class="sp-pill sp-type-tag ' + spEsc(r.type) + '" style="margin-right:8px;">' + spEsc(typeLabels[r.type] || r.type) + '</span>';
       return '<div class="sp-req-item"><div class="sp-req-top"><span class="sp-req-dates">' + typeTag + spFmtDateRange(r.start_date, r.end_date) + ' (' + r.days + (r.days == 1 ? ' day' : ' days') + ')</span><span class="sp-pill ' + r.status + '">' + r.status + '</span></div>'
         + (r.note ? '<div class="sp-req-note">' + spEsc(r.note) + '</div>' : '') + '</div>';
-    }).join('');
+    }
+    full.innerHTML = list.map(itemHtml).join('');
+    home.innerHTML = list.slice(0, SP_HOME_REQUESTS_SHOWN).map(itemHtml).join('')
+      + (list.length > SP_HOME_REQUESTS_SHOWN ? '<a class="sp-see-all" onclick="spOpen(\'spLeave\')">See all ' + list.length + ' in My leave</a>' : '');
   });
 }
 
