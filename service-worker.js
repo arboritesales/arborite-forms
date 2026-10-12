@@ -1,9 +1,9 @@
-const CACHE_NAME = 'arborite-field-forms-v1.9.60';
+const CACHE_NAME = 'arborite-field-forms-v1.9.61';
 const APP_SHELL = [
   './',
   './index.html',
-  './css/app.css?v=1.9.60',
-  './js/app.js?v=1.9.60',
+  './css/app.css?v=1.9.61',
+  './js/app.js?v=1.9.61',
   './manifest.json',
   './arborite-logo-192.png',
   './arborite-logo-512.png',
@@ -13,11 +13,18 @@ const APP_SHELL = [
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js',
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
 ];
 
+// The CDN libraries are pinned to exact versions, so they never change between
+// app releases — copy them over from the previous version's cache rather than
+// downloading ~4MB again on every update over site signal.
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => Promise.all(APP_SHELL.map(url => {
+    const reuse = url.indexOf('https://') === 0 ? caches.match(url) : Promise.resolve(null);
+    return reuse.then(hit => hit ? cache.put(url, hit) : cache.add(url));
+  }))));
   self.skipWaiting();
 });
 
@@ -40,7 +47,7 @@ function networkFirstWithTimeout(request) {
   return caches.open(CACHE_NAME).then(cache => {
     const networkFetch = fetch(request)
       .then(response => {
-        cache.put(request, response.clone());
+        if (response.ok) cache.put(request, response.clone());
         return response;
       })
       .catch(() => null);
@@ -60,6 +67,20 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
   const url = event.request.url;
+
+  // app.js / app.css are requested with ?v=<version>, and index.html (still
+  // network-first below) changes that version on every release — so a cached
+  // copy of a given ?v= URL is always the right file. Serve it straight from
+  // the cache instead of waiting on the network: on a weak signal that wait
+  // was up to 3s per file on every launch. This relies on bumping ?v= with
+  // every release, as the build already does alongside CACHE_NAME.
+  const isVersionedAsset = /\/(app\.js|app\.css)\?v=/.test(url);
+  if (isVersionedAsset) {
+    event.respondWith(
+      caches.match(event.request).then(cached => cached || networkFirstWithTimeout(event.request))
+    );
+    return;
+  }
 
   // Always network-first for the main HTML and core app files so updates arrive immediately
   const isAppShell = event.request.mode === 'navigate'

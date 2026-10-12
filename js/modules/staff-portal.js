@@ -831,6 +831,7 @@ function spClockReportWorkbook(rows) {
 function spExportClockReport() {
   var rows = spLastClockReportRows;
   if (!rows.length) { spToast('Nothing to export for this month.'); return; }
+  if (typeof XLSX === 'undefined') { _withXlsx(spExportClockReport); return; }
   var wb = spClockReportWorkbook(rows);
   XLSX.writeFile(wb, 'Clock Report - ' + spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + '.xlsx');
 }
@@ -839,6 +840,7 @@ function spExportClockReportPerson() {
   if (!spReportSelectedStaff) return;
   var rows = spLastClockReportRows.filter(function(r) { return r.name === spReportSelectedStaff; });
   if (!rows.length) { spToast('Nothing to export for ' + spReportSelectedStaff + ' this month.'); return; }
+  if (typeof XLSX === 'undefined') { _withXlsx(spExportClockReportPerson); return; }
   var wb = spClockReportWorkbook(rows);
   XLSX.writeFile(wb, 'Clock Report - ' + spReportSelectedStaff + ' - ' + spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + '.xlsx');
 }

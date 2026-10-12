@@ -60,13 +60,16 @@ function openFormFromOffice(panelId) {
 // The ledger runs in an iframe and has no login of its own — rather than
 // asking the team to log in twice, it pings us on load and we hand it the
 // session it can already see the team is using, scoped to our own origin.
-// The iframe's src loads at page-load time — before the team has logged in
-// — so its first handshake would only ever see the anon key. Force a fresh
-// reload (and therefore a fresh handshake, using whatever session is active
-// right now) every time the ledger is actually opened, not just once.
+// The iframe has no src until the ledger is first opened (it's in data-src) —
+// loading it at page-load held up the app's own start, which waits for the
+// window load event. Every later open reloads it, so each handshake uses
+// whatever session is active right now rather than the one from first open.
 function openCRMView() {
   var frame = document.getElementById('crmFrame');
-  if (frame) frame.contentWindow.location.reload();
+  if (frame) {
+    if (!frame.getAttribute('src')) frame.setAttribute('src', frame.getAttribute('data-src'));
+    else frame.contentWindow.location.reload();
+  }
   document.getElementById('crmView').style.display = 'block';
 }
 function closeCRMView() {

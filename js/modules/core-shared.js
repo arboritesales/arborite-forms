@@ -146,6 +146,28 @@ var TABLE    = 'job_forms';
 var PANELS   = ['powa','signoff','method','daily','documents','emergency'];
 var STAFF, MACHINES, CUSTOM_STAFF, CUSTOM_MACHINES, allJobs, currentJobRef, pads, drCount, docStore;
 
+// SheetJS is ~900KB and only needed by the Excel export buttons, so it's
+// fetched the first time one is pressed instead of blocking every app start.
+var XLSX_CDN = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+var _xlsxQueue = null;
+function _withXlsx(cb) {
+  if (typeof XLSX !== 'undefined') { cb(); return; }
+  if (_xlsxQueue) { _xlsxQueue.push(cb); return; }
+  _xlsxQueue = [cb];
+  var s = document.createElement('script');
+  s.src = XLSX_CDN;
+  s.onload = function() {
+    var q = _xlsxQueue; _xlsxQueue = null;
+    q.forEach(function(fn) { fn(); });
+  };
+  s.onerror = function() {
+    _xlsxQueue = null;
+    s.parentNode.removeChild(s);
+    alert('Excel export is unavailable — please check your internet connection and try again.');
+  };
+  document.head.appendChild(s);
+}
+
 // A subcontractor job link (?jobLink=<token> — see job-share-link.js) skips
 // the team login entirely and opens straight into that one job's forms.
 var JOB_LINK_TOKEN = null;

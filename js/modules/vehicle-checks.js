@@ -409,7 +409,10 @@ function printVehRecord() {
 }
 
 function exportFieldsToExcel(filename, title, meta, fieldPairs) {
-  if (typeof XLSX === 'undefined') { alert('Excel export is unavailable — please check your internet connection and try again.'); return; }
+  if (typeof XLSX === 'undefined') {
+    _withXlsx(function() { exportFieldsToExcel(filename, title, meta, fieldPairs); });
+    return;
+  }
   var data = [[title], []];
   meta.forEach(function(m){ data.push(m); });
   data.push([]);

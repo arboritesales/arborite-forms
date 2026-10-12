@@ -228,19 +228,47 @@ function hideModals() {
 // ── JOB DOCUMENTS TABLE ──
 var DOC_TABLE = 'job_documents';
 
+// Runs a request, and if the login token has expired (see supaFetch below)
+// refreshes it once and runs the request again. Storage reports an expired
+// token as 400/403 rather than 401, so those are retried too.
+function _withAuthRetry(doFetch) {
+  return doFetch().then(function(r) {
+    if ((r.status === 401 || r.status === 400 || r.status === 403) && _supaSession && _supaSession.refresh_token) {
+      return _refreshSupaSession().then(doFetch).catch(function() { return r; });
+    }
+    return r;
+  });
+}
+
 function _docFetch(method, path, body, prefer) {
-  var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
-  if (prefer) h['Prefer'] = prefer;
-  var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
-  if (body) opts.body = JSON.stringify(body);
-  return fetch(SUPA_URL + '/rest/v1/' + path, opts);
+  var bodyStr = body ? JSON.stringify(body) : null;
+  return _withAuthRetry(function() {
+    var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
+    if (prefer) h['Prefer'] = prefer;
+    var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
+    if (bodyStr) opts.body = bodyStr;
+    return fetch(SUPA_URL + '/rest/v1/' + path, opts);
+  });
 }
 
 function _docDbSave(jobRef, cat, name, mimeType, dataUrl, cb) {
   _docFetch('POST', DOC_TABLE, {job_ref:jobRef, category:cat, name:name, mime_type:mimeType, data:dataUrl}, 'return=representation')
-    .then(function(r){ return r.json(); })
-    .then(function(rows){ cb(null, rows && rows[0] ? rows[0].id : null); })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(rows){
+      var id = rows && rows[0] ? rows[0].id : null;
+      cb(id ? null : new Error('Save not confirmed'), id);
+    })
     .catch(function(e){ cb(e, null); });
+}
+
+// For a saved row whose data hasn't been loaded: its Storage path, if it has
+// one. The filter runs server-side so an old base64 row isn't downloaded just
+// to find out it has no file in Storage.
+function _docDbStoragePath(id, cb) {
+  _docFetch('GET', DOC_TABLE + '?id=eq.' + id + '&data=like.storage:*&select=data')
+    .then(function(r){ return r.ok ? r.json() : []; })
+    .then(function(rows){ cb(rows && rows[0] ? rows[0].data.substring(8) : null); })
+    .catch(function(){ cb(null); });
 }
 
 function _docDbDelete(id) {
@@ -250,15 +278,15 @@ function _docDbDelete(id) {
 function _docDbLoad(jobRef, cb) {
   // Load metadata only (no data) — fast on all devices
   _docFetch('GET', DOC_TABLE + '?job_ref=eq.' + encodeURIComponent(jobRef) + '&select=id,category,name,mime_type')
-    .then(function(r){ return r.json(); })
-    .then(function(rows){ cb(null, rows || []); })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(rows){ cb(null, Array.isArray(rows) ? rows : []); })
     .catch(function(e){ cb(e, []); });
 }
 
 function _docDbLoadData(id, cb) {
   // Fetch data for a single document on demand (when user taps View)
   _docFetch('GET', DOC_TABLE + '?id=eq.' + id + '&select=data')
-    .then(function(r){ return r.json(); })
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function(rows){ cb(null, rows && rows[0] ? rows[0].data : null); })
     .catch(function(e){ cb(e, null); });
 }
@@ -321,6 +349,26 @@ function _uploadDocFile(path, dataUrl, mimeType) {
     headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':mimeType||'application/octet-stream','x-upsert':'true'},
     body: bytes, credentials: 'omit', mode: 'cors'
   });
+}
+// Uploads a File/Blob as-is — no base64 round trip, so a large survey report
+// doesn't need several copies of itself in memory on an iPad.
+function _uploadDocBlob(path, blob, mimeType) {
+  return _withAuthRetry(function() {
+    return fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + path, {
+      method: 'POST',
+      headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Content-Type':mimeType||'application/octet-stream','x-upsert':'true'},
+      body: blob, credentials: 'omit', mode: 'cors'
+    });
+  });
+}
+function _docStorageDelete(path) {
+  _withAuthRetry(function() {
+    return fetch(SUPA_URL + '/storage/v1/object/' + DOC_BUCKET + '/' + path, {
+      method: 'DELETE',
+      headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()},
+      credentials: 'omit', mode: 'cors'
+    });
+  }).catch(function(){});
 }
 var DOC_CATEGORIES = ['method_statement','plans','reports','tree_survey','tpo_approval','additional'];
 
