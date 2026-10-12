@@ -7800,8 +7800,12 @@ function spRenderMyRequests() {
   spRpc('sp_my_leave_requests', { p_token: spSessionToken }).then(function(res) {
     var list = res.ok && Array.isArray(res.data) ? res.data : [];
     if (!list.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No requests yet.</div>'; return; }
+    // Label each line with its type — otherwise a sick entry a manager added
+    // looks identical to an approved holiday.
+    var typeLabels = { holiday: 'Holiday', sick: 'Sick', other: 'Other' };
     el.innerHTML = list.map(function(r) {
-      return '<div class="sp-req-item"><div class="sp-req-top"><span class="sp-req-dates">' + spFmtDateRange(r.start_date, r.end_date) + ' (' + r.days + (r.days == 1 ? ' day' : ' days') + ')</span><span class="sp-pill ' + r.status + '">' + r.status + '</span></div>'
+      var typeTag = '<span class="sp-pill off" style="margin-right:6px;">' + spEsc(typeLabels[r.type] || r.type) + '</span>';
+      return '<div class="sp-req-item"><div class="sp-req-top"><span class="sp-req-dates">' + typeTag + spFmtDateRange(r.start_date, r.end_date) + ' (' + r.days + (r.days == 1 ? ' day' : ' days') + ')</span><span class="sp-pill ' + r.status + '">' + r.status + '</span></div>'
         + (r.note ? '<div class="sp-req-note">' + spEsc(r.note) + '</div>' : '') + '</div>';
     }).join('');
   });
