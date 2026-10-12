@@ -196,6 +196,41 @@ function printAudit() {
   _printWithClass(function() { view.classList.remove('printing-audit'); });
 }
 
+// ── APP UPDATES ──
+// Sign-ins aren't remembered, so a reload always lands back on the login
+// screen. Reloading the moment a new version arrived used to throw people out
+// mid-task (e.g. halfway through a method statement) every time an update was
+// published. Now it only reloads by itself on the login screen; anywhere else
+// it shows a bar and waits for a tap, or for the next Log out.
+var _appUpdatePending = false;
+
+function _appUpdateReady() {
+  if (_appUpdatePending) return;
+  _appUpdatePending = true;
+  if (_onLoginScreen()) { window.location.reload(); return; }
+  _showAppUpdateBar();
+}
+
+// The Staff Portal opens on top of the login screen without hiding it, so a
+// visible portal counts as signed in.
+function _onLoginScreen() {
+  var ls = document.getElementById('lockScreen');
+  var portal = document.getElementById('spRoot');
+  return !!ls && getComputedStyle(ls).display !== 'none'
+    && !(portal && getComputedStyle(portal).display !== 'none');
+}
+
+function _showAppUpdateBar() {
+  if (document.getElementById('appUpdateBar')) return;
+  var bar = document.createElement('div');
+  bar.id = 'appUpdateBar';
+  bar.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100000;display:flex;align-items:center;gap:14px;max-width:calc(100% - 32px);box-sizing:border-box;background:#1b3310;color:#fff;border:1px solid rgba(165,214,90,.5);border-radius:14px;padding:10px 10px 10px 16px;font-family:Barlow,sans-serif;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.35);';
+  bar.innerHTML = '<span>A new version of the app is ready. Save your work, then tap Update.</span>'
+    + '<button style="background:#a5d65a;color:#1b3310;border:none;border-radius:10px;padding:9px 16px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap;">Update</button>';
+  bar.querySelector('button').onclick = function() { window.location.reload(); };
+  document.body.appendChild(bar);
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('./service-worker.js').then(function(reg) {
@@ -207,15 +242,11 @@ if ('serviceWorker' in navigator) {
         if (!newWorker) return;
         newWorker.addEventListener('statechange', function() {
           // Once the new SW is fully activated, reload to get fresh files
-          if (newWorker.state === 'activated') {
-            window.location.reload();
-          }
+          if (newWorker.state === 'activated') _appUpdateReady();
         });
       });
-      // Fallback: also reload on controllerchange (covers skipWaiting path)
-      navigator.serviceWorker.addEventListener('controllerchange', function() {
-        window.location.reload();
-      });
+      // Fallback: also catches the skipWaiting path
+      navigator.serviceWorker.addEventListener('controllerchange', _appUpdateReady);
     }).catch(function() {});
   });
   // Check for updates whenever the app comes back into focus on phone

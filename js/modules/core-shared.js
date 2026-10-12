@@ -82,6 +82,9 @@ var LOCK_FIELDS = {
 // a page reload would do the same.
 function logoutToTeamLogin() {
   if (!confirm('Log out and return to the employee login screen?')) return;
+  // A waiting app update (see _appUpdateReady) can go in now — the reload
+  // lands on the login screen, which is where this is heading anyway.
+  if (typeof _appUpdatePending !== 'undefined' && _appUpdatePending) { window.location.reload(); return; }
   managerUnlocked = false;
   _clearSession();
   ['team', 'manager'].forEach(function(mode) {
