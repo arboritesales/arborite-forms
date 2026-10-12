@@ -18,6 +18,7 @@ function showJobSelectScreen() {
   if (logoutBtn) logoutBtn.style.display = '';
   _renderWelcomeGreeting();
   refreshChecksBadge();
+  refreshTBTBadge();
   refreshDefectsBadge();
 }
 

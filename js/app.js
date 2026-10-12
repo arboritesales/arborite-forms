@@ -2128,6 +2128,7 @@ function showJobSelectScreen() {
   if (logoutBtn) logoutBtn.style.display = '';
   _renderWelcomeGreeting();
   refreshChecksBadge();
+  refreshTBTBadge();
   refreshDefectsBadge();
 }
 
@@ -5120,7 +5121,9 @@ function showTBTList() {
 function fetchTBTList() {
   var listEl = document.getElementById('tbtList');
   listEl.innerHTML = '<div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading...</div>';
-  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at,form_data&quote_ref=like.TBT-*&order=updated_at.desc&limit=100')
+  // Just the fields the list shows — the full form_data carries up to 20
+  // signature images per talk, which made this list slow to open.
+  supaFetch('GET', TABLE + '?select=id,quote_ref,updated_at,topic:form_data->>tbt_topic,signed:form_data->tbt_signed_count&quote_ref=like.TBT-*&order=updated_at.desc&limit=100')
     .then(function(r) { return r.json(); })
     .then(function(rows) {
       if (!Array.isArray(rows) || rows.length === 0) {
@@ -5131,11 +5134,16 @@ function fetchTBTList() {
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
         var d = row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
-        var topic = (row.form_data && row.form_data.tbt_topic) ? row.form_data.tbt_topic : '';
+        var topic = row.topic || '';
         var ref = row.quote_ref;
         // Build display: show topic as main heading if available, ref as secondary
         var mainLine = topic ? topic : ref;
         var subLine = topic ? ref + ' &nbsp;·&nbsp; ' + d : 'Last saved: ' + d;
+        if (typeof row.signed === 'number') {
+          subLine += row.signed < TBT_MIN_SIGNATURES
+            ? ' &nbsp;·&nbsp; <span style="color:#fac775;font-weight:700;">&#9888; ' + row.signed + ' of ' + TBT_MIN_SIGNATURES + ' signatures</span>'
+            : ' &nbsp;·&nbsp; <span style="color:#b6e06e;">&#10003; ' + row.signed + ' signatures</span>';
+        }
         html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadTBT(\'' + ref + '\')">'
           + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div></div>'
@@ -5230,7 +5238,12 @@ function saveTBT() {
   for (var s = 1; s <= 20; s++) {
     var id = 'tbt_sig_' + s;
     var p = pads[id];
-    if (!p || !p.sized) continue;
+    // dataUrl is only set once a box has been signed (or a signature was
+    // loaded into it) — skipping the rest stops empty boxes being saved as
+    // plain white "signatures", which made every TBT look fully signed.
+    // Boxes that were loaded or touched but are blank, or hold only a stray
+    // tap, are dropped below by size.
+    if (!p || !p.sized || !p.dataUrl) continue;
     var cv = p.canvas || document.getElementById(id);
     if (!cv) continue;
     try {
@@ -5241,15 +5254,17 @@ function saveTBT() {
       ctx2.fillRect(0, 0, tmp.width, tmp.height);
       ctx2.drawImage(cv, 0, 0);
       var url = tmp.toDataURL('image/jpeg', 0.6);
-      if (url && url.length > 100) data.signatures[id] = url;
+      if (url && url.length > _tbtBlankJpegLength(tmp.width, tmp.height) * TBT_SIGNATURE_MIN_RATIO) data.signatures[id] = url;
     } catch(e) {}
   }
+  data.tbt_signed_count = Object.keys(data.signatures).length;
   var payload = { quote_ref: currentTBTRef, updated_at: new Date().toISOString(), form_data: data };
   supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r) {
       if (btn) btn.disabled = false;
       if (r.ok || r.status === 201 || r.status === 204) {
         if (btn) { btn.textContent = '✓ Saved'; setTimeout(function(){ btn.textContent = 'Save'; }, 2000); }
+        refreshTBTBadge();
       } else {
         if (btn) { btn.textContent = 'Save failed'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
       }
@@ -5257,6 +5272,54 @@ function saveTBT() {
     .catch(function() {
       if (btn) { btn.disabled = false; btn.textContent = 'Save failed'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
     });
+}
+
+// A box only counts as signed if its JPEG is at least this much bigger than
+// the same-sized empty box. A real signature (even initials) is several
+// times the size; a stray tap or dot is only ~4% bigger — seen on a real
+// TBT (3,543 vs 3,411 bytes for empty, 16,559 for a signature).
+// supabase_tbt_signature_count_2026-10-12.sql applies the same rule to TBTs
+// saved before this, which still hold their empty boxes as white JPEGs.
+var TBT_SIGNATURE_MIN_RATIO = 1.2;
+var _tbtBlankLengths = {};
+
+function _tbtBlankJpegLength(w, h) {
+  var key = w + 'x' + h;
+  if (!_tbtBlankLengths[key]) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    _tbtBlankLengths[key] = c.toDataURL('image/jpeg', 0.6).length;
+  }
+  return _tbtBlankLengths[key];
+}
+
+// ── TOOLBOX TALKS BADGE — on the Welcome screen's Toolbox talks row, the
+// number of TBT forms with fewer than TBT_MIN_SIGNATURES signatures, like the
+// Checks badge. Reads only the server-maintained count, not the signatures. ──
+var TBT_MIN_SIGNATURES = 10;
+
+function refreshTBTBadge() {
+  var badge = document.getElementById('tbtTileBadge');
+  if (!badge) return;
+  supaFetch('GET', TABLE + '?select=quote_ref,signed:form_data->tbt_signed_count&quote_ref=like.TBT-*')
+    .then(function(r) { return r.json(); })
+    .then(function(rows) {
+      // Rows with no count yet (saved by an older app version before the
+      // count script was run) aren't counted rather than guessed at.
+      var toDo = (Array.isArray(rows) ? rows : []).filter(function(r) {
+        return typeof r.signed === 'number' && r.signed < TBT_MIN_SIGNATURES;
+      }).length;
+      if (toDo > 0) {
+        badge.textContent = toDo + (toDo === 1 ? ' form' : ' forms') + ' to do';
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    })
+    .catch(function() { badge.style.display = 'none'; });
 }
 
 function printTBT() {
