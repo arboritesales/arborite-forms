@@ -10,6 +10,7 @@ function _surveyMeta(kind, cat) {
   var cfg = CHECK_CATEGORIES[cat];
   var skipLabels = {};
   if (cfg && cfg.hasMileage) skipLabels[cfg.mileageLabel] = 1;
+  if (cfg && cfg.hasComments) skipLabels['Comments'] = 1;
   return { cfg: cfg, skipLabels: skipLabels };
 }
 

@@ -3008,6 +3008,7 @@ function switchChecksTab(tab) {
   else if (tab === 'defects') { fetchDefects(); }
   else if (tab === 'schedule') { openScheduleView(); }
   else if (tab === 'weeklyreport') { openWeeklyReportView(); }
+  else if (tab === 'climbingkit') { renderCheckGroupPicker(tab); }
   else if (typeof CHECK_CATEGORIES !== 'undefined' && CHECK_CATEGORIES[tab]) { fetchCatList(tab); }
 }
 
@@ -3021,6 +3022,12 @@ function checksBack() {
   if (home && home.style.display !== 'none') { switchChecksTab('schedule'); return; }
   var scheduleTab = document.getElementById('checksTab_schedule');
   if (scheduleTab && scheduleTab.style.display !== 'none') { closeChecksView(); return; }
+  // From a group's sub-tab (e.g. one climber's kit) go back to the group picker
+  var groupCat = Object.keys(CHECK_CATEGORIES).filter(function(k) {
+    var el = document.getElementById('checksTab_' + k);
+    return CHECK_CATEGORIES[k].group && el && el.style.display !== 'none';
+  })[0];
+  if (groupCat) { switchChecksTab(CHECK_CATEGORIES[groupCat].group); return; }
   showChecksHome();
 }
 
@@ -3811,8 +3818,152 @@ var CHECK_CATEGORIES = {
       {key:'notch_tool_lanyard_00457', label:'Notch Tool Lanyard - 00457', options:['Good','Fair','Poor']},
       {key:'bumblebee_flipline_rbl9blcoitn0747cw478', label:'Bumblebee Wire Core Flipline - RBL9BLCOITN0747CW478', options:['Good','Fair','Poor']}
     ]
+  },
+  // Climbing Kit — one sub-tab per climber, reached from the Climbing Kit tile
+  // (group: 'climbingkit'). To add a climber, add another entry with the same
+  // group plus its table (see supabase_climbing_kit_checks_2026-10-13.sql).
+  climbjack: {
+    label: 'Jack Fisher – Climbing Kit', shortLabel: 'Jack Fisher', icon: '🧗', table: 'climbing_kit_jack_fisher_checks',
+    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['Jack Fisher – Climbing Kit'],
+    checksHeading: 'LOLER Interim Inspection',
+    fields: [
+      {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
+      {key:'notch_harness_gv0162021', label:'Notch Harness - GV0162021', options:['Good','Fair','Poor']},
+      {key:'art_ropeguide_032101484', label:'ART Ropeguide - 03.2101484', options:['Good','Fair','Poor']},
+      {key:'isc_fig8_descender_211341770101', label:'ISC UK Figure 8 descender - 211341770101', options:['Good','Fair','Poor']},
+      {key:'petzl_zigzag_2530649719968', label:'Petzl Zigzag - 2530649719968', options:['Good','Fair','Poor']},
+      {key:'petzl_ok_krab_18g0147431547', label:'Petzl OK 3-Way Alu Krab - 18G0147431547', options:['Good','Fair','Poor']},
+      {key:'petzl_ok_krab_21f0335559864', label:'Petzl OK 3-Way Alu Krab - 21F0335559864', options:['Good','Fair','Poor']},
+      {key:'petzl_ok_krab_21f0335559821', label:'Petzl OK 3-Way Alu Krab - 21F0335559821', options:['Good','Fair','Poor']},
+      {key:'dmm_ultra_o_krab_190022004e', label:'DMM Ultra O 3-Way Alu Krab - 190022004E', options:['Good','Fair','Poor']},
+      {key:'isc_oval_krab_241887580022', label:'ISC UK Oval 3-way Alu Krab - 241887580022', options:['Good','Fair','Poor']},
+      {key:'isc_oval_krab_241884990014', label:'ISC UK Oval 3-way Alu Krab - 241884990014', options:['Good','Fair','Poor']},
+      {key:'notch_tool_lanyard_00457', label:'Notch Tool Lanyard - 00457', options:['Good','Fair','Poor']},
+      {key:'bumblebee_flipline_rbl9blcoitn0747cw478', label:'Bumblebee Wire Core Flipline - RBL9BLCOITN0747CW478', options:['Good','Fair','Poor']}
+    ]
+  },
+  climbjames: {
+    label: 'James Hilborne – Climbing Kit', shortLabel: 'James Hilborne', icon: '🧗', table: 'climbing_kit_james_hilborne_checks',
+    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['James Hilborne – Climbing Kit'],
+    checksHeading: 'LOLER Interim Inspection',
+    fields: [
+      {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
+      {key:'teufelberger_harness_22110011931', label:'Harness Teufelberger Pro - 22/11-0011931', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852055760', label:'Edelrid Oval Carabiner - 852055760', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852050990', label:'Edelrid Oval Carabiner - 852050990', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852051011', label:'Edelrid Oval Carabiner - 852051011', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852055779', label:'Edelrid Oval Carabiner - 852055779', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852050815', label:'Edelrid Oval Carabiner - 852050815', options:['Good','Fair','Poor']},
+      {key:'petzl_grillon_22l0455110490', label:'Petzl Grillon - 22L0455110490', options:['Good','Fair','Poor']},
+      {key:'marlow_boa_loop_22k1348031', label:'Marlow Boa Loop - 22K1348-031', options:['Good','Fair','Poor']},
+      {key:'yale_poison_ivy_rope_87789', label:'Rope - Yale Cordage Poison Ivy - 87789', options:['Good','Fair','Poor']},
+      {key:'petzl_krab_23b0469989039', label:'Petzl Carabiner - 23B0469989039', options:['Good','Fair','Poor']},
+      {key:'petzl_krab_23b0469988052', label:'Petzl Carabiner - 23B0469988052', options:['Good','Fair','Poor']},
+      {key:'petzl_zigzag_plus_22l0452791381', label:'Petzl ZigZag Plus - 22L0452791381', options:['Good','Fair','Poor']},
+      {key:'yale_poison_ivy_37m_rope_89096', label:'Yale Cordage Poison Ivy 37m rope - 89096', options:['Good','Fair','Poor']},
+      {key:'camp_herbol_cambium_saver_h0353', label:'CAMP Herbol Cambium saver - H0353', options:['Good','Fair','Poor']},
+      {key:'courant_ellipse_sling_itn08245t528', label:'Courant Ellipse webbing sling - ITN08245T 528', options:['Good','Fair','Poor']},
+      {key:'courant_ellipse_sling_itn08245t525', label:'Courant Ellipse webbing sling - ITN08245T 525', options:['Good','Fair','Poor']},
+      {key:'petzl_ok_triact_25l0701687332', label:'Petzl OK Triact - 25L0701687332', options:['Good','Fair','Poor']},
+      {key:'petzl_ok_triact_25l0701687471', label:'Petzl OK Triact - 25L0701687471', options:['Good','Fair','Poor']},
+      {key:'courant_bumblebee_flipline_alp8522178', label:'Courant Bumblebee Wire Core Flipline - ALP85-22178/3t', options:['Good','Fair','Poor']}
+    ]
+  },
+  climbluke: {
+    label: 'Luke Richardson – Climbing Kit', shortLabel: 'Luke Richardson', icon: '🧗', table: 'climbing_kit_luke_richardson_checks',
+    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['Luke Richardson – Climbing Kit'],
+    checksHeading: 'LOLER Interim Inspection',
+    fields: [
+      {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
+      {key:'teufelberger_harness_22110011931', label:'Harness Teufelberger Pro - 22/11-0011931', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852055760', label:'Edelrid Oval Carabiner - 852055760', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852050990', label:'Edelrid Oval Carabiner - 852050990', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852051011', label:'Edelrid Oval Carabiner - 852051011', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852055779', label:'Edelrid Oval Carabiner - 852055779', options:['Good','Fair','Poor']},
+      {key:'edelrid_oval_krab_852050815', label:'Edelrid Oval Carabiner - 852050815', options:['Good','Fair','Poor']},
+      {key:'petzl_grillon_22l0455110490', label:'Petzl Grillon - 22L0455110490', options:['Good','Fair','Poor']},
+      {key:'marlow_boa_loop_22k1348031', label:'Marlow Boa Loop - 22K1348-031', options:['Good','Fair','Poor']},
+      {key:'yale_poison_ivy_rope_87789', label:'Rope - Yale Cordage Poison Ivy - 87789', options:['Good','Fair','Poor']},
+      {key:'petzl_krab_23b0469989039', label:'Petzl Carabiner - 23B0469989039', options:['Good','Fair','Poor']},
+      {key:'petzl_krab_23b0469988052', label:'Petzl Carabiner - 23B0469988052', options:['Good','Fair','Poor']},
+      {key:'petzl_zigzag_plus_22l0452791381', label:'Petzl ZigZag Plus - 22L0452791381', options:['Good','Fair','Poor']},
+      {key:'yale_poison_ivy_37m_rope_89096', label:'Yale Cordage Poison Ivy 37m rope - 89096', options:['Good','Fair','Poor']},
+      {key:'camp_herbol_cambium_saver_h0353', label:'CAMP Herbol Cambium saver - H0353', options:['Good','Fair','Poor']},
+      {key:'courant_ellipse_sling_itn08245t528', label:'Courant Ellipse webbing sling - ITN08245T 528', options:['Good','Fair','Poor']},
+      {key:'courant_ellipse_sling_itn08245t525', label:'Courant Ellipse webbing sling - ITN08245T 525', options:['Good','Fair','Poor']}
+    ]
+  },
+  climbdave: {
+    label: 'Dave Norris – Climbing Kit', shortLabel: 'Dave Norris', icon: '🧗', table: 'climbing_kit_dave_norris_checks',
+    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['Dave Norris – Climbing Kit'],
+    checksHeading: 'LOLER Interim Inspection',
+    fields: [
+      {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
+      {key:'harness_28486', label:'Harness - 28486', options:['Good','Fair','Poor']},
+      {key:'steel_core_lanyard_0910808', label:'Steel Core Lanyard - 0910808', options:['Good','Fair','Poor']},
+      {key:'tachyon_lanyard_4342', label:'Tachyon lanyard - 4342', options:['Good','Fair','Poor']},
+      {key:'pulleysaver_2017832', label:'Pulleysaver - 2017-832', options:['Good','Fair','Poor']},
+      {key:'sirius_loop_pinto_20170956', label:'Sirius Loop with Pinto - 2017-0956 and 171432060E', options:['Good','Fair','Poor']},
+      {key:'od_loop_20172764', label:'OD Loop - 2017-2764', options:['Good','Fair','Poor']},
+      {key:'sirius_loop_10mm_20171889', label:'10mm Sirius Loop - 2017-1889', options:['Good','Fair','Poor']},
+      {key:'marlow_boa_loop_155634004', label:'Marlow Boa Loop - 155634-004', options:['Good','Fair','Poor']},
+      {key:'marlow_boa_loop_155634001', label:'Marlow Boa Loop - 155634-001', options:['Good','Fair','Poor']},
+      {key:'pantin_10049fu0505', label:'Pantin - 10049FU0505', options:['Good','Fair','Poor']},
+      {key:'karabiner_dn01', label:'Karabiner - DN01', options:['Good','Fair','Poor']},
+      {key:'karabiner_dn02', label:'Karabiner - DN02', options:['Good','Fair','Poor']},
+      {key:'rope_43427', label:'Rope - 43427', options:['Good','Fair','Poor']},
+      {key:'lanyard_1330746', label:'Lanyard - 1330746', options:['Good','Fair','Poor']},
+      {key:'rope_grab_1451325043', label:'Rope Grab - 14/51325/043', options:['Good','Fair','Poor']},
+      {key:'zigzag_16f0029400540', label:'Zigzag - 16F0029400540', options:['Good','Fair','Poor']},
+      {key:'prusik_loop_18041075', label:'Prusik Loop - 18/04-1075', options:['Good','Fair','Poor']},
+      {key:'maillon_c887007', label:'Maillon - C887007', options:['Good','Fair','Poor']},
+      {key:'karabiner_1794684116', label:'Karabiner - 17/94684/116', options:['Good','Fair','Poor']},
+      {key:'karabiner_h122242', label:'Karabiner - H/12/2242', options:['Good','Fair','Poor']},
+      {key:'karabiner_h242510', label:'Karabiner - H/24/2510', options:['Good','Fair','Poor']}
+    ]
+  },
+  climbjason: {
+    label: 'Jason Hiscock – Climbing Kit', shortLabel: 'Jason Hiscock', icon: '🧗', table: 'climbing_kit_jason_hiscock_checks',
+    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['Jason Hiscock – Climbing Kit'],
+    checksHeading: 'LOLER Interim Inspection',
+    fields: [
+      {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
+      {key:'harness_1805152', label:'Harness - 18/05-152', options:['Good','Fair','Poor']},
+      {key:'rope_1711697', label:'Rope - 17-11697', options:['Good','Fair','Poor']},
+      {key:'rope_32798', label:'Rope - 32798', options:['Good','Fair','Poor']},
+      {key:'lanyard_33282', label:'Lanyard - 33282', options:['Good','Fair','Poor']},
+      {key:'friction_saver_70310570', label:'Friction Saver - 70310570', options:['Good','Fair','Poor']},
+      {key:'friction_cord_18080977', label:'Friction Cord - 18/08-0977', options:['Good','Fair','Poor']},
+      {key:'friction_cord_663875042', label:'Friction Cord - 663875042', options:['Good','Fair','Poor']},
+      {key:'friction_cord_163617018', label:'Friction Cord - 163617-018', options:['Good','Fair','Poor']},
+      {key:'zigzag_18d0133144890', label:'Zigzag - 18D0133144890', options:['Good','Fair','Poor']},
+      {key:'pulley_172473662e', label:'Pulley - 172473662E', options:['Good','Fair','Poor']},
+      {key:'pantin_18a0119611118', label:'Pantin - 18A0119611118', options:['Good','Fair','Poor']},
+      {key:'hitchclimber_182500795e', label:'Hitchclimber - 182500795E', options:['Good','Fair','Poor']},
+      {key:'karabiner_181062638e', label:'Karabiner - 181062638E', options:['Good','Fair','Poor']},
+      {key:'karabiner_181062507e', label:'Karabiner - 181062507E', options:['Good','Fair','Poor']},
+      {key:'karabiner_173061274g', label:'Karabiner - 173061274G', options:['Good','Fair','Poor']},
+      {key:'karabiner_180314165e', label:'Karabiner - 180314165E', options:['Good','Fair','Poor']},
+      {key:'karabiner_172833546e', label:'Karabiner - 172833546E', options:['Good','Fair','Poor']}
+    ]
   }
 };
+
+// Sub-tab picker for a group tile (e.g. Climbing Kit) — one tile per category
+// whose group matches.
+function renderCheckGroupPicker(group) {
+  var root = document.getElementById('checksTab_' + group);
+  if (!root) return;
+  var tiles = Object.keys(CHECK_CATEGORIES).filter(function(k){ return CHECK_CATEGORIES[k].group === group; }).map(function(k) {
+    var cfg = CHECK_CATEGORIES[k];
+    return '<div class="dash-tile" style="text-align:center;padding:22px 16px;" onclick="switchChecksTab(\'' + k + '\')">'
+      + '<div class="dash-tile-icon">' + cfg.icon + '</div>'
+      + '<div class="dash-tile-name">' + (cfg.shortLabel || cfg.label) + '</div></div>';
+  }).join('');
+  root.innerHTML =
+    '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;">Select climber</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;">' + tiles + '</div>';
+}
 
 var _catState = {};
 function catState(cat) {
@@ -3895,11 +4046,28 @@ function catGetMachine(cat) {
 function renderCategoryPanel(cat) {
   var cfg = CHECK_CATEGORIES[cat];
   var root = document.getElementById('checksTab_' + cat);
+  // Sub-tabs of a group tile (e.g. each climber's kit) have no container in
+  // index.html — create one next to the group's.
+  if (!root && cfg && cfg.group) {
+    var groupEl = document.getElementById('checksTab_' + cfg.group);
+    if (groupEl) {
+      root = document.createElement('div');
+      root.id = 'checksTab_' + cat;
+      root.className = 'checks-tab-content';
+      root.style.cssText = 'display:none;max-width:600px;margin:0 auto;padding:20px;';
+      groupEl.parentNode.insertBefore(root, groupEl.nextSibling);
+    }
+  }
   if (!root || !cfg) return;
 
   var fieldsHtml = cfg.fields.map(function(f){ return catFieldRow(cat, f); }).join('');
   var mileageHtml = cfg.hasMileage
     ? '<div class="field-row lw"><div class="fc lbl">' + cfg.mileageLabel + '</div><div class="fc"><input id="catMileage_' + cat + '" type="number" step="any" placeholder="Enter value" style="width:100%;border:none;border-bottom:1.5px solid var(--border);padding:6px 0;font-size:13px;font-family:\'Barlow\',sans-serif;outline:none;background:transparent;" oninput="catAutoSave(\'' + cat + '\')"></div></div>'
+    : '';
+  // Free-text box straight after the last kit item (climbing kits)
+  var commentsHtml = cfg.hasComments
+    ? '<div style="padding:12px 14px;border-top:1px solid #e0e0d8;"><div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:6px;">Comments</div>'
+      + '<textarea id="catComments_' + cat + '" rows="3" placeholder="Any comments on the kit..." style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-size:13px;font-family:\'Barlow\',sans-serif;outline:none;resize:vertical;" oninput="catAutoSave(\'' + cat + '\')"></textarea></div>'
     : '';
 
   root.innerHTML =
@@ -3933,6 +4101,7 @@ function renderCategoryPanel(cat) {
     + '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
     + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9989; ' + (cfg.checksHeading || 'Checks') + '</div>'
     + fieldsHtml
+    + commentsHtml
     + '</div>'
     + '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
     + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#11088; Overall Rating</div>'
@@ -4042,6 +4211,8 @@ function catClearForm(cat) {
   if (mileage) mileage.value = '';
   var notes = document.getElementById('catNotes_' + cat);
   if (notes) notes.value = '';
+  var comments = document.getElementById('catComments_' + cat);
+  if (comments) comments.value = '';
   var root = document.getElementById('catFormPanel_' + cat);
   root.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
   root.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
@@ -4073,6 +4244,7 @@ function saveCatCheck(cat, isAuto) {
     payload.mileage = (mEl && mEl.value) ? parseFloat(mEl.value) : null;
   }
   cfg.fields.forEach(function(f) { payload[f.key] = catGetFieldVal(cat, f.key); });
+  if (cfg.hasComments) payload.comments = document.getElementById('catComments_' + cat).value;
   var _defPayload = getDefectPayload('cat_' + cat);
   payload.has_defect = _defPayload.has_defect;
   payload.defect_comment = _defPayload.defect_comment;
@@ -4177,6 +4349,8 @@ function catFieldRows(cat, d) {
   var fieldRows = [];
   if (cfg.hasMileage) fieldRows.push([cfg.mileageLabel, (d.mileage != null && d.mileage !== '') ? d.mileage : '']);
   cfg.fields.forEach(function(f) { fieldRows.push([f.label, d[f.key]]); });
+  // Third element marks free text, so it isn't coloured as a Good/Poor answer
+  if (cfg.hasComments) fieldRows.push(['Comments', d.comments, true]);
   return fieldRows;
 }
 
@@ -4214,7 +4388,8 @@ function loadCatRecord(cat, id) {
       if (!f[1] && f[1] !== 0) return '';
       var val = f[1];
       var colour = '';
-      if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
+      if (f[2]) val = String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+      else if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
       else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
       else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
       return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;' + colour + '">' + val + '</div></div>';
@@ -4302,6 +4477,7 @@ function _surveyMeta(kind, cat) {
   var cfg = CHECK_CATEGORIES[cat];
   var skipLabels = {};
   if (cfg && cfg.hasMileage) skipLabels[cfg.mileageLabel] = 1;
+  if (cfg && cfg.hasComments) skipLabels['Comments'] = 1;
   return { cfg: cfg, skipLabels: skipLabels };
 }
 

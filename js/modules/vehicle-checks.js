@@ -24,6 +24,7 @@ function switchChecksTab(tab) {
   else if (tab === 'defects') { fetchDefects(); }
   else if (tab === 'schedule') { openScheduleView(); }
   else if (tab === 'weeklyreport') { openWeeklyReportView(); }
+  else if (tab === 'climbingkit') { renderCheckGroupPicker(tab); }
   else if (typeof CHECK_CATEGORIES !== 'undefined' && CHECK_CATEGORIES[tab]) { fetchCatList(tab); }
 }
 
@@ -37,6 +38,12 @@ function checksBack() {
   if (home && home.style.display !== 'none') { switchChecksTab('schedule'); return; }
   var scheduleTab = document.getElementById('checksTab_schedule');
   if (scheduleTab && scheduleTab.style.display !== 'none') { closeChecksView(); return; }
+  // From a group's sub-tab (e.g. one climber's kit) go back to the group picker
+  var groupCat = Object.keys(CHECK_CATEGORIES).filter(function(k) {
+    var el = document.getElementById('checksTab_' + k);
+    return CHECK_CATEGORIES[k].group && el && el.style.display !== 'none';
+  })[0];
+  if (groupCat) { switchChecksTab(CHECK_CATEGORIES[groupCat].group); return; }
   showChecksHome();
 }
 
