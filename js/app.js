@@ -3008,7 +3008,7 @@ function switchChecksTab(tab) {
   else if (tab === 'defects') { fetchDefects(); }
   else if (tab === 'schedule') { openScheduleView(); }
   else if (tab === 'weeklyreport') { openWeeklyReportView(); }
-  else if (tab === 'climbingkit') { renderCheckGroupPicker(tab); }
+  else if (typeof CHECK_GROUPS !== 'undefined' && CHECK_GROUPS[tab]) { renderCheckGroupPicker(tab); }
   else if (typeof CHECK_CATEGORIES !== 'undefined' && CHECK_CATEGORIES[tab]) { fetchCatList(tab); }
 }
 
@@ -3798,10 +3798,11 @@ var CHECK_CATEGORIES = {
       {key:'ground_controls', label:'Function check of ground controls completed?', options:['Yes','No']}
     ]
   },
+  // Rigging Kit — sub-tabs reached from the Rigging Kit tile (group: 'riggingkit').
+  // Each kit's items are checked individually below — no machine picker.
   rigging: {
-    label: 'Rigging Kit', icon: '⛩️', table: 'rigging_kit_checks',
-    // One kit, each item is checked individually below — no machine picker.
-    hideMachine: true, machines: ['Rigging Kit'],
+    label: 'Large Rigging Kit', shortLabel: 'Large Rigging Kit', icon: '⛩️', table: 'rigging_kit_checks',
+    group: 'riggingkit', hideMachine: true, machines: ['Large Rigging Kit'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -3817,6 +3818,36 @@ var CHECK_CATEGORIES = {
       {key:'isc_oval_krab_241884990014', label:'ISC UK Oval 3-way Alu Krab - 241884990014', options:['Good','Fair','Poor']},
       {key:'notch_tool_lanyard_00457', label:'Notch Tool Lanyard - 00457', options:['Good','Fair','Poor']},
       {key:'bumblebee_flipline_rbl9blcoitn0747cw478', label:'Bumblebee Wire Core Flipline - RBL9BLCOITN0747CW478', options:['Good','Fair','Poor']}
+    ]
+  },
+  riggingjason: {
+    label: 'Small Rigging Kit – Jason and Team', shortLabel: 'Small Rigging Kit', subLabel: 'Jason and Team', icon: '⛩️', table: 'rigging_kit_jason_team_checks',
+    group: 'riggingkit', hasComments: true, hideMachine: true, machines: ['Small Rigging Kit – Jason and Team'],
+    checksHeading: 'LOLER Interim Inspection',
+    fields: [
+      {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
+      {key:'courant_aka_rigging_line_rg20170', label:'Courant AKA Rigging Line - SN:RG20170', options:['Good','Fair','Poor']},
+      {key:'courant_dead_eye_rg20166', label:'Courant Dead Eye - SN:RG20166', options:['Good','Fair','Poor']},
+      {key:'teufelberger_trex_whoopie_rg20167', label:'Teufelberger T-REX Whoopie Sling - SN:RG20167', options:['Good','Fair','Poor']},
+      {key:'steel_carabiner_263900361', label:'Steel Carabiner - SN:263900361', options:['Good','Fair','Poor']},
+      {key:'steel_carabiner_263900381', label:'Steel Carabiner - SN:263900381', options:['Good','Fair','Poor']},
+      {key:'stein_ld1250_friction_2601062', label:'Stein LD1250 Floating Friction Device - SN:26-01-062', options:['Good','Fair','Poor']},
+      {key:'isc_pulley_rp056_262110980010', label:'ISC Pulley RP056 - SN:262110980010', options:['Good','Fair','Poor']}
+    ]
+  },
+  riggingjack: {
+    label: 'Small Rigging Kit – Jack and Team', shortLabel: 'Small Rigging Kit', subLabel: 'Jack and Team', icon: '⛩️', table: 'rigging_kit_jack_team_checks',
+    group: 'riggingkit', hasComments: true, hideMachine: true, machines: ['Small Rigging Kit – Jack and Team'],
+    checksHeading: 'LOLER Interim Inspection',
+    fields: [
+      {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
+      {key:'courant_aka_rigging_line_rg20170', label:'Courant AKA Rigging Line - SN:RG20170', options:['Good','Fair','Poor']},
+      {key:'courant_dead_eye_rg20166', label:'Courant Dead Eye - SN:RG20166', options:['Good','Fair','Poor']},
+      {key:'teufelberger_trex_whoopie_rg20167', label:'Teufelberger T-REX Whoopie Sling - SN:RG20167', options:['Good','Fair','Poor']},
+      {key:'steel_carabiner_263900361', label:'Steel Carabiner - SN:263900361', options:['Good','Fair','Poor']},
+      {key:'steel_carabiner_263900381', label:'Steel Carabiner - SN:263900381', options:['Good','Fair','Poor']},
+      {key:'stein_ld1250_friction_2601062', label:'Stein LD1250 Floating Friction Device - SN:26-01-062', options:['Good','Fair','Poor']},
+      {key:'isc_pulley_rp056_262110980010', label:'ISC Pulley RP056 - SN:262110980010', options:['Good','Fair','Poor']}
     ]
   },
   // Climbing Kit — one sub-tab per climber, reached from the Climbing Kit tile
@@ -3949,6 +3980,12 @@ var CHECK_CATEGORIES = {
   }
 };
 
+// Group tiles on the Checks home that open a sub-tab picker instead of a form
+var CHECK_GROUPS = {
+  climbingkit: { heading: 'Select climber' },
+  riggingkit: { heading: 'Select kit' }
+};
+
 // Sub-tab picker for a group tile (e.g. Climbing Kit) — one tile per category
 // whose group matches.
 function renderCheckGroupPicker(group) {
@@ -3958,10 +3995,12 @@ function renderCheckGroupPicker(group) {
     var cfg = CHECK_CATEGORIES[k];
     return '<div class="dash-tile" style="text-align:center;padding:22px 16px;" onclick="switchChecksTab(\'' + k + '\')">'
       + '<div class="dash-tile-icon">' + cfg.icon + '</div>'
-      + '<div class="dash-tile-name">' + (cfg.shortLabel || cfg.label) + '</div></div>';
+      + '<div class="dash-tile-name">' + (cfg.shortLabel || cfg.label) + '</div>'
+      + (cfg.subLabel ? '<div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:4px;">' + cfg.subLabel + '</div>' : '')
+      + '</div>';
   }).join('');
   root.innerHTML =
-    '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;">Select climber</div>'
+    '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;">' + CHECK_GROUPS[group].heading + '</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;">' + tiles + '</div>';
 }
 

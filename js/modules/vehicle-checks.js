@@ -24,7 +24,7 @@ function switchChecksTab(tab) {
   else if (tab === 'defects') { fetchDefects(); }
   else if (tab === 'schedule') { openScheduleView(); }
   else if (tab === 'weeklyreport') { openWeeklyReportView(); }
-  else if (tab === 'climbingkit') { renderCheckGroupPicker(tab); }
+  else if (typeof CHECK_GROUPS !== 'undefined' && CHECK_GROUPS[tab]) { renderCheckGroupPicker(tab); }
   else if (typeof CHECK_CATEGORIES !== 'undefined' && CHECK_CATEGORIES[tab]) { fetchCatList(tab); }
 }
 
