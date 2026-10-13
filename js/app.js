@@ -576,6 +576,7 @@ function attachSigListeners(canvas, id) {
             scheduleAutoSave(el.id, true);
             break;
           }
+          if (el.id === 'tbtFormPanel') { tbtAutoSave(); break; }
           el = el.parentNode;
         }
       }
@@ -603,6 +604,7 @@ function clrSig(id) {
   var canvas = (p && p.canvas) || document.getElementById(id);
   var panel = canvas && canvas.closest && canvas.closest('.panel');
   if (panel) scheduleAutoSave(panel.id, true);
+  else if (canvas && canvas.closest && canvas.closest('#tbtFormPanel')) tbtAutoSave();
 }
 function initAllSigs() {
   var cs = document.querySelectorAll('.sig-wrap canvas');
@@ -5298,6 +5300,7 @@ function renderTBTPhotos() {
         if (!confirm('Remove this photo?')) return;
         tbtPhotos.splice(idx, 1);
         renderTBTPhotos();
+        tbtAutoSave();
       };
       tile.appendChild(del);
       wrap.appendChild(tile);
@@ -5330,7 +5333,7 @@ function tbtPhotoUpload(input) {
     renderTBTPhotos();
     var path = 'tbt/' + (currentTBTRef || 'unfiled') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.jpg';
     _uploadDefectPhoto(path, dataUrl, 'image/jpeg').then(function(r) {
-      if (r.ok) { slot.storagePath = path; slot.status = 'saved'; }
+      if (r.ok) { slot.storagePath = path; slot.status = 'saved'; tbtAutoSave(); }
       else { slot.status = 'error'; }
       renderTBTPhotos();
     }).catch(function(){ slot.status = 'error'; renderTBTPhotos(); });
@@ -5363,6 +5366,9 @@ function closeTBTView() {
 }
 
 function showTBTList() {
+  // Leaving the form: send any change still waiting on the auto-save timer
+  // now, while currentTBTRef still names this talk.
+  if (_tbtAutoSaveTimer) { clearTimeout(_tbtAutoSaveTimer); _tbtAutoSaveTimer = null; saveTBT(); }
   document.getElementById('tbtListPanel').style.display = 'block';
   document.getElementById('tbtFormPanel').style.display = 'none';
   currentTBTRef = null;
@@ -5431,7 +5437,14 @@ function newTBT() {
 
 function showTBTForm() {
   document.getElementById('tbtListPanel').style.display = 'none';
-  document.getElementById('tbtFormPanel').style.display = 'block';
+  var panel = document.getElementById('tbtFormPanel');
+  panel.style.display = 'block';
+  // Typing in any field auto-saves (signatures and photos call tbtAutoSave
+  // themselves). Values set by loadTBT/clearTBTFormFields fire no input event.
+  if (!panel._tbtAutoSaveAttached) {
+    panel._tbtAutoSaveAttached = true;
+    panel.addEventListener('input', tbtAutoSave);
+  }
   document.getElementById('tbtView').scrollTop = 0;
   setTimeout(function() { for (var i = 1; i <= 20; i++) initSig('tbt_sig_' + i); }, 60);
 }
@@ -5477,10 +5490,27 @@ function loadTBT(ref) {
     .catch(function() { showTBTForm(); });
 }
 
+// ── AUTO-SAVE — every signature, clear, typed change and photo saves the
+// talk ~1s later, so nobody has to remember the Save button (which still
+// works). Saves never overlap: one made while another is in flight waits and
+// goes next, carrying the latest form state. ──
+var _tbtAutoSaveTimer = null;
+var _tbtSaving = false;
+var _tbtPendingPayload = null;
+
+function tbtAutoSave() {
+  if (!currentTBTRef) return;
+  clearTimeout(_tbtAutoSaveTimer);
+  var btn = document.getElementById('tbtSaveBtn');
+  if (btn && !_tbtSaving) btn.textContent = 'Saving...';
+  _tbtAutoSaveTimer = setTimeout(function() { _tbtAutoSaveTimer = null; saveTBT(); }, 1000);
+}
+
 function saveTBT() {
   if (!currentTBTRef) return;
+  clearTimeout(_tbtAutoSaveTimer); _tbtAutoSaveTimer = null;
   var btn = document.getElementById('tbtSaveBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+  if (btn) btn.textContent = 'Saving...';
   var panel = document.getElementById('tbtFormPanel');
   var data = { signatures: {} };
   var inputs = panel.querySelectorAll('input[type="text"][id], input[type="date"][id], textarea[id]');
@@ -5510,19 +5540,32 @@ function saveTBT() {
   }
   data.tbt_signed_count = Object.keys(data.signatures).length;
   var payload = { quote_ref: currentTBTRef, updated_at: new Date().toISOString(), form_data: data };
+  _tbtSend(payload);
+}
+
+function _tbtSend(payload) {
+  if (_tbtSaving) { _tbtPendingPayload = payload; return; }
+  _tbtSaving = true;
+  var btn = document.getElementById('tbtSaveBtn');
+  function done(ok) {
+    _tbtSaving = false;
+    if (_tbtPendingPayload) { var next = _tbtPendingPayload; _tbtPendingPayload = null; _tbtSend(next); return; }
+    if (!btn) return;
+    btn.textContent = ok ? '✓ Saved' : 'Save failed';
+    setTimeout(function(){ if (!_tbtSaving && !_tbtAutoSaveTimer) btn.textContent = 'Save'; }, ok ? 2000 : 2500);
+  }
   supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r) {
-      if (btn) btn.disabled = false;
-      if (r.ok || r.status === 201 || r.status === 204) {
-        if (btn) { btn.textContent = '✓ Saved'; setTimeout(function(){ btn.textContent = 'Save'; }, 2000); }
+      var ok = r.ok || r.status === 201 || r.status === 204;
+      if (ok) {
         refreshTBTBadge();
-      } else {
-        if (btn) { btn.textContent = 'Save failed'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
+        // Saved on the way out to the list: reload it so its count is current
+        var list = document.getElementById('tbtListPanel');
+        if (list && list.style.display !== 'none') fetchTBTList();
       }
+      done(ok);
     })
-    .catch(function() {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save failed'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
-    });
+    .catch(function() { done(false); });
 }
 
 // A box only counts as signed if its JPEG is at least this much bigger than

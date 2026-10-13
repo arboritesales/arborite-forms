@@ -53,6 +53,7 @@ function attachSigListeners(canvas, id) {
             scheduleAutoSave(el.id, true);
             break;
           }
+          if (el.id === 'tbtFormPanel') { tbtAutoSave(); break; }
           el = el.parentNode;
         }
       }
@@ -80,6 +81,7 @@ function clrSig(id) {
   var canvas = (p && p.canvas) || document.getElementById(id);
   var panel = canvas && canvas.closest && canvas.closest('.panel');
   if (panel) scheduleAutoSave(panel.id, true);
+  else if (canvas && canvas.closest && canvas.closest('#tbtFormPanel')) tbtAutoSave();
 }
 function initAllSigs() {
   var cs = document.querySelectorAll('.sig-wrap canvas');
