@@ -3105,6 +3105,7 @@ function vehClearForm() {
   document.getElementById('veh_reg').value = '';
   document.getElementById('veh_mileage').value = '';
   document.getElementById('veh_notes').value = '';
+  document.getElementById('veh_comments').value = '';
   document.querySelectorAll('.veh-opts .veh-btn').forEach(function(b){ b.className = b.classList.contains('veh-multi') ? 'veh-btn veh-multi' : 'veh-btn'; });
   document.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
   document.getElementById('vehSaveStatus').textContent = '';
@@ -3191,7 +3192,8 @@ function saveVehCheck(isAuto) {
     spanner_socket: vehGetFieldVal('veh_spanner'),
     ladders: vehGetFieldVal('veh_ladders'),
     overall_rating: rating,
-    remedial_notes: document.getElementById('veh_notes').value
+    remedial_notes: document.getElementById('veh_notes').value,
+    comments: document.getElementById('veh_comments').value
   };
   var _defPayload = getDefectPayload('veh');
   payload.has_defect = _defPayload.has_defect;
@@ -3336,7 +3338,8 @@ function vehFieldList(d) {
     ['Hydraulic Fluid',d.hydraulic_fluid],['Tipping System',d.tipping_system],
     ['First Aid Kit',d.first_aid],['Fire Extinguisher',d.fire_extinguisher],
     ['Handbook Present',d.handbook],['Spanner & Socket Set',d.spanner_socket],
-    ['Ladders',d.ladders]
+    ['Ladders',d.ladders],
+    ['Comments',d.comments,true] // free text — not coloured as an answer
   ];
 }
 
@@ -3374,7 +3377,8 @@ function loadVehRecord(id) {
       if (!f[1]) return '';
       var val = f[1];
       var colour = '';
-      if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
+      if (f[2]) val = String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+      else if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
       else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
       else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
       return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;' + colour + '">' + val + '</div></div>';
@@ -3823,7 +3827,7 @@ var CHECK_CATEGORIES = {
   },
   riggingjason: {
     label: 'Small Rigging Kit – Jason and Team', shortLabel: 'Small Rigging Kit', subLabel: 'Jason and Team', icon: '⛩️', table: 'rigging_kit_jason_team_checks',
-    group: 'riggingkit', hasComments: true, hideMachine: true, machines: ['Small Rigging Kit – Jason and Team'],
+    group: 'riggingkit', hideMachine: true, machines: ['Small Rigging Kit – Jason and Team'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -3838,7 +3842,7 @@ var CHECK_CATEGORIES = {
   },
   riggingjack: {
     label: 'Small Rigging Kit – Jack and Team', shortLabel: 'Small Rigging Kit', subLabel: 'Jack and Team', icon: '⛩️', table: 'rigging_kit_jack_team_checks',
-    group: 'riggingkit', hasComments: true, hideMachine: true, machines: ['Small Rigging Kit – Jack and Team'],
+    group: 'riggingkit', hideMachine: true, machines: ['Small Rigging Kit – Jack and Team'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -3856,7 +3860,7 @@ var CHECK_CATEGORIES = {
   // group plus its table (see supabase_climbing_kit_checks_2026-10-13.sql).
   climbjack: {
     label: 'Jack Fisher – Climbing Kit', shortLabel: 'Jack Fisher', icon: '🧗', table: 'climbing_kit_jack_fisher_checks',
-    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['Jack Fisher – Climbing Kit'],
+    group: 'climbingkit', hideMachine: true, machines: ['Jack Fisher – Climbing Kit'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -3876,7 +3880,7 @@ var CHECK_CATEGORIES = {
   },
   climbjames: {
     label: 'James Hilborne – Climbing Kit', shortLabel: 'James Hilborne', icon: '🧗', table: 'climbing_kit_james_hilborne_checks',
-    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['James Hilborne – Climbing Kit'],
+    group: 'climbingkit', hideMachine: true, machines: ['James Hilborne – Climbing Kit'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -3903,7 +3907,7 @@ var CHECK_CATEGORIES = {
   },
   climbluke: {
     label: 'Luke Richardson – Climbing Kit', shortLabel: 'Luke Richardson', icon: '🧗', table: 'climbing_kit_luke_richardson_checks',
-    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['Luke Richardson – Climbing Kit'],
+    group: 'climbingkit', hideMachine: true, machines: ['Luke Richardson – Climbing Kit'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -3927,7 +3931,7 @@ var CHECK_CATEGORIES = {
   },
   climbdave: {
     label: 'Dave Norris – Climbing Kit', shortLabel: 'Dave Norris', icon: '🧗', table: 'climbing_kit_dave_norris_checks',
-    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['Dave Norris – Climbing Kit'],
+    group: 'climbingkit', hideMachine: true, machines: ['Dave Norris – Climbing Kit'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -3956,7 +3960,7 @@ var CHECK_CATEGORIES = {
   },
   climbjason: {
     label: 'Jason Hiscock – Climbing Kit', shortLabel: 'Jason Hiscock', icon: '🧗', table: 'climbing_kit_jason_hiscock_checks',
-    group: 'climbingkit', hasComments: true, hideMachine: true, machines: ['Jason Hiscock – Climbing Kit'],
+    group: 'climbingkit', hideMachine: true, machines: ['Jason Hiscock – Climbing Kit'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -4104,11 +4108,9 @@ function renderCategoryPanel(cat) {
   var mileageHtml = cfg.hasMileage
     ? '<div class="field-row lw"><div class="fc lbl">' + cfg.mileageLabel + '</div><div class="fc"><input id="catMileage_' + cat + '" type="number" step="any" placeholder="Enter value" style="width:100%;border:none;border-bottom:1.5px solid var(--border);padding:6px 0;font-size:13px;font-family:\'Barlow\',sans-serif;outline:none;background:transparent;" oninput="catAutoSave(\'' + cat + '\')"></div></div>'
     : '';
-  // Free-text box straight after the last kit item (climbing kits)
-  var commentsHtml = cfg.hasComments
-    ? '<div style="padding:12px 14px;border-top:1px solid #e0e0d8;"><div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:6px;">Comments</div>'
-      + '<textarea id="catComments_' + cat + '" rows="3" placeholder="Any comments on the kit..." style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-size:13px;font-family:\'Barlow\',sans-serif;outline:none;resize:vertical;" oninput="catAutoSave(\'' + cat + '\')"></textarea></div>'
-    : '';
+  // Free-text box straight after the last item (every form; comments column)
+  var commentsHtml = '<div style="padding:12px 14px;border-top:1px solid #e0e0d8;"><div style="font-size:12px;color:var(--mid);font-weight:600;margin-bottom:6px;">Comments</div>'
+    + '<textarea id="catComments_' + cat + '" rows="3" placeholder="Any comments..." style="width:100%;border:1px solid var(--border);border-radius:3px;padding:8px;font-size:13px;font-family:\'Barlow\',sans-serif;outline:none;resize:vertical;" oninput="catAutoSave(\'' + cat + '\')"></textarea></div>';
 
   root.innerHTML =
     '<div id="catListPanel_' + cat + '">'
@@ -4284,7 +4286,7 @@ function saveCatCheck(cat, isAuto) {
     payload.mileage = (mEl && mEl.value) ? parseFloat(mEl.value) : null;
   }
   cfg.fields.forEach(function(f) { payload[f.key] = catGetFieldVal(cat, f.key); });
-  if (cfg.hasComments) payload.comments = document.getElementById('catComments_' + cat).value;
+  payload.comments = document.getElementById('catComments_' + cat).value;
   var _defPayload = getDefectPayload('cat_' + cat);
   payload.has_defect = _defPayload.has_defect;
   payload.defect_comment = _defPayload.defect_comment;
@@ -4391,7 +4393,7 @@ function catFieldRows(cat, d) {
   if (cfg.hasMileage) fieldRows.push([cfg.mileageLabel, (d.mileage != null && d.mileage !== '') ? d.mileage : '']);
   cfg.fields.forEach(function(f) { fieldRows.push([f.label, d[f.key]]); });
   // Third element marks free text, so it isn't coloured as a Good/Poor answer
-  if (cfg.hasComments) fieldRows.push(['Comments', d.comments, true]);
+  fieldRows.push(['Comments', d.comments, true]);
   return fieldRows;
 }
 
@@ -4514,11 +4516,10 @@ var _surveyReportData = null;
 // Fields that are identity/metadata rather than a quality score, per kind —
 // reused by both the single-record Survey Report and the Defects dashboard.
 function _surveyMeta(kind, cat) {
-  if (kind === 'vehicle') return { fieldRows: null, skipLabels: { 'Vehicle': 1, 'Mileage': 1 } };
+  if (kind === 'vehicle') return { fieldRows: null, skipLabels: { 'Vehicle': 1, 'Mileage': 1, 'Comments': 1 } };
   var cfg = CHECK_CATEGORIES[cat];
-  var skipLabels = {};
+  var skipLabels = { 'Comments': 1 }; // free text, not a quality score
   if (cfg && cfg.hasMileage) skipLabels[cfg.mileageLabel] = 1;
-  if (cfg && cfg.hasComments) skipLabels['Comments'] = 1;
   return { cfg: cfg, skipLabels: skipLabels };
 }
 

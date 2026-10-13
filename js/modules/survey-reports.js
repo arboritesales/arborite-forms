@@ -6,11 +6,10 @@ var _surveyReportData = null;
 // Fields that are identity/metadata rather than a quality score, per kind —
 // reused by both the single-record Survey Report and the Defects dashboard.
 function _surveyMeta(kind, cat) {
-  if (kind === 'vehicle') return { fieldRows: null, skipLabels: { 'Vehicle': 1, 'Mileage': 1 } };
+  if (kind === 'vehicle') return { fieldRows: null, skipLabels: { 'Vehicle': 1, 'Mileage': 1, 'Comments': 1 } };
   var cfg = CHECK_CATEGORIES[cat];
-  var skipLabels = {};
+  var skipLabels = { 'Comments': 1 }; // free text, not a quality score
   if (cfg && cfg.hasMileage) skipLabels[cfg.mileageLabel] = 1;
-  if (cfg && cfg.hasComments) skipLabels['Comments'] = 1;
   return { cfg: cfg, skipLabels: skipLabels };
 }
 

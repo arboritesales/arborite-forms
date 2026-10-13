@@ -121,6 +121,7 @@ function vehClearForm() {
   document.getElementById('veh_reg').value = '';
   document.getElementById('veh_mileage').value = '';
   document.getElementById('veh_notes').value = '';
+  document.getElementById('veh_comments').value = '';
   document.querySelectorAll('.veh-opts .veh-btn').forEach(function(b){ b.className = b.classList.contains('veh-multi') ? 'veh-btn veh-multi' : 'veh-btn'; });
   document.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
   document.getElementById('vehSaveStatus').textContent = '';
@@ -207,7 +208,8 @@ function saveVehCheck(isAuto) {
     spanner_socket: vehGetFieldVal('veh_spanner'),
     ladders: vehGetFieldVal('veh_ladders'),
     overall_rating: rating,
-    remedial_notes: document.getElementById('veh_notes').value
+    remedial_notes: document.getElementById('veh_notes').value,
+    comments: document.getElementById('veh_comments').value
   };
   var _defPayload = getDefectPayload('veh');
   payload.has_defect = _defPayload.has_defect;
@@ -352,7 +354,8 @@ function vehFieldList(d) {
     ['Hydraulic Fluid',d.hydraulic_fluid],['Tipping System',d.tipping_system],
     ['First Aid Kit',d.first_aid],['Fire Extinguisher',d.fire_extinguisher],
     ['Handbook Present',d.handbook],['Spanner & Socket Set',d.spanner_socket],
-    ['Ladders',d.ladders]
+    ['Ladders',d.ladders],
+    ['Comments',d.comments,true] // free text — not coloured as an answer
   ];
 }
 
@@ -390,7 +393,8 @@ function loadVehRecord(id) {
       if (!f[1]) return '';
       var val = f[1];
       var colour = '';
-      if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
+      if (f[2]) val = String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+      else if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
       else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
       else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
       return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;' + colour + '">' + val + '</div></div>';
