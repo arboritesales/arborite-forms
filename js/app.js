@@ -3234,6 +3234,7 @@ function saveVehCheck(isAuto) {
       s.textContent = '✓ ' + (isAuto ? 'Auto-saved' : 'Saved successfully!');
       if (!isAuto) {
         if (_activeScheduledCheckId) { _markScheduledComplete(_activeScheduledCheckId); _activeScheduledCheckId = null; }
+        else { _completeMatchingScheduled('vehicle', payload.vehicle); }
         setTimeout(function(){ showVehList(); fetchVehList(); }, 1000);
       }
       else { setTimeout(function(){ if(s) s.textContent = ''; }, 2000); }
@@ -4320,6 +4321,7 @@ function saveCatCheck(cat, isAuto) {
       s.textContent = '✓ ' + (isAuto ? 'Auto-saved' : 'Saved successfully!');
       if (!isAuto) {
         if (_activeScheduledCheckId) { _markScheduledComplete(_activeScheduledCheckId); _activeScheduledCheckId = null; }
+        else { _completeMatchingScheduled(cat, payload.machine); }
         setTimeout(function(){ showCatList(cat); fetchCatList(cat); }, 1000);
       }
       else { setTimeout(function(){ if (s) s.textContent = ''; }, 2000); }
@@ -4900,23 +4902,53 @@ function _markScheduledComplete(id) {
   }).catch(function(){});
 }
 
-// ── CHECKS NOTIFICATION BADGE — shown on the Checks tile on the Welcome
-// screen so employees see at a glance how many checks are outstanding today,
-// without having to open the calendar first. Not filtered server-side by
-// `completed` so this still degrades gracefully (shows today's total) before
-// supabase_schedule_completed.sql has been run. ──
+// A check done straight from its tile (not via Start on the Schedule) still
+// ticks off the oldest matching outstanding item from the last 7 days — same
+// category, and the same machine unless the category has only one asset
+// (hideMachine kits, whose scheduled name may predate a rename).
+function _completeMatchingScheduled(category, machine) {
+  var cfg = CHECK_CATEGORIES[category];
+  var now = new Date();
+  var weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  var q = 'todays_checks?select=id&category=eq.' + encodeURIComponent(category)
+    + '&completed=not.is.true&scheduled_date=gte.' + _isoDate(weekAgo) + '&scheduled_date=lte.' + _isoDate(now)
+    + '&order=scheduled_date.asc&limit=1';
+  if (!(cfg && cfg.hideMachine)) {
+    if (!machine) return;
+    q += '&machine=eq.' + encodeURIComponent(machine);
+  }
+  fetch(SUPA_URL + '/rest/v1/' + q, {
+    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) {
+    if (Array.isArray(rows) && rows[0] && rows[0].id) _markScheduledComplete(rows[0].id);
+  })
+  .catch(function(){});
+}
+
+// ── CHECKS NOTIFICATION BADGE — shown on the Checks row on the Welcome
+// screen so employees see at a glance how many checks are outstanding,
+// without having to open the calendar first. The week's checks are all
+// booked on one day, so this counts anything scheduled in the last 7 days
+// (up to today) not yet done — it stays up after the booked day until each
+// check is saved, and last week's batch drops off when the next is booked.
+// Not filtered server-side by `completed` so this still degrades gracefully
+// before supabase_schedule_completed.sql has been run. ──
 function refreshChecksBadge() {
   var badge = document.getElementById('checksTileBadge');
   if (!badge) return;
-  fetch(SUPA_URL + '/rest/v1/todays_checks?scheduled_date=eq.' + _isoDate(new Date()), {
+  var now = new Date();
+  var weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  fetch(SUPA_URL + '/rest/v1/todays_checks?scheduled_date=gte.' + _isoDate(weekAgo) + '&scheduled_date=lte.' + _isoDate(now), {
     headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
   })
   .then(function(r){ return r.json(); })
   .then(function(rows) {
     var outstanding = (Array.isArray(rows) ? rows : []).filter(function(r){ return !r.completed; }).length;
     if (outstanding > 0) {
-      badge.textContent = outstanding;
-      badge.style.display = 'block';
+      badge.textContent = outstanding + (outstanding === 1 ? ' check' : ' checks') + ' to do';
+      badge.style.display = '';
     } else {
       badge.style.display = 'none';
     }

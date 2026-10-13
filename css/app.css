@@ -340,7 +340,6 @@ textarea{resize:vertical;min-height:60px;line-height:1.5;}
 .ws-row-text{flex:1;min-width:0;}
 .ws-chev{font-size:18px;color:rgba(255,255,255,.4);}
 .ws-badge{display:inline-block;background:#c62828;color:#fff;font-size:12px;font-weight:600;padding:3px 9px;border-radius:12px;white-space:nowrap;}
-.ws-badge-due::after{content:' due';}
 @media (max-width:420px){
   .ws-body{padding-top:22px;}
   .ws-greeting{font-size:30px;}
