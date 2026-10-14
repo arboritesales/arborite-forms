@@ -4906,15 +4906,15 @@ function _markScheduledComplete(id) {
 }
 
 // A check done straight from its tile (not via Start on the Schedule) still
-// ticks off the oldest matching outstanding item from the last 7 days — same
+// ticks off the oldest matching outstanding item booked up to today — same
 // category, and the same machine unless the category has only one asset
-// (hideMachine kits, whose scheduled name may predate a rename).
+// (hideMachine kits, whose scheduled name may predate a rename). No lower
+// date bound: undone bookings carry over until done, however late.
 function _completeMatchingScheduled(category, machine) {
   var cfg = CHECK_CATEGORIES[category];
   var now = new Date();
-  var weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
   var q = 'todays_checks?select=id&category=eq.' + encodeURIComponent(category)
-    + '&completed=not.is.true&scheduled_date=gte.' + _isoDate(weekAgo) + '&scheduled_date=lte.' + _isoDate(now)
+    + '&completed=not.is.true&scheduled_date=lte.' + _isoDate(now)
     + '&order=scheduled_date.asc&limit=1';
   if (!(cfg && cfg.hideMachine)) {
     if (!machine) return;
@@ -4932,18 +4932,14 @@ function _completeMatchingScheduled(category, machine) {
 
 // ── CHECKS NOTIFICATION BADGE — shown on the Checks row on the Welcome
 // screen so employees see at a glance how many checks are outstanding,
-// without having to open the calendar first. The week's checks are all
-// booked on one day, so this counts anything scheduled in the last 7 days
-// (up to today) not yet done — it stays up after the booked day until each
-// check is saved, and last week's batch drops off when the next is booked.
-// Not filtered server-side by `completed` so this still degrades gracefully
-// before supabase_schedule_completed.sql has been run. ──
+// without having to open the calendar first. Counts every check booked up
+// to today that isn't done yet — it stays up until each one is saved,
+// matching the calendar, where undone checks carry over until completed. ──
 function refreshChecksBadge() {
   var badge = document.getElementById('checksTileBadge');
   if (!badge) return;
   var now = new Date();
-  var weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
-  fetch(SUPA_URL + '/rest/v1/todays_checks?scheduled_date=gte.' + _isoDate(weekAgo) + '&scheduled_date=lte.' + _isoDate(now), {
+  fetch(SUPA_URL + '/rest/v1/todays_checks?select=id,completed&completed=is.false&scheduled_date=lte.' + _isoDate(now), {
     headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
   })
   .then(function(r){ return r.json(); })
@@ -4985,11 +4981,33 @@ function shiftSchedule(deltaWeeks) {
   fetchScheduleData();
 }
 
+// A booked check that hasn't been done yet shows again every other day after
+// it was booked (Mon -> Wed, Fri, Sun, ...), up to today, until it's saved —
+// so it stays in front of whoever opens the calendar however late it gets.
+function _carriedOverFor(iso) {
+  if (iso > _isoDate(new Date())) return [];
+  var day = new Date(iso + 'T00:00:00');
+  var out = [];
+  Object.keys(_scheduleData).forEach(function(k) {
+    var daysLater = Math.round((day - new Date(k + 'T00:00:00')) / 86400000);
+    if (daysLater <= 0 || daysLater % 2 !== 0) return;
+    _scheduleData[k].forEach(function(r) { if (!r.completed) out.push(r); });
+  });
+  out.sort(function(a, b) { return a.scheduled_date.localeCompare(b.scheduled_date); });
+  return out;
+}
+
+function _overdueFromLabel(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
+}
+
 function fetchScheduleData() {
   var start = _isoDate(_scheduleWeekStart);
   var endDate = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + 27);
   var end = _isoDate(endDate);
-  fetch(SUPA_URL + '/rest/v1/todays_checks?scheduled_date=gte.' + start + '&scheduled_date=lte.' + end + '&order=scheduled_date.asc', {
+  // Everything in the visible 4 weeks, plus any older booking still not done
+  // so it can carry over into them (see _carriedOverFor).
+  fetch(SUPA_URL + '/rest/v1/todays_checks?or=(scheduled_date.gte.' + start + ',completed.is.false)&scheduled_date=lte.' + end + '&order=scheduled_date.asc', {
     headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
   })
   .then(function(r){ return r.json(); })
@@ -5031,18 +5049,23 @@ function renderScheduleGrid() {
     var d = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + i);
     var iso = _isoDate(d);
     var items = _scheduleData[iso] || [];
+    var carried = _carriedOverFor(iso);
+    var total = items.length + carried.length;
     var isToday = iso === today;
     var weekdayShort = d.toLocaleDateString('en-GB',{weekday:'short'});
     html += '<div class="sched-day-cell" style="background:' + (isToday ? '#eef7e2' : '#fafaf8') + ';border-radius:6px;min-height:120px;padding:8px;display:flex;flex-direction:column;gap:6px;' + (isToday ? 'box-shadow:0 0 0 2px var(--green) inset;' : '') + '">'
       + '<div class="sched-day-date" style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:14px;color:var(--mid);"><span class="sched-day-weekday" style="display:none;">' + weekdayShort + ' </span>' + d.getDate() + '</div>'
       + '<div class="sched-day-pills" style="display:flex;flex-direction:column;gap:4px;flex:1;">'
-      + items.slice(0, 5).map(function(it) {
+      + items.concat(carried).slice(0, 5).map(function(it) {
           var meta = checksCategoryMeta(it.category);
-          var doneMark = it.completed ? '&#10003; ' : '';
-          return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + (it.completed ? '#d7ecc9' : '#e8f2e3') + ';color:#2d5a1b;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + doneMark + meta.icon + ' ' + (it.machine || '') + '</div>';
+          var isCarried = it.scheduled_date !== iso;
+          var mark = it.completed ? '&#10003; ' : isCarried ? '&#8635; ' : '';
+          var bg = it.completed ? '#d7ecc9' : isCarried ? '#fdf0d5' : '#e8f2e3';
+          var fg = isCarried ? '#7a4d00' : '#2d5a1b';
+          return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + bg + ';color:' + fg + ';line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + mark + meta.icon + ' ' + (it.machine || '') + '</div>';
         }).join('')
       + '</div>'
-      + '<button class="sched-day-action" onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10.5px;font-weight:700;border-radius:4px;padding:5px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (items.length === 0 ? (managerUnlocked ? '+ Add' : 'Nothing') : 'View (' + items.length + ') ›') + '</button>'
+      + '<button class="sched-day-action" onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10.5px;font-weight:700;border-radius:4px;padding:5px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (total === 0 ? (managerUnlocked ? '+ Add' : 'Nothing') : 'View (' + total + ') ›') + '</button>'
       + '</div>';
   }
   grid.innerHTML = html;
@@ -5080,7 +5103,7 @@ function scheduleTypeChange() {
 
 function renderScheduleModalList() {
   var wrap = document.getElementById('scheduleModalList');
-  var items = _scheduleData[_scheduleModalDate] || [];
+  var items = (_scheduleData[_scheduleModalDate] || []).concat(_carriedOverFor(_scheduleModalDate));
   if (!items.length) {
     wrap.innerHTML = '<div style="color:#9a9a90;font-size:12.5px;padding:14px 0;text-align:center;">Nothing scheduled for this day.</div>';
     return;
@@ -5089,8 +5112,13 @@ function renderScheduleModalList() {
     var meta = checksCategoryMeta(it.category);
     var machineEsc = (it.machine || '').replace(/'/g, "\\'");
     var doneBadge = '<span style="font-size:10.5px;font-weight:800;color:#2d5a1b;background:#e8f2e3;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10003; Completed</span>';
+    var isCarried = it.scheduled_date !== _scheduleModalDate;
+    var overdueTag = isCarried ? '<div style="font-size:10.5px;font-weight:700;color:#7a4d00;margin-top:2px;">&#8635; Not done yet — booked ' + _overdueFromLabel(it.scheduled_date) + '</div>' : '';
     var actionHtml;
-    if (managerUnlocked) {
+    if (managerUnlocked && isCarried) {
+      // Remove it from the day it was booked on, not from a carried-over copy
+      actionHtml = '';
+    } else if (managerUnlocked) {
       actionHtml = (it.completed ? doneBadge : '')
         + '<button onclick="removeScheduledCheck(\'' + it.id + '\')" style="background:none;border:none;color:#a02020;font-size:16px;cursor:pointer;padding:2px 8px;" aria-label="Remove">&#10005;</button>';
     } else {
@@ -5100,7 +5128,7 @@ function renderScheduleModalList() {
     }
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e0e0d8;font-size:12.5px;">'
       + '<span style="font-size:16px;">' + meta.icon + '</span>'
-      + '<span style="flex:1;">' + meta.label + ' — ' + (it.machine || '') + '</span>'
+      + '<span style="flex:1;">' + meta.label + ' — ' + (it.machine || '') + overdueTag + '</span>'
       + actionHtml
       + '</div>';
   }).join('');
