@@ -5210,10 +5210,13 @@ function renderWeeklyReport(entries, tables) {
 
   var counts = { total: entries.length, excellent: 0, satisfactory: 0, unsatisfactory: 0, defects: 0 };
   entries.forEach(function(e) {
+    // Ratings are stored as the button text (e.g. "✅ ExcellentNo areas of
+    // non-compliance"), so match by substring — check 'unsatisfactory' before
+    // 'satisfactory' since one contains the other.
     var r = (e.rating || '').toLowerCase();
-    if (r === 'excellent') counts.excellent++;
-    else if (r === 'satisfactory') counts.satisfactory++;
-    else if (r === 'unsatisfactory') counts.unsatisfactory++;
+    if (r.indexOf('unsatisfactory') !== -1) counts.unsatisfactory++;
+    else if (r.indexOf('satisfactory') !== -1) counts.satisfactory++;
+    else if (r.indexOf('excellent') !== -1) counts.excellent++;
     if (e.hasDefect) counts.defects++;
   });
 
