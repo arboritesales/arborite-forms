@@ -38,7 +38,7 @@ var CHECK_CATEGORIES = {
       {key:'no_stress', label:'Is the "no stress" system operable?', options:['Yes','No']},
       {key:'feed_reset', label:'Does any feed roller reset function operate correctly?', options:['Yes','No']},
       {key:'engine_oil', label:'Is the engine oil level correct?', options:['Yes','No']},
-      {key:'engine_coolant', label:'Is the engine coolant level correct?', options:['Yes','No']},
+      {key:'engine_coolant', label:'Is the engine coolant level correct?', options:['Yes','No','N/A']},
       {key:'hydraulic_oil', label:'Is the hydraulic oil level correct?', options:['Yes','No']},
       {key:'drive_belts', label:'Are the drive belts in visually good condition, do not appear obviously loose and are free from defects?', options:['Yes','No']},
       {key:'radiator_screen', label:'Is the radiator screen clear of debris and free from defects?', options:['Yes','No']},
