@@ -134,6 +134,7 @@ function vehSel(groupId, btn, val) {
   group.querySelectorAll('.veh-btn.veh-multi').forEach(function(b){ b.className = 'veh-btn veh-multi'; });
   var cls = 'active-' + val.toLowerCase().replace(/\//g,'').replace(/ /g,'');
   btn.classList.add(cls);
+  group.style.outline = '';
   vehAutoSave();
 }
 
@@ -142,12 +143,14 @@ function vehToggle(groupId, btn, val) {
   group.querySelectorAll('.veh-btn:not(.veh-multi)').forEach(function(b){ b.className = 'veh-btn'; });
   var cls = 'active-' + val.toLowerCase().replace(/ /g,'');
   if (btn.classList.contains(cls)) { btn.classList.remove(cls); } else { btn.classList.add(cls); }
+  group.style.outline = '';
   vehAutoSave();
 }
 
 function vehRating(btn, val) {
   document.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
   btn.classList.add('active-' + val.toLowerCase());
+  btn.parentNode.style.outline = '';
   vehAutoSave();
 }
 
@@ -179,6 +182,15 @@ function saveVehCheck(isAuto) {
   var mileage = document.getElementById('veh_mileage').value;
   var rating = vehGetRating();
   var s = document.getElementById('vehSaveStatus');
+
+  if (!isAuto) {
+    var missing = _unansweredCheckItems(document.getElementById('vehFormPanel'));
+    if (!reg) missing.unshift('Vehicle');
+    var ratingRow = document.querySelector('#vehFormPanel .veh-rating-btn');
+    if (ratingRow) ratingRow.parentNode.style.outline = rating ? '' : '2px solid #ff6b6b';
+    if (!rating) missing.push('Overall rating');
+    if (missing.length) { _showCheckSubmitBlocked(s, missing); return; }
+  }
 
   var payload = {
     inspector_name: _vehInspector,
@@ -281,12 +293,15 @@ function fetchVehList() {
       var rating = (r.overall_rating || '').toLowerCase();
       var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
       var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
+      var badgeHtml = _isUnfinishedCheck(r)
+        ? '<span class="veh-list-badge" style="background:#5a5a50;color:#fff;">&#9203; Not finished</span>'
+        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + r.overall_rating + '</span>';
       var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
       var miles = r.mileage ? Number(r.mileage).toLocaleString() + ' miles' : '';
       return '<div class="veh-list-entry" onclick="openVehRecord(\'' + r.id + '\')">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
         + '<span class="veh-list-reg">' + (r.vehicle || 'Unknown') + '</span>'
-        + '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + (r.overall_rating || 'No rating') + '</span>'
+        + badgeHtml
         + '</div>'
         + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + (miles ? ' · ' + miles : '') + '</div>'
         + '<div style="font-size:11px;color:rgba(126,200,32,.6);margin-top:4px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">🔒 Tap to view</div>'

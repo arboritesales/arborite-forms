@@ -3120,6 +3120,7 @@ function vehSel(groupId, btn, val) {
   group.querySelectorAll('.veh-btn.veh-multi').forEach(function(b){ b.className = 'veh-btn veh-multi'; });
   var cls = 'active-' + val.toLowerCase().replace(/\//g,'').replace(/ /g,'');
   btn.classList.add(cls);
+  group.style.outline = '';
   vehAutoSave();
 }
 
@@ -3128,12 +3129,14 @@ function vehToggle(groupId, btn, val) {
   group.querySelectorAll('.veh-btn:not(.veh-multi)').forEach(function(b){ b.className = 'veh-btn'; });
   var cls = 'active-' + val.toLowerCase().replace(/ /g,'');
   if (btn.classList.contains(cls)) { btn.classList.remove(cls); } else { btn.classList.add(cls); }
+  group.style.outline = '';
   vehAutoSave();
 }
 
 function vehRating(btn, val) {
   document.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
   btn.classList.add('active-' + val.toLowerCase());
+  btn.parentNode.style.outline = '';
   vehAutoSave();
 }
 
@@ -3165,6 +3168,15 @@ function saveVehCheck(isAuto) {
   var mileage = document.getElementById('veh_mileage').value;
   var rating = vehGetRating();
   var s = document.getElementById('vehSaveStatus');
+
+  if (!isAuto) {
+    var missing = _unansweredCheckItems(document.getElementById('vehFormPanel'));
+    if (!reg) missing.unshift('Vehicle');
+    var ratingRow = document.querySelector('#vehFormPanel .veh-rating-btn');
+    if (ratingRow) ratingRow.parentNode.style.outline = rating ? '' : '2px solid #ff6b6b';
+    if (!rating) missing.push('Overall rating');
+    if (missing.length) { _showCheckSubmitBlocked(s, missing); return; }
+  }
 
   var payload = {
     inspector_name: _vehInspector,
@@ -3267,12 +3279,15 @@ function fetchVehList() {
       var rating = (r.overall_rating || '').toLowerCase();
       var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
       var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
+      var badgeHtml = _isUnfinishedCheck(r)
+        ? '<span class="veh-list-badge" style="background:#5a5a50;color:#fff;">&#9203; Not finished</span>'
+        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + r.overall_rating + '</span>';
       var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
       var miles = r.mileage ? Number(r.mileage).toLocaleString() + ' miles' : '';
       return '<div class="veh-list-entry" onclick="openVehRecord(\'' + r.id + '\')">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
         + '<span class="veh-list-reg">' + (r.vehicle || 'Unknown') + '</span>'
-        + '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + (r.overall_rating || 'No rating') + '</span>'
+        + badgeHtml
         + '</div>'
         + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + (miles ? ' · ' + miles : '') + '</div>'
         + '<div style="font-size:11px;color:rgba(126,200,32,.6);margin-top:4px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">🔒 Tap to view</div>'
@@ -3498,6 +3513,35 @@ function defectAutoSaveHook(prefix) {
   if (prefix === 'veh') vehAutoSave();
   else if (prefix.indexOf('cat_') === 0) catAutoSave(prefix.substring(4));
 }
+// Save & Submit on a check form only goes through once every item, the
+// defects question and the overall rating are answered — auto-save still
+// keeps a part-done check as you go. Lists any unanswered option groups
+// under root by their row label and outlines them in red.
+function _unansweredCheckItems(root) {
+  var missing = [];
+  if (!root) return missing;
+  root.querySelectorAll('.veh-opts').forEach(function(group) {
+    var answered = !!group.querySelector('.veh-btn[class*="active-"]');
+    group.style.outline = answered ? '' : '2px solid #ff6b6b';
+    if (answered) return;
+    var lbl = group.parentNode.querySelector('.lbl');
+    missing.push(lbl ? lbl.textContent.trim() : 'an item');
+  });
+  return missing;
+}
+
+function _showCheckSubmitBlocked(statusEl, missing) {
+  var list = missing.slice(0, 3).join(', ') + (missing.length > 3 ? ' and ' + (missing.length - 3) + ' more' : '');
+  if (statusEl) { statusEl.style.color = '#ff6b6b'; statusEl.textContent = 'Not submitted — still to answer: ' + list; }
+  alert('Please answer everything before submitting.\n\nStill to answer: ' + list + '\n\n(Missing items are outlined in red.)');
+}
+
+// Checks are auto-saved as soon as anything is filled in, so a row without
+// an overall rating is one that was started but never submitted.
+function _isUnfinishedCheck(row) {
+  return !(row && row.overall_rating);
+}
+
 function defectBlockHtml(prefix) {
   return '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
     + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9888;&#65039; Defects</div>'
@@ -3517,6 +3561,7 @@ function defectSel(prefix, btn, val) {
   var group = document.getElementById(prefix + '_defect');
   group.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
   btn.classList.add(val === 'Yes' ? 'active-poor' : 'active-good');
+  group.style.outline = '';
   defectState(prefix).flag = val;
   var panel = document.getElementById(prefix + '_defectPanel');
   if (panel) panel.style.display = (val === 'Yes') ? 'block' : 'none';
@@ -4041,6 +4086,7 @@ function catFieldSel(cat, key, btn, val) {
   var group = document.getElementById('catField_' + cat + '_' + key);
   group.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
   btn.classList.add(catOptionClass(val));
+  group.style.outline = '';
   catAutoSave(cat);
 }
 
@@ -4055,6 +4101,7 @@ function catRating(cat, btn, val) {
   var root = document.getElementById('catRating_' + cat);
   root.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
   btn.classList.add('active-' + val.toLowerCase());
+  root.style.outline = '';
   catAutoSave(cat);
 }
 
@@ -4277,6 +4324,16 @@ function saveCatCheck(cat, isAuto) {
   var st = catState(cat);
   var s = document.getElementById('catSaveStatus_' + cat);
 
+  if (!isAuto) {
+    var missing = _unansweredCheckItems(document.getElementById('catFormPanel_' + cat));
+    if (!catGetMachine(cat)) missing.unshift(cfg.machineLabel || 'Machine');
+    var ratingRow = document.getElementById('catRating_' + cat);
+    var hasRating = !!catGetRating(cat);
+    if (ratingRow) ratingRow.style.outline = hasRating ? '' : '2px solid #ff6b6b';
+    if (!hasRating) missing.push('Overall rating');
+    if (missing.length) { _showCheckSubmitBlocked(s, missing); return; }
+  }
+
   var payload = {
     inspector_name: st.inspector,
     machine: catGetMachine(cat),
@@ -4355,11 +4412,14 @@ function fetchCatList(cat) {
       var rating = (r.overall_rating || '').toLowerCase();
       var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
       var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
+      var badgeHtml = _isUnfinishedCheck(r)
+        ? '<span class="veh-list-badge" style="background:#5a5a50;color:#fff;">&#9203; Not finished</span>'
+        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + r.overall_rating + '</span>';
       var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
       return '<div class="veh-list-entry" onclick="openCatRecord(\'' + cat + '\',\'' + r.id + '\')">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
         + '<span class="veh-list-reg">' + (r.machine || 'Unknown') + '</span>'
-        + '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + (r.overall_rating || 'No rating') + '</span>'
+        + badgeHtml
         + '</div>'
         + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + '</div>'
         + '<div style="font-size:11px;color:rgba(126,200,32,.6);margin-top:4px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">🔒 Tap to view</div>'
@@ -5236,6 +5296,11 @@ function renderWeeklyReport(entries, tables) {
   var bodyEl = document.getElementById('weeklyReportBody');
   if (!bodyEl) return;
 
+  // Started-but-never-submitted checks (no overall rating) aren't completed
+  // checks — leave them out of every figure and just say how many there are.
+  var unfinished = entries.filter(function(e) { return !e.rating; });
+  entries = entries.filter(function(e) { return !!e.rating; });
+
   var counts = { total: entries.length, excellent: 0, satisfactory: 0, unsatisfactory: 0, defects: 0 };
   entries.forEach(function(e) {
     // Ratings are stored as the button text (e.g. "✅ ExcellentNo areas of
@@ -5257,7 +5322,11 @@ function renderWeeklyReport(entries, tables) {
     + '<div style="background:white;border-radius:7px;padding:14px;text-align:center;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:28px;color:var(--green);">' + counts.excellent + '</div><div style="font-size:11px;color:#8a8a7a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">Excellent</div></div>'
     + '<div style="background:white;border-radius:7px;padding:14px;text-align:center;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:28px;color:#e6a817;">' + counts.satisfactory + '</div><div style="font-size:11px;color:#8a8a7a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">Satisfactory</div></div>'
     + '<div style="background:white;border-radius:7px;padding:14px;text-align:center;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:28px;color:#c62828;">' + counts.defects + '</div><div style="font-size:11px;color:#8a8a7a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">Defects logged</div></div>'
-    + '</div>';
+    + '</div>'
+    + (unfinished.length
+      ? '<div style="background:rgba(255,255,255,.1);border-radius:7px;padding:10px 14px;margin-bottom:16px;font-size:12.5px;color:rgba(255,255,255,.8);">&#9203; ' + unfinished.length + ' started but not finished (not counted): '
+        + unfinished.map(function(e) { return e.label + ' — ' + (e.name || 'Unknown') + (e.inspector ? ' (' + e.inspector + ')' : ''); }).join(', ') + '</div>'
+      : '');
 
   var barsHtml = tables.map(function(t) {
     var k = t.cat || t.kind;

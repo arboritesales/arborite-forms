@@ -406,6 +406,7 @@ function catFieldSel(cat, key, btn, val) {
   var group = document.getElementById('catField_' + cat + '_' + key);
   group.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
   btn.classList.add(catOptionClass(val));
+  group.style.outline = '';
   catAutoSave(cat);
 }
 
@@ -420,6 +421,7 @@ function catRating(cat, btn, val) {
   var root = document.getElementById('catRating_' + cat);
   root.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
   btn.classList.add('active-' + val.toLowerCase());
+  root.style.outline = '';
   catAutoSave(cat);
 }
 
@@ -642,6 +644,16 @@ function saveCatCheck(cat, isAuto) {
   var st = catState(cat);
   var s = document.getElementById('catSaveStatus_' + cat);
 
+  if (!isAuto) {
+    var missing = _unansweredCheckItems(document.getElementById('catFormPanel_' + cat));
+    if (!catGetMachine(cat)) missing.unshift(cfg.machineLabel || 'Machine');
+    var ratingRow = document.getElementById('catRating_' + cat);
+    var hasRating = !!catGetRating(cat);
+    if (ratingRow) ratingRow.style.outline = hasRating ? '' : '2px solid #ff6b6b';
+    if (!hasRating) missing.push('Overall rating');
+    if (missing.length) { _showCheckSubmitBlocked(s, missing); return; }
+  }
+
   var payload = {
     inspector_name: st.inspector,
     machine: catGetMachine(cat),
@@ -720,11 +732,14 @@ function fetchCatList(cat) {
       var rating = (r.overall_rating || '').toLowerCase();
       var badgeCls = rating.indexOf('excellent') !== -1 ? 'excellent' : rating.indexOf('unsatisfactory') !== -1 ? 'unsatisfactory' : 'satisfactory';
       var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
+      var badgeHtml = _isUnfinishedCheck(r)
+        ? '<span class="veh-list-badge" style="background:#5a5a50;color:#fff;">&#9203; Not finished</span>'
+        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + r.overall_rating + '</span>';
       var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
       return '<div class="veh-list-entry" onclick="openCatRecord(\'' + cat + '\',\'' + r.id + '\')">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
         + '<span class="veh-list-reg">' + (r.machine || 'Unknown') + '</span>'
-        + '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + (r.overall_rating || 'No rating') + '</span>'
+        + badgeHtml
         + '</div>'
         + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + '</div>'
         + '<div style="font-size:11px;color:rgba(126,200,32,.6);margin-top:4px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">🔒 Tap to view</div>'

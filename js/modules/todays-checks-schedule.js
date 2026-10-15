@@ -375,6 +375,11 @@ function renderWeeklyReport(entries, tables) {
   var bodyEl = document.getElementById('weeklyReportBody');
   if (!bodyEl) return;
 
+  // Started-but-never-submitted checks (no overall rating) aren't completed
+  // checks — leave them out of every figure and just say how many there are.
+  var unfinished = entries.filter(function(e) { return !e.rating; });
+  entries = entries.filter(function(e) { return !!e.rating; });
+
   var counts = { total: entries.length, excellent: 0, satisfactory: 0, unsatisfactory: 0, defects: 0 };
   entries.forEach(function(e) {
     // Ratings are stored as the button text (e.g. "✅ ExcellentNo areas of
@@ -396,7 +401,11 @@ function renderWeeklyReport(entries, tables) {
     + '<div style="background:white;border-radius:7px;padding:14px;text-align:center;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:28px;color:var(--green);">' + counts.excellent + '</div><div style="font-size:11px;color:#8a8a7a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">Excellent</div></div>'
     + '<div style="background:white;border-radius:7px;padding:14px;text-align:center;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:28px;color:#e6a817;">' + counts.satisfactory + '</div><div style="font-size:11px;color:#8a8a7a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">Satisfactory</div></div>'
     + '<div style="background:white;border-radius:7px;padding:14px;text-align:center;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:28px;color:#c62828;">' + counts.defects + '</div><div style="font-size:11px;color:#8a8a7a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">Defects logged</div></div>'
-    + '</div>';
+    + '</div>'
+    + (unfinished.length
+      ? '<div style="background:rgba(255,255,255,.1);border-radius:7px;padding:10px 14px;margin-bottom:16px;font-size:12.5px;color:rgba(255,255,255,.8);">&#9203; ' + unfinished.length + ' started but not finished (not counted): '
+        + unfinished.map(function(e) { return e.label + ' — ' + (e.name || 'Unknown') + (e.inspector ? ' (' + e.inspector + ')' : ''); }).join(', ') + '</div>'
+      : '');
 
   var barsHtml = tables.map(function(t) {
     var k = t.cat || t.kind;

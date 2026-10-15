@@ -19,6 +19,35 @@ function defectAutoSaveHook(prefix) {
   if (prefix === 'veh') vehAutoSave();
   else if (prefix.indexOf('cat_') === 0) catAutoSave(prefix.substring(4));
 }
+// Save & Submit on a check form only goes through once every item, the
+// defects question and the overall rating are answered — auto-save still
+// keeps a part-done check as you go. Lists any unanswered option groups
+// under root by their row label and outlines them in red.
+function _unansweredCheckItems(root) {
+  var missing = [];
+  if (!root) return missing;
+  root.querySelectorAll('.veh-opts').forEach(function(group) {
+    var answered = !!group.querySelector('.veh-btn[class*="active-"]');
+    group.style.outline = answered ? '' : '2px solid #ff6b6b';
+    if (answered) return;
+    var lbl = group.parentNode.querySelector('.lbl');
+    missing.push(lbl ? lbl.textContent.trim() : 'an item');
+  });
+  return missing;
+}
+
+function _showCheckSubmitBlocked(statusEl, missing) {
+  var list = missing.slice(0, 3).join(', ') + (missing.length > 3 ? ' and ' + (missing.length - 3) + ' more' : '');
+  if (statusEl) { statusEl.style.color = '#ff6b6b'; statusEl.textContent = 'Not submitted — still to answer: ' + list; }
+  alert('Please answer everything before submitting.\n\nStill to answer: ' + list + '\n\n(Missing items are outlined in red.)');
+}
+
+// Checks are auto-saved as soon as anything is filled in, so a row without
+// an overall rating is one that was started but never submitted.
+function _isUnfinishedCheck(row) {
+  return !(row && row.overall_rating);
+}
+
 function defectBlockHtml(prefix) {
   return '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
     + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9888;&#65039; Defects</div>'
@@ -38,6 +67,7 @@ function defectSel(prefix, btn, val) {
   var group = document.getElementById(prefix + '_defect');
   group.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
   btn.classList.add(val === 'Yes' ? 'active-poor' : 'active-good');
+  group.style.outline = '';
   defectState(prefix).flag = val;
   var panel = document.getElementById(prefix + '_defectPanel');
   if (panel) panel.style.display = (val === 'Yes') ? 'block' : 'none';
