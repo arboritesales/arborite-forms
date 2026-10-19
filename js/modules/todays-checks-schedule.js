@@ -123,13 +123,16 @@ function shiftSchedule(deltaWeeks) {
 // A booked check that hasn't been done yet shows again every other day after
 // it was booked (Mon -> Wed, Fri, Sun, ...), up to today, until it's saved —
 // so it stays in front of whoever opens the calendar however late it gets.
+// Today always shows every one still not done, whatever day it was booked,
+// so it matches the "N checks to do" badge.
 function _carriedOverFor(iso) {
-  if (iso > _isoDate(new Date())) return [];
+  var todayIso = _isoDate(new Date());
+  if (iso > todayIso) return [];
   var day = new Date(iso + 'T00:00:00');
   var out = [];
   Object.keys(_scheduleData).forEach(function(k) {
     var daysLater = Math.round((day - new Date(k + 'T00:00:00')) / 86400000);
-    if (daysLater <= 0 || daysLater % 2 !== 0) return;
+    if (daysLater <= 0 || (daysLater % 2 !== 0 && iso !== todayIso)) return;
     _scheduleData[k].forEach(function(r) { if (!r.completed) out.push(r); });
   });
   out.sort(function(a, b) { return a.scheduled_date.localeCompare(b.scheduled_date); });

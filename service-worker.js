@@ -1,9 +1,9 @@
-const CACHE_NAME = 'arborite-field-forms-v1.9.75';
+const CACHE_NAME = 'arborite-field-forms-v1.9.76';
 const APP_SHELL = [
   './',
   './index.html',
-  './css/app.css?v=1.9.75',
-  './js/app.js?v=1.9.75',
+  './css/app.css?v=1.9.76',
+  './js/app.js?v=1.9.76',
   './manifest.json',
   './arborite-logo-192.png',
   './arborite-logo-512.png',
