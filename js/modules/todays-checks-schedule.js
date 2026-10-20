@@ -409,6 +409,19 @@ function fetchWeeklyReportData() {
   });
 }
 
+// Ratings are stored as the button text (e.g. "✅ ExcellentNo areas of
+// non-compliance"), so match by substring — check 'unsatisfactory' before
+// 'satisfactory' since one contains the other.
+function _ratingWord(rating) {
+  var r = (rating || '').toLowerCase();
+  if (r.indexOf('unsatisfactory') !== -1) return 'Unsatisfactory';
+  if (r.indexOf('satisfactory') !== -1) return 'Satisfactory';
+  if (r.indexOf('excellent') !== -1) return 'Excellent';
+  return rating || '';
+}
+
+var _weeklyReportLast = null; // what's on screen, for Download Excel
+
 function renderWeeklyReport(entries, tables) {
   var bodyEl = document.getElementById('weeklyReportBody');
   if (!bodyEl) return;
@@ -420,13 +433,10 @@ function renderWeeklyReport(entries, tables) {
 
   var counts = { total: entries.length, excellent: 0, satisfactory: 0, unsatisfactory: 0, defects: 0 };
   entries.forEach(function(e) {
-    // Ratings are stored as the button text (e.g. "✅ ExcellentNo areas of
-    // non-compliance"), so match by substring — check 'unsatisfactory' before
-    // 'satisfactory' since one contains the other.
-    var r = (e.rating || '').toLowerCase();
-    if (r.indexOf('unsatisfactory') !== -1) counts.unsatisfactory++;
-    else if (r.indexOf('satisfactory') !== -1) counts.satisfactory++;
-    else if (r.indexOf('excellent') !== -1) counts.excellent++;
+    var w = _ratingWord(e.rating);
+    if (w === 'Unsatisfactory') counts.unsatisfactory++;
+    else if (w === 'Satisfactory') counts.satisfactory++;
+    else if (w === 'Excellent') counts.excellent++;
     if (e.hasDefect) counts.defects++;
   });
 
@@ -480,9 +490,60 @@ function renderWeeklyReport(entries, tables) {
       }).join('') + '</ul>'
     : '<div style="color:#9a9a90;font-size:12.5px;padding:14px 0;text-align:center;">No checks completed this week.</div>';
 
-  bodyEl.innerHTML = statHtml
+  _weeklyReportLast = { entries: entries, unfinished: unfinished, counts: counts, bars: bars };
+
+  bodyEl.innerHTML = '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;">'
+    + '<button onclick="downloadWeeklyReportExcel()" style="background:#1d6f42;border:none;color:white;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128202; Download Excel</button>'
+    + '</div>'
+    + statHtml
     + '<div style="background:white;border-radius:8px;padding:16px;margin-bottom:16px;">' + (barsHtml || '<div style="color:#9a9a90;font-size:12.5px;text-align:center;padding:10px 0;">Nothing to break down yet.</div>') + '</div>'
     + '<div style="background:#1a3210;padding:10px 16px;border-radius:8px 8px 0 0;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">Individual Reports</div>'
     + '<div style="background:white;border-radius:0 0 8px 8px;padding:6px 16px 16px;">' + reportListHtml + '</div>';
+}
+
+// Two sheets: Summary (the figures and breakdown on screen) and Checks (one
+// row per completed check, then any started but not finished).
+function downloadWeeklyReportExcel() {
+  if (typeof XLSX === 'undefined') { _withXlsx(downloadWeeklyReportExcel); return; }
+  var r = _weeklyReportLast;
+  if (!r) return;
+  var opt = _weeklyReportOptions().filter(function(o) { return o.key === _weeklyReportFilter; })[0];
+  var catLabel = opt ? opt.label : 'All checks';
+  var rangeEl = document.getElementById('weeklyReportRange');
+  var range = rangeEl ? rangeEl.textContent : '';
+  var single = _weeklyReportTables().length === 1;
+
+  var summary = [
+    ['Weekly Report — ' + catLabel], ['Week', range], [],
+    ['Checks completed', r.counts.total],
+    ['Excellent', r.counts.excellent],
+    ['Satisfactory', r.counts.satisfactory],
+    ['Unsatisfactory', r.counts.unsatisfactory],
+    ['Defects logged', r.counts.defects],
+    ['Started but not finished', r.unfinished.length],
+    [], [single ? 'Machine / vehicle' : 'Category', 'Checks']
+  ];
+  r.bars.forEach(function(b) { if (b.count) summary.push([b.label, b.count]); });
+
+  function row(e, rating) {
+    var d = e.createdAt ? new Date(e.createdAt) : null;
+    return [
+      d ? d.toLocaleDateString('en-GB') : '', d ? d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '',
+      e.label, e.name, e.inspector, rating, e.hasDefect ? 'Yes' : 'No'
+    ];
+  }
+  var checks = [['Date', 'Time', 'Category', 'Machine / vehicle', 'Inspector', 'Rating', 'Defect']];
+  r.entries.forEach(function(e) { checks.push(row(e, _ratingWord(e.rating))); });
+  r.unfinished.forEach(function(e) { checks.push(row(e, 'Not finished')); });
+
+  var wb = XLSX.utils.book_new();
+  var ws1 = XLSX.utils.aoa_to_sheet(summary);
+  ws1['!cols'] = [{ wch: 34 }, { wch: 28 }];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+  var ws2 = XLSX.utils.aoa_to_sheet(checks);
+  ws2['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 32 }, { wch: 32 }, { wch: 20 }, { wch: 16 }, { wch: 8 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Checks');
+  var weekOf = _weeklyReportWeekStart ? _isoDate(_weeklyReportWeekStart) : '';
+  XLSX.writeFile(wb, 'Weekly_Report_' + safeFileSegment(catLabel) + '_' + weekOf + '.xlsx');
 }
 
