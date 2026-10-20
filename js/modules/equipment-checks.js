@@ -354,8 +354,8 @@ var CHECK_CATEGORIES = {
 
 // Group tiles on the Checks home that open a sub-tab picker instead of a form
 var CHECK_GROUPS = {
-  climbingkit: { heading: 'Select climber' },
-  riggingkit: { heading: 'Select kit' }
+  climbingkit: { heading: 'Select climber', label: 'Climbing Kit' },
+  riggingkit: { heading: 'Select kit', label: 'Rigging Kit' }
 };
 
 // Sub-tab picker for a group tile (e.g. Climbing Kit) — one tile per category

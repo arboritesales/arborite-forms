@@ -317,9 +317,39 @@ function removeScheduledCheck(id) {
 // ── WEEKLY REPORT (Manager Access) — rollup across every check table for a
 // given week, reusing the same table/category list as the Defects dashboard ──
 var _weeklyReportWeekStart = null; // Date — Monday of the currently viewed week
+var _weeklyReportFilter = 'all';   // 'all', 'vehicle', a category key, or a group key
+
+// One choice per tile on the Checks home — grouped kits (Rigging / Climbing)
+// report together, with the breakdown split by kit.
+function _weeklyReportOptions() {
+  var opts = [{ key: 'all', label: 'All checks' }, { key: 'vehicle', label: 'Vehicle Checks' }];
+  var seenGroups = {};
+  Object.keys(CHECK_CATEGORIES).forEach(function(k) {
+    var g = CHECK_CATEGORIES[k].group;
+    if (g) {
+      if (seenGroups[g]) return;
+      seenGroups[g] = 1;
+      opts.push({ key: g, label: (CHECK_GROUPS[g] && CHECK_GROUPS[g].label) || g });
+    } else {
+      opts.push({ key: k, label: CHECK_CATEGORIES[k].label });
+    }
+  });
+  return opts;
+}
+
+function setWeeklyReportFilter(key) {
+  _weeklyReportFilter = key || 'all';
+  fetchWeeklyReportData();
+}
 
 function openWeeklyReportView() {
   if (!_weeklyReportWeekStart) _weeklyReportWeekStart = _mondayOf(new Date());
+  var sel = document.getElementById('weeklyReportCatSel');
+  if (sel) {
+    sel.innerHTML = _weeklyReportOptions().map(function(o) {
+      return '<option value="' + o.key + '"' + (o.key === _weeklyReportFilter ? ' selected' : '') + '>' + o.label + '</option>';
+    }).join('');
+  }
   fetchWeeklyReportData();
 }
 
@@ -335,7 +365,12 @@ function _weeklyReportTables() {
     var cfg = CHECK_CATEGORIES[catKey];
     list.push({ kind: 'cat', cat: catKey, table: cfg.table, nameField: 'machine', label: cfg.label });
   });
-  return list;
+  var f = _weeklyReportFilter;
+  if (f === 'all') return list;
+  return list.filter(function(t) {
+    if (f === 'vehicle') return t.kind === 'vehicle';
+    return t.cat === f || (t.cat && CHECK_CATEGORIES[t.cat].group === f);
+  });
 }
 
 function fetchWeeklyReportData() {
@@ -395,9 +430,23 @@ function renderWeeklyReport(entries, tables) {
     if (e.hasDefect) counts.defects++;
   });
 
-  var byCat = {};
-  entries.forEach(function(e) { var k = e.cat || e.kind; byCat[k] = (byCat[k] || 0) + 1; });
-  var maxCatCount = Math.max.apply(null, tables.map(function(t){ var k = t.cat || t.kind; return byCat[k] || 0; }).concat([1]));
+  // One category picked: break it down by machine/vehicle instead of by category
+  var bars;
+  if (tables.length === 1) {
+    var byName = {};
+    entries.forEach(function(e) { var n = e.name || 'Unknown'; byName[n] = (byName[n] || 0) + 1; });
+    bars = Object.keys(byName).sort().map(function(n) { return { label: n, count: byName[n] }; });
+  } else {
+    var byCat = {};
+    entries.forEach(function(e) { var k = e.cat || e.kind; byCat[k] = (byCat[k] || 0) + 1; });
+    var inGroup = _weeklyReportFilter !== 'all';
+    bars = tables.map(function(t) {
+      var cfg = t.cat ? CHECK_CATEGORIES[t.cat] : null;
+      var label = inGroup && cfg ? (cfg.subLabel ? cfg.shortLabel + ' – ' + cfg.subLabel : cfg.shortLabel || t.label) : t.label;
+      return { label: label, count: byCat[t.cat || t.kind] || 0 };
+    });
+  }
+  var maxCatCount = Math.max.apply(null, bars.map(function(b){ return b.count; }).concat([1]));
 
   var statHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">'
     + '<div style="background:white;border-radius:7px;padding:14px;text-align:center;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:28px;color:var(--green);">' + counts.total + '</div><div style="font-size:11px;color:#8a8a7a;text-transform:uppercase;letter-spacing:.5px;margin-top:4px;">Checks completed</div></div>'
@@ -410,13 +459,12 @@ function renderWeeklyReport(entries, tables) {
         + unfinished.map(function(e) { return e.label + ' — ' + (e.name || 'Unknown') + (e.inspector ? ' (' + e.inspector + ')' : ''); }).join(', ') + '</div>'
       : '');
 
-  var barsHtml = tables.map(function(t) {
-    var k = t.cat || t.kind;
-    var c = byCat[k] || 0;
+  var barsHtml = bars.map(function(b) {
+    var c = b.count;
     if (!c) return '';
     var pct = Math.round((c / maxCatCount) * 100);
     return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12.5px;">'
-      + '<div style="width:120px;flex-shrink:0;color:var(--mid);">' + t.label + '</div>'
+      + '<div style="width:120px;flex-shrink:0;color:var(--mid);">' + b.label + '</div>'
       + '<div style="flex:1;height:16px;background:#eee;border-radius:3px;overflow:hidden;"><div style="height:100%;border-radius:3px;background:var(--green);width:' + pct + '%;"></div></div>'
       + '<div style="width:28px;text-align:right;color:#8a8a7a;">' + c + '</div>'
       + '</div>';
