@@ -4991,21 +4991,81 @@ function _completeMatchingScheduled(category, machine) {
   .catch(function(){});
 }
 
+// ── DAILY CHECKS — these machines need a check every weekday (Mon–Fri)
+// without anyone booking it. They aren't stored as todays_checks rows: a day's
+// daily check counts as done when a finished check (one with an overall
+// rating) was saved for that machine that day. They don't carry over — a
+// missed one shows as missed on its own day only. A manager booking for the
+// same machine on the same day takes its place. ──
+var DAILY_CHECKS = [
+  { category: 'digger',  machine: 'KX027-4' },
+  { category: 'digger',  machine: 'Volvo ECR145E' },
+  { category: 'climber', machine: 'MDB LV 800 Green Climber' },
+  { category: 'stump',   machine: 'FSI D74' },
+  { category: 'mewp',    machine: 'Hinowa MEWP' }
+];
+
+// Resolves to { 'YYYY-MM-DD|category|machine': true } for every finished
+// daily-check machine check saved from startIso to endIso (inclusive).
+function _fetchDailyDone(startIso, endIso) {
+  var from = new Date(startIso + 'T00:00:00').toISOString();
+  var e = new Date(endIso + 'T00:00:00');
+  var to = new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1).toISOString();
+  var cats = {};
+  DAILY_CHECKS.forEach(function(d) { cats[d.category] = 1; });
+  return Promise.all(Object.keys(cats).map(function(cat) {
+    return fetch(SUPA_URL + '/rest/v1/' + CHECK_CATEGORIES[cat].table + '?select=machine,created_at&overall_rating=not.is.null'
+      + '&created_at=gte.' + encodeURIComponent(from) + '&created_at=lt.' + encodeURIComponent(to), {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(rows) {
+      return (Array.isArray(rows) ? rows : []).map(function(r) {
+        return _isoDate(new Date(r.created_at)) + '|' + cat + '|' + r.machine;
+      });
+    })
+    .catch(function() { return []; });
+  })).then(function(lists) {
+    var done = {};
+    lists.forEach(function(l) { l.forEach(function(k) { done[k] = true; }); });
+    return done;
+  });
+}
+
+// The daily checks due on iso, shaped like todays_checks rows (id '' — Start
+// falls back to ticking off any matching booking). bookedMap holds
+// 'category|machine' for that day's manager bookings.
+function _dailyFor(iso, bookedMap, doneMap) {
+  var dow = new Date(iso + 'T00:00:00').getDay();
+  if (dow === 0 || dow === 6) return [];
+  return DAILY_CHECKS.filter(function(d) { return !bookedMap[d.category + '|' + d.machine]; })
+    .map(function(d) {
+      return { id: '', daily: true, category: d.category, machine: d.machine, scheduled_date: iso,
+               completed: !!doneMap[iso + '|' + d.category + '|' + d.machine] };
+    });
+}
+
 // ── CHECKS NOTIFICATION BADGE — shown on the Checks row on the Welcome
 // screen so employees see at a glance how many checks are outstanding,
 // without having to open the calendar first. Counts every check booked up
 // to today that isn't done yet — it stays up until each one is saved,
-// matching the calendar, where undone checks carry over until completed. ──
+// matching the calendar, where undone checks carry over until completed.
+// Today's daily checks (DAILY_CHECKS) count too until each is saved. ──
 function refreshChecksBadge() {
   var badge = document.getElementById('checksTileBadge');
   if (!badge) return;
-  var now = new Date();
-  fetch(SUPA_URL + '/rest/v1/todays_checks?select=id,completed&completed=is.false&scheduled_date=lte.' + _isoDate(now), {
-    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(rows) {
-    var outstanding = (Array.isArray(rows) ? rows : []).filter(function(r){ return !r.completed; }).length;
+  var today = _isoDate(new Date());
+  var hdrs = { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() } };
+  Promise.all([
+    fetch(SUPA_URL + '/rest/v1/todays_checks?select=id,completed&completed=is.false&scheduled_date=lte.' + today, hdrs).then(function(r){ return r.json(); }),
+    fetch(SUPA_URL + '/rest/v1/todays_checks?select=category,machine&scheduled_date=eq.' + today, hdrs).then(function(r){ return r.json(); }),
+    _fetchDailyDone(today, today)
+  ])
+  .then(function(res) {
+    var rows = res[0], booked = {};
+    (Array.isArray(res[1]) ? res[1] : []).forEach(function(r) { booked[r.category + '|' + r.machine] = 1; });
+    var dailyLeft = _dailyFor(today, booked, res[2]).filter(function(it) { return !it.completed; }).length;
+    var outstanding = (Array.isArray(rows) ? rows : []).filter(function(r){ return !r.completed; }).length + dailyLeft;
     if (outstanding > 0) {
       badge.textContent = outstanding + (outstanding === 1 ? ' check' : ' checks') + ' to do';
       badge.style.display = '';
@@ -5022,6 +5082,13 @@ function refreshChecksBadge() {
 var _scheduleWeekStart = null; // Date — Monday of the first visible week
 var _scheduleData = {};        // 'YYYY-MM-DD' -> array of todays_checks rows
 var _scheduleModalDate = null;
+var _scheduleDailyDone = {};   // see _fetchDailyDone
+
+function _scheduleDailyFor(iso) {
+  var booked = {};
+  (_scheduleData[iso] || []).forEach(function(r) { booked[r.category + '|' + r.machine] = 1; });
+  return _dailyFor(iso, booked, _scheduleDailyDone);
+}
 
 function _mondayOf(d) {
   var day = d.getDay(); // 0=Sun..6=Sat
@@ -5071,11 +5138,15 @@ function fetchScheduleData() {
   var end = _isoDate(endDate);
   // Everything in the visible 4 weeks, plus any older booking still not done
   // so it can carry over into them (see _carriedOverFor).
-  fetch(SUPA_URL + '/rest/v1/todays_checks?or=(scheduled_date.gte.' + start + ',completed.is.false)&scheduled_date=lte.' + end + '&order=scheduled_date.asc', {
-    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(rows) {
+  Promise.all([
+    fetch(SUPA_URL + '/rest/v1/todays_checks?or=(scheduled_date.gte.' + start + ',completed.is.false)&scheduled_date=lte.' + end + '&order=scheduled_date.asc', {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+    }).then(function(r){ return r.json(); }),
+    _fetchDailyDone(start, end)
+  ])
+  .then(function(res) {
+    var rows = res[0];
+    _scheduleDailyDone = res[1];
     _scheduleData = {};
     (Array.isArray(rows) ? rows : []).forEach(function(r) {
       if (!_scheduleData[r.scheduled_date]) _scheduleData[r.scheduled_date] = [];
@@ -5114,18 +5185,20 @@ function renderScheduleGrid() {
     var iso = _isoDate(d);
     var items = _scheduleData[iso] || [];
     var carried = _carriedOverFor(iso);
-    var total = items.length + carried.length;
+    var daily = _scheduleDailyFor(iso);
+    var total = items.length + daily.length + carried.length;
     var isToday = iso === today;
     var weekdayShort = d.toLocaleDateString('en-GB',{weekday:'short'});
     html += '<div class="sched-day-cell" style="background:' + (isToday ? '#eef7e2' : '#fafaf8') + ';border-radius:6px;min-height:120px;padding:8px;display:flex;flex-direction:column;gap:6px;' + (isToday ? 'box-shadow:0 0 0 2px var(--green) inset;' : '') + '">'
       + '<div class="sched-day-date" style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:14px;color:var(--mid);"><span class="sched-day-weekday" style="display:none;">' + weekdayShort + ' </span>' + d.getDate() + '</div>'
       + '<div class="sched-day-pills" style="display:flex;flex-direction:column;gap:4px;flex:1;">'
-      + items.concat(carried).slice(0, 5).map(function(it) {
+      + items.concat(daily, carried).slice(0, 6).map(function(it) {
           var meta = checksCategoryMeta(it.category);
           var isCarried = it.scheduled_date !== iso;
-          var mark = it.completed ? '&#10003; ' : isCarried ? '&#8635; ' : '';
-          var bg = it.completed ? '#d7ecc9' : isCarried ? '#fdf0d5' : '#e8f2e3';
-          var fg = isCarried ? '#7a4d00' : '#2d5a1b';
+          var isMissed = it.daily && !it.completed && iso < today;
+          var mark = it.completed ? '&#10003; ' : isMissed ? '&#10007; ' : isCarried ? '&#8635; ' : '';
+          var bg = it.completed ? '#d7ecc9' : isMissed ? '#f6dede' : isCarried ? '#fdf0d5' : '#e8f2e3';
+          var fg = isMissed ? '#8a1c1c' : isCarried ? '#7a4d00' : '#2d5a1b';
           return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + bg + ';color:' + fg + ';line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + mark + meta.icon + ' ' + (it.machine || '') + '</div>';
         }).join('')
       + '</div>'
@@ -5167,7 +5240,8 @@ function scheduleTypeChange() {
 
 function renderScheduleModalList() {
   var wrap = document.getElementById('scheduleModalList');
-  var items = (_scheduleData[_scheduleModalDate] || []).concat(_carriedOverFor(_scheduleModalDate));
+  var items = (_scheduleData[_scheduleModalDate] || []).concat(_scheduleDailyFor(_scheduleModalDate), _carriedOverFor(_scheduleModalDate));
+  var today = _isoDate(new Date());
   if (!items.length) {
     wrap.innerHTML = '<div style="color:#9a9a90;font-size:12.5px;padding:14px 0;text-align:center;">Nothing scheduled for this day.</div>';
     return;
@@ -5179,7 +5253,14 @@ function renderScheduleModalList() {
     var isCarried = it.scheduled_date !== _scheduleModalDate;
     var overdueTag = isCarried ? '<div style="font-size:10.5px;font-weight:700;color:#7a4d00;margin-top:2px;">&#8635; Not done yet — booked ' + _overdueFromLabel(it.scheduled_date) + '</div>' : '';
     var actionHtml;
-    if (managerUnlocked && isCarried) {
+    if (it.daily) {
+      // Automatic — nothing to remove; only today's can be started
+      overdueTag = '<div style="font-size:10.5px;font-weight:700;color:#8a8a7a;margin-top:2px;">Daily check (Mon–Fri)</div>';
+      if (it.completed) actionHtml = doneBadge;
+      else if (_scheduleModalDate < today) actionHtml = '<span style="font-size:10.5px;font-weight:800;color:#8a1c1c;background:#f6dede;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10007; Missed</span>';
+      else if (_scheduleModalDate === today && !managerUnlocked) actionHtml = '<button onclick="startScheduledCheck(\'' + it.category + '\',\'\',\'' + machineEsc + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Start &#8594;</button>';
+      else actionHtml = '';
+    } else if (managerUnlocked && isCarried) {
       // Remove it from the day it was booked on, not from a carried-over copy
       actionHtml = '';
     } else if (managerUnlocked) {
