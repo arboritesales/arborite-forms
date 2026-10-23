@@ -72,9 +72,12 @@ function _completeMatchingScheduled(category, machine) {
 // ── DAILY CHECKS — these machines need a check every weekday (Mon–Fri)
 // without anyone booking it. They aren't stored as todays_checks rows: a day's
 // daily check counts as done when a finished check (one with an overall
-// rating) was saved for that machine that day. They don't carry over — a
-// missed one shows as missed on its own day only. A manager booking for the
-// same machine on the same day takes its place. ──
+// rating) was saved for that machine that day. A missed one shows as missed
+// on its own day and stays outstanding until the machine is next checked:
+// on weekdays that day's daily check is flagged "not done since", and at
+// weekends it carries over every other day like a booking (and always onto
+// today). A manager booking for the same machine on the same day takes its
+// place. ──
 var DAILY_CHECKS = [
   { category: 'digger',  machine: 'KX027-4' },
   { category: 'digger',  machine: 'Volvo ECR145E' },
@@ -82,6 +85,55 @@ var DAILY_CHECKS = [
   { category: 'stump',   machine: 'FSI D74' },
   { category: 'mewp',    machine: 'Hinowa MEWP' }
 ];
+var DAILY_CHECKS_FROM = '2026-10-23'; // first day they were due — nothing missed before it
+
+function _addDaysIso(iso, n) {
+  var d = new Date(iso + 'T00:00:00');
+  return _isoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n));
+}
+
+function _isWeekendIso(iso) {
+  var dow = new Date(iso + 'T00:00:00').getDay();
+  return dow === 0 || dow === 6;
+}
+
+// How far back to look for missed daily checks (at most 60 days).
+function _dailyLookbackStart(today) {
+  var b = _addDaysIso(today, -60);
+  return b > DAILY_CHECKS_FROM ? b : DAILY_CHECKS_FROM;
+}
+
+// { 'category|machine': 'YYYY-MM-DD' } — the first missed weekday since the
+// machine was last checked, for each machine with a miss still outstanding.
+// doneMap must cover _dailyLookbackStart(today) .. today.
+function _dailyMissedSince(doneMap, today) {
+  var out = {};
+  DAILY_CHECKS.forEach(function(d) {
+    var key = d.category + '|' + d.machine, since = null;
+    for (var iso = _dailyLookbackStart(today); iso <= today; iso = _addDaysIso(iso, 1)) {
+      if (doneMap[iso + '|' + key]) since = null;
+      else if (iso < today && !since && !_isWeekendIso(iso)) since = iso;
+    }
+    if (since) out[key] = since;
+  });
+  return out;
+}
+
+// Weekend days only: outstanding missed daily checks carried every other day
+// after the first miss, and always onto today.
+function _dailyCarriedFor(iso, missedMap, today) {
+  if (iso > today || !_isWeekendIso(iso)) return [];
+  var day = new Date(iso + 'T00:00:00');
+  var out = [];
+  DAILY_CHECKS.forEach(function(d) {
+    var since = missedMap[d.category + '|' + d.machine];
+    if (!since) return;
+    var daysLater = Math.round((day - new Date(since + 'T00:00:00')) / 86400000);
+    if (daysLater <= 0 || (daysLater % 2 !== 0 && iso !== today)) return;
+    out.push({ id: '', daily: true, carried: true, category: d.category, machine: d.machine, scheduled_date: since, completed: false });
+  });
+  return out;
+}
 
 // Resolves to { 'YYYY-MM-DD|category|machine': true } for every finished
 // daily-check machine check saved from startIso to endIso (inclusive).
@@ -112,14 +164,16 @@ function _fetchDailyDone(startIso, endIso) {
 
 // The daily checks due on iso, shaped like todays_checks rows (id '' — Start
 // falls back to ticking off any matching booking). bookedMap holds
-// 'category|machine' for that day's manager bookings.
-function _dailyFor(iso, bookedMap, doneMap) {
-  var dow = new Date(iso + 'T00:00:00').getDay();
-  if (dow === 0 || dow === 6) return [];
+// 'category|machine' for that day's manager bookings. Today's also carry
+// missedSince when an earlier day's check for that machine is outstanding.
+function _dailyFor(iso, bookedMap, doneMap, missedMap, today) {
+  if (iso < DAILY_CHECKS_FROM || _isWeekendIso(iso)) return [];
   return DAILY_CHECKS.filter(function(d) { return !bookedMap[d.category + '|' + d.machine]; })
     .map(function(d) {
-      return { id: '', daily: true, category: d.category, machine: d.machine, scheduled_date: iso,
-               completed: !!doneMap[iso + '|' + d.category + '|' + d.machine] };
+      var key = d.category + '|' + d.machine;
+      var done = !!doneMap[iso + '|' + key];
+      return { id: '', daily: true, category: d.category, machine: d.machine, scheduled_date: iso, completed: done,
+               missedSince: (iso === today && !done && missedMap[key]) || null };
     });
 }
 
@@ -128,7 +182,8 @@ function _dailyFor(iso, bookedMap, doneMap) {
 // without having to open the calendar first. Counts every check booked up
 // to today that isn't done yet — it stays up until each one is saved,
 // matching the calendar, where undone checks carry over until completed.
-// Today's daily checks (DAILY_CHECKS) count too until each is saved. ──
+// Today's daily checks (DAILY_CHECKS) count too until each is saved, and at
+// weekends any missed one still outstanding. ──
 function refreshChecksBadge() {
   var badge = document.getElementById('checksTileBadge');
   if (!badge) return;
@@ -137,12 +192,14 @@ function refreshChecksBadge() {
   Promise.all([
     fetch(SUPA_URL + '/rest/v1/todays_checks?select=id,completed&completed=is.false&scheduled_date=lte.' + today, hdrs).then(function(r){ return r.json(); }),
     fetch(SUPA_URL + '/rest/v1/todays_checks?select=category,machine&scheduled_date=eq.' + today, hdrs).then(function(r){ return r.json(); }),
-    _fetchDailyDone(today, today)
+    _fetchDailyDone(_dailyLookbackStart(today), today)
   ])
   .then(function(res) {
     var rows = res[0], booked = {};
     (Array.isArray(res[1]) ? res[1] : []).forEach(function(r) { booked[r.category + '|' + r.machine] = 1; });
-    var dailyLeft = _dailyFor(today, booked, res[2]).filter(function(it) { return !it.completed; }).length;
+    var missed = _dailyMissedSince(res[2], today);
+    var dailyLeft = _dailyFor(today, booked, res[2], missed, today).concat(_dailyCarriedFor(today, missed, today))
+      .filter(function(it) { return !it.completed; }).length;
     var outstanding = (Array.isArray(rows) ? rows : []).filter(function(r){ return !r.completed; }).length + dailyLeft;
     if (outstanding > 0) {
       badge.textContent = outstanding + (outstanding === 1 ? ' check' : ' checks') + ' to do';
@@ -161,11 +218,15 @@ var _scheduleWeekStart = null; // Date — Monday of the first visible week
 var _scheduleData = {};        // 'YYYY-MM-DD' -> array of todays_checks rows
 var _scheduleModalDate = null;
 var _scheduleDailyDone = {};   // see _fetchDailyDone
+var _scheduleDailyMissed = {}; // see _dailyMissedSince
 
+// That day's daily checks plus, at weekends, any missed one carried onto it
 function _scheduleDailyFor(iso) {
+  var today = _isoDate(new Date());
   var booked = {};
   (_scheduleData[iso] || []).forEach(function(r) { booked[r.category + '|' + r.machine] = 1; });
-  return _dailyFor(iso, booked, _scheduleDailyDone);
+  return _dailyFor(iso, booked, _scheduleDailyDone, _scheduleDailyMissed, today)
+    .concat(_dailyCarriedFor(iso, _scheduleDailyMissed, today));
 }
 
 function _mondayOf(d) {
@@ -215,16 +276,20 @@ function fetchScheduleData() {
   var endDate = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + 27);
   var end = _isoDate(endDate);
   // Everything in the visible 4 weeks, plus any older booking still not done
-  // so it can carry over into them (see _carriedOverFor).
+  // so it can carry over into them (see _carriedOverFor). Daily-check
+  // history also goes back far enough to find any miss still outstanding.
+  var today = _isoDate(new Date());
+  var lookback = _dailyLookbackStart(today);
   Promise.all([
     fetch(SUPA_URL + '/rest/v1/todays_checks?or=(scheduled_date.gte.' + start + ',completed.is.false)&scheduled_date=lte.' + end + '&order=scheduled_date.asc', {
       headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
     }).then(function(r){ return r.json(); }),
-    _fetchDailyDone(start, end)
+    _fetchDailyDone(start < lookback ? start : lookback, end > today ? end : today)
   ])
   .then(function(res) {
     var rows = res[0];
     _scheduleDailyDone = res[1];
+    _scheduleDailyMissed = _dailyMissedSince(res[1], today);
     _scheduleData = {};
     (Array.isArray(rows) ? rows : []).forEach(function(r) {
       if (!_scheduleData[r.scheduled_date]) _scheduleData[r.scheduled_date] = [];
@@ -273,7 +338,8 @@ function renderScheduleGrid() {
       + items.concat(daily, carried).slice(0, 6).map(function(it) {
           var meta = checksCategoryMeta(it.category);
           var isCarried = it.scheduled_date !== iso;
-          var isMissed = it.daily && !it.completed && iso < today;
+          var isMissed = it.daily && !it.carried && !it.completed && iso < today;
+          if (it.missedSince) isCarried = true; // today's daily check, overdue from an earlier day
           var mark = it.completed ? '&#10003; ' : isMissed ? '&#10007; ' : isCarried ? '&#8635; ' : '';
           var bg = it.completed ? '#d7ecc9' : isMissed ? '#f6dede' : isCarried ? '#fdf0d5' : '#e8f2e3';
           var fg = isMissed ? '#8a1c1c' : isCarried ? '#7a4d00' : '#2d5a1b';
@@ -333,9 +399,12 @@ function renderScheduleModalList() {
     var actionHtml;
     if (it.daily) {
       // Automatic — nothing to remove; only today's can be started
-      overdueTag = '<div style="font-size:10.5px;font-weight:700;color:#8a8a7a;margin-top:2px;">Daily check (Mon–Fri)</div>';
+      var since = it.carried ? it.scheduled_date : it.missedSince;
+      overdueTag = since
+        ? '<div style="font-size:10.5px;font-weight:700;color:#7a4d00;margin-top:2px;">&#8635; Daily check not done since ' + _overdueFromLabel(since) + '</div>'
+        : '<div style="font-size:10.5px;font-weight:700;color:#8a8a7a;margin-top:2px;">Daily check (Mon–Fri)</div>';
       if (it.completed) actionHtml = doneBadge;
-      else if (_scheduleModalDate < today) actionHtml = '<span style="font-size:10.5px;font-weight:800;color:#8a1c1c;background:#f6dede;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10007; Missed</span>';
+      else if (_scheduleModalDate < today && !it.carried) actionHtml = '<span style="font-size:10.5px;font-weight:800;color:#8a1c1c;background:#f6dede;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10007; Missed</span>';
       else if (_scheduleModalDate === today && !managerUnlocked) actionHtml = '<button onclick="startScheduledCheck(\'' + it.category + '\',\'\',\'' + machineEsc + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Start &#8594;</button>';
       else actionHtml = '';
     } else if (managerUnlocked && isCarried) {
