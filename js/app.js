@@ -2996,7 +2996,8 @@ var VEH_EMPLOYEES = {
   '0206': 'Liam Couling',
   '2580': 'Liam Cooper',
   '6252': 'Jack Fisher',
-  '0712': 'George Sim'
+  '0712': 'George Sim',
+  '4444': 'Olly Key'
 };
 var _vehInspector = null;
 var _vehAutoSaveTimer = null;
