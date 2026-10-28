@@ -334,7 +334,11 @@ function spDoClock(action) {
 // — in before 07:00 or out after 16:00 — is overtime instead, surfaced for
 // approval in the Monthly Clock Report rather than emailed (see
 // spSaveOvertime); the two are deliberately not symmetric notification-wise.
+// Weekdays only: 07:00-16:00 doesn't apply to weekend work, and alerts for it
+// would just eat into the EmailJS monthly quota the holiday emails share.
 function spCheckLateEarlyAlert(action, when) {
+  var dow = when.getDay();
+  if (dow === 0 || dow === 6) return;
   var mins = when.getHours() * 60 + when.getMinutes();
   var isLateIn = action === 'in' && mins > 7 * 60;
   var isEarlyOut = action === 'out' && mins < 16 * 60;
