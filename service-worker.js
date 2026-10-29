@@ -1,13 +1,14 @@
-const CACHE_NAME = 'arborite-field-forms-v1.9.84';
+const CACHE_NAME = 'arborite-field-forms-v1.9.85';
 const APP_SHELL = [
   './',
   './index.html',
-  './css/app.css?v=1.9.84',
-  './js/app.js?v=1.9.84',
+  './css/app.css?v=1.9.85',
+  './js/app.js?v=1.9.85',
   './manifest.json',
   './arborite-logo-192.png',
   './arborite-logo-512.png',
   './arborite-leaf.svg',
+  './arborite-logo-full.svg',
   './crm/index.html',
   './crm/data.json',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
