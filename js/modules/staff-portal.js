@@ -50,16 +50,6 @@ function spNotifyHolidayRequest(params) {
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params).catch(function() {});
   });
 }
-// Same template/service as spNotifyHolidayRequest — the Subject field needs
-// to read {{subject}} rather than the hardcoded "Holiday request from
-// {{staff_name}}" for both to show the right subject line.
-function spNotifyClockAlert(params) {
-  if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) return;
-  _loadEmailJS(function(err) {
-    if (err || typeof emailjs === 'undefined') return;
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params).catch(function() {});
-  });
-}
 
 function spHeaders() {
   return { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() };
@@ -324,44 +314,7 @@ function spDoClock(action) {
       }
       spRenderClockStatus(action === 'in');
       spRenderOnsite();
-      spCheckLateEarlyAlert(action, new Date());
     }).catch(function() { btn1.disabled = false; btn2.disabled = false; spToast('Connection error — try again.'); });
-  });
-}
-
-// Normal hours are 07:00-16:00. Clocking in after 07:00 or out before 16:00
-// emails jon/joel (a shortfall worth a manager's attention). The mirror case
-// — in before 07:00 or out after 16:00 — is overtime instead, surfaced for
-// approval in the Monthly Clock Report rather than emailed (see
-// spSaveOvertime); the two are deliberately not symmetric notification-wise.
-// Weekdays only: 07:00-16:00 doesn't apply to weekend work, and alerts for it
-// would just eat into the EmailJS monthly quota the holiday emails share.
-function spCheckLateEarlyAlert(action, when) {
-  var dow = when.getDay();
-  if (dow === 0 || dow === 6) return;
-  var mins = when.getHours() * 60 + when.getMinutes();
-  var isLateIn = action === 'in' && mins > 7 * 60;
-  var isEarlyOut = action === 'out' && mins < 16 * 60;
-  if (!isLateIn && !isEarlyOut) return;
-  var timeStr = String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0');
-  var dateStr = when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  // The EmailJS template's Subject field is stuck on its original hardcoded
-  // "Holiday request from {{staff_name}}" — repeated attempts to change it
-  // to {{subject}} haven't actually saved on EmailJS's end (a dashboard
-  // quirk, confirmed by sending a diagnostic email and checking what showed
-  // up). Rather than depend on that edit ever landing, staff_name itself
-  // carries the alert text so the subject line is still useful even
-  // wrapped in that fixed prefix — still sending `subject` too, so this
-  // starts working the normal way for free if the template ever does get
-  // fixed on their end.
-  var alertLabel = (isLateIn ? 'LATE CLOCK-IN' : 'EARLY CLOCK-OUT') + ' — ' + spSessionName + ' at ' + timeStr;
-  spNotifyClockAlert({
-    subject: (isLateIn ? 'Late clock-in — ' : 'Early clock-out — ') + spSessionName,
-    staff_name: alertLabel,
-    name: spSessionName,
-    time: timeStr,
-    date_range: dateStr,
-    message: spSessionName + ' ' + (isLateIn ? 'clocked in at ' : 'clocked out at ') + timeStr + ' on ' + dateStr + '.'
   });
 }
 

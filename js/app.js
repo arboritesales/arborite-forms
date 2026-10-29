@@ -2990,7 +2990,7 @@ var VEH_EMPLOYEES = {
   '6230': 'Jason Hiscock',
   '1599': 'Luke Richardson',
   '1961': 'Dave Norris',
-  '0000': 'James Hilborne',
+  '0000': 'James Hilborn',
   '4033': 'Joel Cripps',
   '1234': 'Jon Challinor',
   '0206': 'Liam Couling',
@@ -3928,8 +3928,8 @@ var CHECK_CATEGORIES = {
     ]
   },
   climbjames: {
-    label: 'James Hilborne – Climbing Kit', shortLabel: 'James Hilborne', icon: '🧗', table: 'climbing_kit_james_hilborne_checks',
-    group: 'climbingkit', hideMachine: true, machines: ['James Hilborne – Climbing Kit'],
+    label: 'James Hilborn – Climbing Kit', shortLabel: 'James Hilborn', icon: '🧗', table: 'climbing_kit_james_hilborne_checks',
+    group: 'climbingkit', hideMachine: true, machines: ['James Hilborn – Climbing Kit'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
@@ -5059,7 +5059,9 @@ function _dailyCarriedFor(iso, missedMap, today) {
 }
 
 // Resolves to { 'YYYY-MM-DD|category|machine': true } for every finished
-// daily-check machine check saved from startIso to endIso (inclusive).
+// daily-check machine check saved from startIso to endIso (inclusive), and
+// every day a machine was marked not in use (see markNotInUse) — a machine
+// that wasn't used that day didn't need its daily check.
 function _fetchDailyDone(startIso, endIso) {
   var from = new Date(startIso + 'T00:00:00').toISOString();
   var e = new Date(endIso + 'T00:00:00');
@@ -5078,7 +5080,19 @@ function _fetchDailyDone(startIso, endIso) {
       });
     })
     .catch(function() { return []; });
-  })).then(function(lists) {
+  }).concat([
+    fetch(SUPA_URL + '/rest/v1/todays_checks?select=category,machine,scheduled_date&not_in_use=is.true'
+      + '&scheduled_date=gte.' + startIso + '&scheduled_date=lte.' + endIso, {
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(rows) {
+      return (Array.isArray(rows) ? rows : []).map(function(r) {
+        return r.scheduled_date + '|' + r.category + '|' + r.machine;
+      });
+    })
+    .catch(function() { return []; })
+  ])).then(function(lists) {
     var done = {};
     lists.forEach(function(l) { l.forEach(function(k) { done[k] = true; }); });
     return done;
@@ -5219,6 +5233,8 @@ function fetchScheduleData() {
       _scheduleData[r.scheduled_date].push(r);
     });
     renderScheduleGrid();
+    var modal = document.getElementById('scheduleModal');
+    if (modal && modal.style.display === 'flex') renderScheduleModalList();
   })
   .catch(function() {
     var grid = document.getElementById('scheduleGrid');
@@ -5232,11 +5248,9 @@ function renderScheduleGrid() {
   var prevBtn = document.getElementById('schedulePrevBtn');
   var nextBtn = document.getElementById('scheduleNextBtn');
   var hint = document.getElementById('scheduleHint');
-  var allCatBtn = document.getElementById('checksAllCategoriesBtn');
   if (prevBtn) prevBtn.style.display = managerUnlocked ? '' : 'none';
   if (nextBtn) nextBtn.style.display = managerUnlocked ? '' : 'none';
   if (hint) hint.style.display = managerUnlocked ? 'none' : '';
-  if (allCatBtn) allCatBtn.style.display = managerUnlocked ? '' : 'none';
   var endDate = new Date(_scheduleWeekStart.getFullYear(), _scheduleWeekStart.getMonth(), _scheduleWeekStart.getDate() + 27);
   var rangeEl = document.getElementById('scheduleRange');
   if (rangeEl) {
@@ -5263,9 +5277,9 @@ function renderScheduleGrid() {
           var isCarried = it.scheduled_date !== iso;
           var isMissed = it.daily && !it.carried && !it.completed && iso < today;
           if (it.missedSince) isCarried = true; // today's daily check, overdue from an earlier day
-          var mark = it.completed ? '&#10003; ' : isMissed ? '&#10007; ' : isCarried ? '&#8635; ' : '';
-          var bg = it.completed ? '#d7ecc9' : isMissed ? '#f6dede' : isCarried ? '#fdf0d5' : '#e8f2e3';
-          var fg = isMissed ? '#8a1c1c' : isCarried ? '#7a4d00' : '#2d5a1b';
+          var mark = it.not_in_use ? '&#9208; ' : it.completed ? '&#10003; ' : isMissed ? '&#10007; ' : isCarried ? '&#8635; ' : '';
+          var bg = it.not_in_use ? '#ececea' : it.completed ? '#d7ecc9' : isMissed ? '#f6dede' : isCarried ? '#fdf0d5' : '#e8f2e3';
+          var fg = it.not_in_use ? '#55554d' : isMissed ? '#8a1c1c' : isCarried ? '#7a4d00' : '#2d5a1b';
           return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + bg + ';color:' + fg + ';line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + mark + meta.icon + ' ' + (it.machine || '') + '</div>';
         }).join('')
       + '</div>'
@@ -5316,7 +5330,10 @@ function renderScheduleModalList() {
   wrap.innerHTML = items.map(function(it) {
     var meta = checksCategoryMeta(it.category);
     var machineEsc = (it.machine || '').replace(/'/g, "\\'");
-    var doneBadge = '<span style="font-size:10.5px;font-weight:800;color:#2d5a1b;background:#e8f2e3;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10003; Completed</span>';
+    var doneBadge = it.not_in_use
+      ? '<span style="font-size:10.5px;font-weight:800;color:#55554d;background:#ececea;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#9208; Not in use</span>'
+      : '<span style="font-size:10.5px;font-weight:800;color:#2d5a1b;background:#e8f2e3;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10003; Completed</span>';
+    var notInUseBtn = '<button onclick="markNotInUse(\'' + it.category + '\',\'' + (it.id || '') + '\',\'' + machineEsc + '\')" style="background:none;border:1.5px solid #b8b8ae;color:#55554d;padding:5px 9px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Not in use</button>';
     var isCarried = it.scheduled_date !== _scheduleModalDate;
     var overdueTag = isCarried ? '<div style="font-size:10.5px;font-weight:700;color:#7a4d00;margin-top:2px;">&#8635; Not done yet — booked ' + _overdueFromLabel(it.scheduled_date) + '</div>' : '';
     var actionHtml;
@@ -5328,7 +5345,7 @@ function renderScheduleModalList() {
         : '<div style="font-size:10.5px;font-weight:700;color:#8a8a7a;margin-top:2px;">Daily check (Mon–Fri)</div>';
       if (it.completed) actionHtml = doneBadge;
       else if (_scheduleModalDate < today && !it.carried) actionHtml = '<span style="font-size:10.5px;font-weight:800;color:#8a1c1c;background:#f6dede;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10007; Missed</span>';
-      else if (_scheduleModalDate === today && !managerUnlocked) actionHtml = '<button onclick="startScheduledCheck(\'' + it.category + '\',\'\',\'' + machineEsc + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Start &#8594;</button>';
+      else if (_scheduleModalDate === today && !managerUnlocked) actionHtml = notInUseBtn + '<button onclick="startScheduledCheck(\'' + it.category + '\',\'\',\'' + machineEsc + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Start &#8594;</button>';
       else actionHtml = '';
     } else if (managerUnlocked && isCarried) {
       // Remove it from the day it was booked on, not from a carried-over copy
@@ -5339,7 +5356,7 @@ function renderScheduleModalList() {
     } else {
       actionHtml = it.completed
         ? doneBadge
-        : '<button onclick="startScheduledCheck(\'' + it.category + '\',\'' + it.id + '\',\'' + machineEsc + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Start &#8594;</button>';
+        : (_scheduleModalDate <= today ? notInUseBtn : '') + '<button onclick="startScheduledCheck(\'' + it.category + '\',\'' + it.id + '\',\'' + machineEsc + '\')" style="background:var(--lime);border:none;color:#1a3210;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;white-space:nowrap;">Start &#8594;</button>';
     }
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e0e0d8;font-size:12.5px;">'
       + '<span style="font-size:16px;">' + meta.icon + '</span>'
@@ -5347,6 +5364,29 @@ function renderScheduleModalList() {
       + actionHtml
       + '</div>';
   }).join('');
+}
+
+// ── NOT IN USE — tapped instead of Start when a machine isn't being used.
+// A booking is flagged in place; a daily check gets a row of its own for
+// today, which takes its place like a manager booking would. Either way it's
+// a completed todays_checks row with not_in_use set, so it drops off the list
+// and the badge, covers that day's daily check, and is listed for managers
+// in the Weekly Report. ──
+function markNotInUse(cat, id, machine) {
+  var meta = checksCategoryMeta(cat);
+  if (!confirm(meta.label + ' — ' + machine + '\n\nMark as not in use today? It will come off the list and the office will see it wasn\'t used.')) return;
+  var headers = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Prefer':'return=minimal'};
+  var flags = { completed: true, not_in_use: true, not_in_use_at: new Date().toISOString() };
+  var req = id
+    ? fetch(SUPA_URL + '/rest/v1/todays_checks?id=eq.' + id, { method: 'PATCH', headers: headers, body: JSON.stringify(flags) })
+    : fetch(SUPA_URL + '/rest/v1/todays_checks', { method: 'POST', headers: headers,
+        body: JSON.stringify(Object.assign({ category: cat, machine: machine, scheduled_date: _isoDate(new Date()) }, flags)) });
+  req.then(function(r) {
+    if (!r.ok) throw new Error('not in use failed');
+    fetchScheduleData();
+    refreshChecksBadge();
+  })
+  .catch(function() { alert('Could not mark as not in use — check connection and try again.'); });
 }
 
 function addScheduledCheck() {
@@ -5459,6 +5499,18 @@ function fetchWeeklyReportData() {
   var endIso = _isoDate(weekEnd) + 'T00:00:00';
   var tables = _weeklyReportTables();
 
+  // Machines marked not in use this week (see markNotInUse), narrowed to the
+  // same tables as the rest of the report
+  var cats = {};
+  tables.forEach(function(t) { cats[t.cat || t.kind] = 1; });
+  var notInUseReq = fetch(SUPA_URL + '/rest/v1/todays_checks?select=category,machine,scheduled_date,not_in_use_at&not_in_use=is.true'
+    + '&not_in_use_at=gte.' + startIso + '&not_in_use_at=lt.' + endIso + '&order=not_in_use_at.desc', {
+    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(rows) { return (Array.isArray(rows) ? rows : []).filter(function(r) { return cats[r.category]; }); })
+  .catch(function() { return []; });
+
   Promise.all(tables.map(function(t) {
     var fields = 'id,created_at,inspector_name,overall_rating,has_defect,' + t.nameField;
     return fetch(SUPA_URL + '/rest/v1/' + t.table + '?select=' + fields + '&created_at=gte.' + startIso + '&created_at=lt.' + endIso + '&order=created_at.desc', {
@@ -5475,10 +5527,11 @@ function fetchWeeklyReportData() {
       });
     })
     .catch(function() { return []; });
-  })).then(function(results) {
+  }).concat([notInUseReq])).then(function(results) {
+    var notInUse = results.pop();
     var all = [].concat.apply([], results);
     all.sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); });
-    renderWeeklyReport(all, tables);
+    renderWeeklyReport(all, tables, notInUse);
   });
 }
 
@@ -5495,7 +5548,7 @@ function _ratingWord(rating) {
 
 var _weeklyReportLast = null; // what's on screen, for Download Excel
 
-function renderWeeklyReport(entries, tables) {
+function renderWeeklyReport(entries, tables, notInUse) {
   var bodyEl = document.getElementById('weeklyReportBody');
   if (!bodyEl) return;
 
@@ -5563,7 +5616,17 @@ function renderWeeklyReport(entries, tables) {
       }).join('') + '</ul>'
     : '<div style="color:#9a9a90;font-size:12.5px;padding:14px 0;text-align:center;">No checks completed this week.</div>';
 
-  _weeklyReportLast = { entries: entries, unfinished: unfinished, counts: counts, bars: bars };
+  var notInUseHtml = notInUse.length
+    ? '<ul style="list-style:none;margin:0;padding:0;">' + notInUse.map(function(n) {
+        var dateStr = new Date(n.not_in_use_at).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'});
+        return '<li style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;">'
+          + '<span style="font-weight:600;color:#333;">' + checksCategoryMeta(n.category).icon + ' ' + checksCategoryMeta(n.category).label + ' — ' + (n.machine || '') + '</span>'
+          + '<span style="color:#8a8a7a;font-size:11.5px;white-space:nowrap;">' + dateStr + '</span>'
+          + '</li>';
+      }).join('') + '</ul>'
+    : '<div style="color:#9a9a90;font-size:12.5px;padding:14px 0;text-align:center;">No machines marked not in use this week.</div>';
+
+  _weeklyReportLast = { entries: entries, unfinished: unfinished, counts: counts, bars: bars, notInUse: notInUse };
 
   bodyEl.innerHTML = '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;">'
     + '<button onclick="downloadWeeklyReportExcel()" style="background:#1d6f42;border:none;color:white;padding:7px 14px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;">&#128202; Download Excel</button>'
@@ -5571,7 +5634,9 @@ function renderWeeklyReport(entries, tables) {
     + statHtml
     + '<div style="background:white;border-radius:8px;padding:16px;margin-bottom:16px;">' + (barsHtml || '<div style="color:#9a9a90;font-size:12.5px;text-align:center;padding:10px 0;">Nothing to break down yet.</div>') + '</div>'
     + '<div style="background:#1a3210;padding:10px 16px;border-radius:8px 8px 0 0;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">Individual Reports</div>'
-    + '<div style="background:white;border-radius:0 0 8px 8px;padding:6px 16px 16px;">' + reportListHtml + '</div>';
+    + '<div style="background:white;border-radius:0 0 8px 8px;padding:6px 16px 16px;">' + reportListHtml + '</div>'
+    + '<div style="background:#1a3210;padding:10px 16px;border-radius:8px 8px 0 0;margin-top:16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9208; Machines Not In Use</div>'
+    + '<div style="background:white;border-radius:0 0 8px 8px;padding:6px 16px 16px;">' + notInUseHtml + '</div>';
 }
 
 // Two sheets: Summary (the figures and breakdown on screen) and Checks (one
@@ -5616,6 +5681,13 @@ function downloadWeeklyReportExcel() {
   var ws2 = XLSX.utils.aoa_to_sheet(checks);
   ws2['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 32 }, { wch: 32 }, { wch: 20 }, { wch: 16 }, { wch: 8 }];
   XLSX.utils.book_append_sheet(wb, ws2, 'Checks');
+  var unused = [['Date', 'Category', 'Machine / vehicle']];
+  r.notInUse.forEach(function(n) {
+    unused.push([new Date(n.not_in_use_at).toLocaleDateString('en-GB'), checksCategoryMeta(n.category).label, n.machine || '']);
+  });
+  var ws3 = XLSX.utils.aoa_to_sheet(unused);
+  ws3['!cols'] = [{ wch: 12 }, { wch: 32 }, { wch: 32 }];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Not in use');
   var weekOf = _weeklyReportWeekStart ? _isoDate(_weeklyReportWeekStart) : '';
   XLSX.writeFile(wb, 'Weekly_Report_' + safeFileSegment(catLabel) + '_' + weekOf + '.xlsx');
 }
@@ -8216,16 +8288,6 @@ function spNotifyHolidayRequest(params) {
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params).catch(function() {});
   });
 }
-// Same template/service as spNotifyHolidayRequest — the Subject field needs
-// to read {{subject}} rather than the hardcoded "Holiday request from
-// {{staff_name}}" for both to show the right subject line.
-function spNotifyClockAlert(params) {
-  if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) return;
-  _loadEmailJS(function(err) {
-    if (err || typeof emailjs === 'undefined') return;
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params).catch(function() {});
-  });
-}
 
 function spHeaders() {
   return { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() };
@@ -8490,44 +8552,7 @@ function spDoClock(action) {
       }
       spRenderClockStatus(action === 'in');
       spRenderOnsite();
-      spCheckLateEarlyAlert(action, new Date());
     }).catch(function() { btn1.disabled = false; btn2.disabled = false; spToast('Connection error — try again.'); });
-  });
-}
-
-// Normal hours are 07:00-16:00. Clocking in after 07:00 or out before 16:00
-// emails jon/joel (a shortfall worth a manager's attention). The mirror case
-// — in before 07:00 or out after 16:00 — is overtime instead, surfaced for
-// approval in the Monthly Clock Report rather than emailed (see
-// spSaveOvertime); the two are deliberately not symmetric notification-wise.
-// Weekdays only: 07:00-16:00 doesn't apply to weekend work, and alerts for it
-// would just eat into the EmailJS monthly quota the holiday emails share.
-function spCheckLateEarlyAlert(action, when) {
-  var dow = when.getDay();
-  if (dow === 0 || dow === 6) return;
-  var mins = when.getHours() * 60 + when.getMinutes();
-  var isLateIn = action === 'in' && mins > 7 * 60;
-  var isEarlyOut = action === 'out' && mins < 16 * 60;
-  if (!isLateIn && !isEarlyOut) return;
-  var timeStr = String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0');
-  var dateStr = when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  // The EmailJS template's Subject field is stuck on its original hardcoded
-  // "Holiday request from {{staff_name}}" — repeated attempts to change it
-  // to {{subject}} haven't actually saved on EmailJS's end (a dashboard
-  // quirk, confirmed by sending a diagnostic email and checking what showed
-  // up). Rather than depend on that edit ever landing, staff_name itself
-  // carries the alert text so the subject line is still useful even
-  // wrapped in that fixed prefix — still sending `subject` too, so this
-  // starts working the normal way for free if the template ever does get
-  // fixed on their end.
-  var alertLabel = (isLateIn ? 'LATE CLOCK-IN' : 'EARLY CLOCK-OUT') + ' — ' + spSessionName + ' at ' + timeStr;
-  spNotifyClockAlert({
-    subject: (isLateIn ? 'Late clock-in — ' : 'Early clock-out — ') + spSessionName,
-    staff_name: alertLabel,
-    name: spSessionName,
-    time: timeStr,
-    date_range: dateStr,
-    message: spSessionName + ' ' + (isLateIn ? 'clocked in at ' : 'clocked out at ') + timeStr + ' on ' + dateStr + '.'
   });
 }
 

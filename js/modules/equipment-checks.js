@@ -246,8 +246,8 @@ var CHECK_CATEGORIES = {
     ]
   },
   climbjames: {
-    label: 'James Hilborne – Climbing Kit', shortLabel: 'James Hilborne', icon: '🧗', table: 'climbing_kit_james_hilborne_checks',
-    group: 'climbingkit', hideMachine: true, machines: ['James Hilborne – Climbing Kit'],
+    label: 'James Hilborn – Climbing Kit', shortLabel: 'James Hilborn', icon: '🧗', table: 'climbing_kit_james_hilborne_checks',
+    group: 'climbingkit', hideMachine: true, machines: ['James Hilborn – Climbing Kit'],
     checksHeading: 'LOLER Interim Inspection',
     fields: [
       {key:'used_since_last', label:'Has the equipment been used since its last interim inspection?', options:['Yes','No']},
