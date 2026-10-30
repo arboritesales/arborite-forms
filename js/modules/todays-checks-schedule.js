@@ -44,29 +44,32 @@ function _markScheduledComplete(id) {
   }).catch(function(){});
 }
 
-// A check done straight from its tile (not via Start on the Schedule) still
-// ticks off the oldest matching outstanding item booked up to today — same
-// category, and the same machine unless the category has only one asset
-// (hideMachine kits, whose scheduled name may predate a rename). No lower
-// date bound: undone bookings carry over until done, however late.
+// A saved check ticks off every matching outstanding item booked up to today
+// — same category, and the same machine unless the category has only one
+// asset (hideMachine kits, whose scheduled name may predate a rename). No
+// lower date bound: undone bookings carry over until done, however late, and
+// one check today covers all of them (a machine booked on several missed days
+// would otherwise stay on the list after it's been checked).
 function _completeMatchingScheduled(category, machine) {
   var cfg = CHECK_CATEGORIES[category];
-  var now = new Date();
-  var q = 'todays_checks?select=id&category=eq.' + encodeURIComponent(category)
-    + '&completed=not.is.true&scheduled_date=lte.' + _isoDate(now)
-    + '&order=scheduled_date.asc&limit=1';
+  var q = 'todays_checks?category=eq.' + encodeURIComponent(category)
+    + '&completed=not.is.true&scheduled_date=lte.' + _isoDate(new Date());
   if (!(cfg && cfg.hideMachine)) {
     if (!machine) return;
     q += '&machine=eq.' + encodeURIComponent(machine);
   }
   fetch(SUPA_URL + '/rest/v1/' + q, {
-    headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() }
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(rows) {
-    if (Array.isArray(rows) && rows[0] && rows[0].id) _markScheduledComplete(rows[0].id);
-  })
-  .catch(function(){});
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Prefer':'return=minimal'},
+    body: JSON.stringify({ completed: true })
+  }).catch(function(){});
+}
+
+// After a check is submitted: the booking it was started from (if any), plus
+// any other outstanding booking for the same machine
+function _completeScheduledFor(category, machine) {
+  if (_activeScheduledCheckId) { _markScheduledComplete(_activeScheduledCheckId); _activeScheduledCheckId = null; }
+  _completeMatchingScheduled(category, machine);
 }
 
 // ── DAILY CHECKS — these machines need a check every weekday (Mon–Fri)

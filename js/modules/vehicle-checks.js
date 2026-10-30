@@ -265,8 +265,7 @@ function saveVehCheck(isAuto) {
       s.style.color = 'var(--lime)';
       s.textContent = '✓ ' + (isAuto ? 'Auto-saved' : 'Saved successfully!');
       if (!isAuto) {
-        if (_activeScheduledCheckId) { _markScheduledComplete(_activeScheduledCheckId); _activeScheduledCheckId = null; }
-        else { _completeMatchingScheduled('vehicle', payload.vehicle); }
+        _completeScheduledFor('vehicle', payload.vehicle);
         setTimeout(function(){ showVehList(); fetchVehList(); }, 1000);
       }
       else { setTimeout(function(){ if(s) s.textContent = ''; }, 2000); }
