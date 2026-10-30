@@ -2,6 +2,8 @@
 -- Staff Portal — manager-only functions need the MANAGER login (2026-10-30)
 -- ============================================================================
 -- Run this once in the Supabase SQL editor, before the Staff Portal goes live.
+-- RUN 2026-10-30: check query showed anon_can_run = false and
+-- has_manager_check = true for all 14.
 --
 -- Found during the pre-launch health check: the 2026-10-28 script locked the
 -- manager-only functions away from anon, but left them open to every
