@@ -8325,7 +8325,21 @@ function spOpen(id) {
   if (id === 'spCalendar') { spCalMonth = new Date(); spCalMonth.setDate(1); spRenderCalendar(); }
   if (id === 'spManagerDash') spRenderMgr();
 }
-function spOpenManagerDash() { spOpen('spManagerDash'); }
+// Staff Dashboards is Manager-login only — the server enforces this (see
+// supabase_staff_portal_manager_only_2026-10-30.sql); this just says so up
+// front instead of opening a screen full of permission errors when it's
+// reached from the team login via the Office tile. Reads the email from the
+// stored Supabase session rather than managerUnlocked, which is reset on reload.
+function spIsManagerLogin() {
+  try {
+    var payload = _supaSession.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(payload)).email === 'manager@arborite.app';
+  } catch (e) { return false; }
+}
+function spOpenManagerDash() {
+  if (!spIsManagerLogin()) { alert('Staff Dashboards needs the Manager login — log out and sign in with the Manager password.'); return; }
+  spOpen('spManagerDash');
+}
 
 // "Request time off" on the staff home — opens My Leave at the request form.
 function spOpenRequestForm() {
