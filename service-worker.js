@@ -1,9 +1,9 @@
-const CACHE_NAME = 'arborite-field-forms-v1.9.88';
+const CACHE_NAME = 'arborite-field-forms-v1.9.89';
 const APP_SHELL = [
   './',
   './index.html',
-  './css/app.css?v=1.9.88',
-  './js/app.js?v=1.9.88',
+  './css/app.css?v=1.9.89',
+  './js/app.js?v=1.9.89',
   './manifest.json',
   './arborite-logo-192.png',
   './arborite-logo-512.png',
@@ -15,7 +15,8 @@ const APP_SHELL = [
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js',
-  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  'https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js'
 ];
 
 // The CDN libraries are pinned to exact versions, so they never change between

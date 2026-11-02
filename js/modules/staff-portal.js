@@ -23,7 +23,7 @@ var SP_PORTAL_VIEWS = ['spPortalHome', 'spLeave', 'spCalendar'];
 var EMAILJS_PUBLIC_KEY = 'NcS8zQ2guo6twuud5';
 var EMAILJS_SERVICE_ID = 'service_ty7zbgk';
 var EMAILJS_TEMPLATE_ID = 'template_wfegnoj';
-var EMAILJS_CDN = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+var EMAILJS_CDN = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js';
 var _emailjsReady = false, _emailjsLoading = false, _emailjsQueue = [];
 function _loadEmailJS(cb) {
   if (_emailjsReady) { cb(); return; }
