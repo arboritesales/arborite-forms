@@ -268,6 +268,11 @@ function spAttemptGPS() {
     return;
   }
   navigator.geolocation.getCurrentPosition(function(pos) {
+    if (spIsApproxLoc(pos.coords.accuracy)) {
+      note.className = 'sp-gps-note err';
+      note.textContent = '📍 ' + SP_PRECISE_LOC_HELP;
+      return;
+    }
     note.className = 'sp-gps-note';
     note.textContent = '📍 Location ready (±' + Math.round(pos.coords.accuracy) + 'm) — captured fresh each time you clock in/out.';
   }, function(err) {
@@ -318,7 +323,10 @@ function spDoClock(action) {
         spToast(msg);
         return;
       }
-      if (gps) {
+      if (gps && spIsApproxLoc(gps.accuracy_m)) {
+        note.className = 'sp-gps-note err';
+        note.textContent = '📍 Clocked ' + (action === 'in' ? 'in' : 'out') + '. ' + SP_PRECISE_LOC_HELP;
+      } else if (gps) {
         note.className = 'sp-gps-note';
         note.textContent = '📍 Location captured (±' + Math.round(gps.accuracy_m) + 'm) for this ' + (action === 'in' ? 'clock-in' : 'clock-out') + '.';
       } else {
@@ -868,6 +876,24 @@ function spMapLink(lat, lng) {
   return ' &middot; <a href="https://maps.google.com/?q=' + lat + ',' + lng + '" target="_blank" rel="noopener" style="color:var(--green);text-decoration:underline;">view on map</a>';
 }
 
+// How far a pin can be trusted, from the accuracy the phone reported with it.
+// Over 500 m: the phone only shared an approximate location (an iPhone with
+// Precise Location off snaps to a ~2 km grid). Under 1 m: better than any
+// phone GPS can do — the signature of a fake-location app (a clock-out on
+// 2 Nov 2026 came in at 0.01 m, placed at the yard from 20+ miles away).
+var SP_LOC_APPROX_M = 500, SP_LOC_SUSPECT_M = 1;
+function spIsApproxLoc(acc) { return acc != null && acc > SP_LOC_APPROX_M; }
+function spIsSuspectLoc(acc) { return acc != null && acc < SP_LOC_SUSPECT_M; }
+function spFmtAccuracy(acc) { return acc >= 1000 ? (Math.round(acc / 100) / 10) + ' km' : Math.round(acc) + ' m'; }
+function spLocFlag(acc) {
+  if (acc == null) return '';
+  if (spIsSuspectLoc(acc)) return ' <span class="sp-loc-flag suspect" title="No phone GPS is this accurate — likely a fake-location app">Suspicious reading</span>';
+  if (spIsApproxLoc(acc)) return ' <span class="sp-loc-flag approx" title="Precise Location is off on this phone">Approximate (±' + spFmtAccuracy(acc) + ')</span>';
+  return ' &middot; ±' + spFmtAccuracy(acc);
+}
+
+var SP_PRECISE_LOC_HELP = 'Your phone is only sharing a rough location (±2 km). Please turn on Precise Location — iPhone: Settings → Privacy & Security → Location Services → Safari Websites (or your browser) → Precise Location on. Android: Settings → Location → Chrome → Use precise location on.';
+
 // Shared by the "Recent clock activity" and "Monthly clock report" directory
 // views below — both drill down from a plain list of employee names, so both
 // need the full active-staff roster (not just names with activity this
@@ -905,8 +931,13 @@ function spRenderClockActivity() {
       spEnsureStaffNamesLoaded(function(names) {
         if (!names.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No staff found.</div>'; return; }
         el.innerHTML = names.map(function(n) {
-          var count = rows.filter(function(r) { return r.name === n; }).length;
-          return '<div class="sp-onsite-row" style="cursor:pointer;" onclick="spSelectClockActivity(\'' + spJsStr(n) + '\')"><span>' + spEsc(n)
+          var mine = rows.filter(function(r) { return r.name === n; });
+          var count = mine.length;
+          var suspect = mine.filter(function(r) { return spIsSuspectLoc(r.accuracy_m); }).length;
+          var approx = mine.filter(function(r) { return spIsApproxLoc(r.accuracy_m); }).length;
+          var flags = (suspect ? '<span class="sp-loc-flag suspect">' + suspect + ' suspicious</span>' : '')
+            + (approx ? '<span class="sp-loc-flag approx">' + approx + ' approximate</span>' : '');
+          return '<div class="sp-onsite-row" style="cursor:pointer;" onclick="spSelectClockActivity(\'' + spJsStr(n) + '\')"><span>' + spEsc(n) + flags
             + '<br><span class="sp-onsite-time">' + (count ? count + ' recent event' + (count === 1 ? '' : 's') : 'No recent activity') + '</span></span><span>&rsaquo;</span></div>';
         }).join('');
       });
@@ -922,7 +953,7 @@ function spRenderClockActivity() {
       var when = t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
       var label = r.action === 'in' ? 'Clocked in' : 'Clocked out';
       return '<div class="sp-onsite-row"><span>' + label
-        + '<br><span class="sp-onsite-time">' + when + (r.lat != null ? spMapLink(r.lat, r.lng) : ' &middot; no location') + '</span></span>'
+        + '<br><span class="sp-onsite-time">' + when + (r.lat != null ? spMapLink(r.lat, r.lng) + spLocFlag(r.accuracy_m) : ' &middot; no location') + '</span></span>'
         + '<button class="sp-clock-del-btn" title="Delete this entry" onclick="spDeleteClockEvent(\'' + r.id + '\')">&times;</button></div>';
     }).join('');
   });

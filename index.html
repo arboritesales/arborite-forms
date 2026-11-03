@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.9.90">
+  <link rel="stylesheet" href="css/app.css?v=1.9.91">
 </head>
 <body>
 
@@ -60,7 +60,7 @@
       <div class="lock-err" id="lockMgrErr"></div>
     </div>
   </div>
-  <div class="lock-ver">v1.9.90</div>
+  <div class="lock-ver">v1.9.91</div>
   </div>
 </div>
 
@@ -121,6 +121,10 @@
 #spRoot .sp-onsite-row:last-child{border-bottom:none;}
 #spRoot .sp-clock-del-btn{background:rgba(255,140,140,.12);color:#ff9a9a;border:1px solid rgba(255,140,140,.6);border-radius:8px;width:26px;height:26px;font-size:15px;line-height:1;cursor:pointer;flex-shrink:0;margin-left:10px;}
 #spRoot .sp-onsite-time{color:var(--mid);font-size:12px;}
+#spRoot .sp-loc-flag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.2px;padding:1px 7px;border-radius:10px;margin-left:6px;}
+#spRoot .sp-loc-flag.approx{background:rgba(239,159,39,.18);color:#fac775;}
+#spRoot .sp-loc-flag.suspect{background:rgba(255,90,90,.2);color:#ff9a9a;}
+#spRoot .sp-loc-checked{font-size:11px;color:var(--mid);margin-top:8px;text-align:center;}
 #spRoot .sp-field{margin-bottom:12px;}
 #spRoot .sp-field label{display:block;font-size:11.5px;font-weight:500;color:var(--mid);letter-spacing:.3px;margin-bottom:6px;}
 #spRoot .sp-field select,#spRoot .sp-field input,#spRoot .sp-field textarea{width:100%;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:11px 12px;font-family:'Barlow',sans-serif;font-size:15px;outline:none;background:rgba(0,0,0,.18);color:#fff;color-scheme:dark;box-sizing:border-box;}
@@ -229,6 +233,7 @@
           </div>
         </div>
         <div class="sp-gps-note" id="spGpsNote">&#128205; Checking your location for the record&hellip;</div>
+        <div class="sp-loc-checked">Your location is recorded with every clock in and out, and checked by the office.</div>
       </div>
 
       <div class="sp-section-label">My leave</div>
@@ -373,7 +378,7 @@
   <div style="position:relative;z-index:1;">
   <div class="ws-header">
     <div class="ws-brand">
-      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.9.90<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
+      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.9.91<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
     </div>
     <button id="logoutBtn" class="ws-icon-btn" onclick="logoutToTeamLogin()" style="display:none;" aria-label="Log out" title="Log out"><svg class="ic"><use href="#i-logout"/></svg><span>Log out</span></button>
   </div>
@@ -446,7 +451,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.90</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.91</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -3030,7 +3035,7 @@
   </div>
 </div>
 
-  <script src="js/app.js?v=1.9.90"></script>
+  <script src="js/app.js?v=1.9.91"></script>
 </body>
 </html>
 
