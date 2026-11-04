@@ -1,18 +1,4 @@
 // ── CHECKS / VEHICLE INSPECTIONS ──
-var VEH_EMPLOYEES = {
-  '1995': 'Joe Grace',
-  '6230': 'Jason Hiscock',
-  '1599': 'Luke Richardson',
-  '1961': 'Dave Norris',
-  '0000': 'James Hilborn',
-  '4033': 'Joel Cripps',
-  '1234': 'Jon Challinor',
-  '0206': 'Liam Couling',
-  '2580': 'Liam Cooper',
-  '6252': 'Jack Fisher',
-  '0712': 'George Sim',
-  '4444': 'Olly Key'
-};
 var _vehInspector = null;
 var _vehAutoSaveTimer = null;
 var _vehCurrentId = null;
@@ -85,28 +71,46 @@ function showVehPinPanel() {
   document.getElementById('checksView').scrollTop = 0;
 }
 
-function checkVehPin(val) {
-  var nameEl = document.getElementById('vehPinName');
-  var errEl = document.getElementById('vehPinErr');
-  var confirmBtn = document.getElementById('vehPinConfirm');
+// Checks PINs live on the server (check_pins), never in this public code.
+// Shared by the vehicle and equipment sign-in panels.
+var _pinVerified = null; // {pin, name} once the server has recognised a PIN
+
+function _checkInspectorPin(val, inputEl, nameEl, errEl, confirmBtn) {
+  _pinVerified = null;
   errEl.textContent = '';
   nameEl.style.display = 'none';
   confirmBtn.style.display = 'none';
-  if (val.length >= 3) {
-    var name = VEH_EMPLOYEES[val];
-    if (name) {
-      nameEl.textContent = '✓ ' + name;
-      nameEl.style.display = 'block';
-      confirmBtn.style.display = 'inline-block';
-    } else if (val.length >= 4) {
-      errEl.textContent = 'PIN not recognised — try again';
-    }
-  }
+  if (val.length < 3) return;
+  supaFetch('POST', 'rpc/verify_check_pin', {p_pin: val})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(name) {
+      if (inputEl.value !== val) return; // typed on since this was asked
+      if (name) {
+        _pinVerified = {pin: val, name: name};
+        nameEl.textContent = '✓ ' + name;
+        nameEl.style.display = 'block';
+        confirmBtn.style.display = 'inline-block';
+      } else if (val.length >= 4) {
+        errEl.textContent = 'PIN not recognised — try again';
+      }
+    })
+    .catch(function() {
+      if (inputEl.value === val) errEl.textContent = 'Could not check PIN — check your connection';
+    });
+}
+
+function _verifiedInspectorName(inputEl) {
+  return (_pinVerified && _pinVerified.pin === inputEl.value) ? _pinVerified.name : null;
+}
+
+function checkVehPin(val) {
+  _checkInspectorPin(val, document.getElementById('vehPin'), document.getElementById('vehPinName'),
+    document.getElementById('vehPinErr'), document.getElementById('vehPinConfirm'));
 }
 
 function confirmVehPin() {
   var pinEl = document.getElementById('vehPin');
-  var name = VEH_EMPLOYEES[pinEl.value];
+  var name = _verifiedInspectorName(pinEl);
   if (!name) return;
   _vehInspector = name;
   _vehCurrentId = null;
@@ -342,17 +346,19 @@ function confirmVehPass() {
   var inp = document.getElementById('vehPassInp');
   var err = document.getElementById('vehPassErr');
   if (!inp) return;
-  if (inp.value === '2001') {
-    var pending = _pendingManagerRecord;
-    closeVehPassModal();
-    if (!pending) return;
-    if (pending.kind === 'cat') loadCatRecord(pending.cat, pending.id);
-    else loadVehRecord(pending.id);
-  } else {
-    err.textContent = 'Incorrect password — try again';
-    inp.value = '';
-    inp.focus();
-  }
+  _verifyOfficeCode('records', inp.value, function(ok) {
+    if (ok) {
+      var pending = _pendingManagerRecord;
+      closeVehPassModal();
+      if (!pending) return;
+      if (pending.kind === 'cat') loadCatRecord(pending.cat, pending.id);
+      else loadVehRecord(pending.id);
+    } else {
+      err.textContent = 'Incorrect password, or no connection — try again';
+      inp.value = '';
+      inp.focus();
+    }
+  });
 }
 
 var _vehDetailRecordId = null;
@@ -482,6 +488,7 @@ function closeVehDetail() {
 }
 
 function deleteVehRecord() {
+  if (!_managerOnlyDelete('check records')) return;
   if (!_vehDetailRecordId || _vehDetailRecordId === 'null' || _vehDetailRecordId === 'undefined') {
     alert('This record can\'t be deleted — it\'s missing an ID. Please let the office know so it can be fixed.');
     return;

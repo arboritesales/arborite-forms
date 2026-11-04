@@ -639,27 +639,13 @@ function showCatPinPanel(cat) {
 }
 
 function checkCatPin(cat, val) {
-  var nameEl = document.getElementById('catPinName_' + cat);
-  var errEl = document.getElementById('catPinErr_' + cat);
-  var confirmBtn = document.getElementById('catPinConfirm_' + cat);
-  errEl.textContent = '';
-  nameEl.style.display = 'none';
-  confirmBtn.style.display = 'none';
-  if (val.length >= 3) {
-    var name = VEH_EMPLOYEES[val];
-    if (name) {
-      nameEl.textContent = '✓ ' + name;
-      nameEl.style.display = 'block';
-      confirmBtn.style.display = 'inline-block';
-    } else if (val.length >= 4) {
-      errEl.textContent = 'PIN not recognised — try again';
-    }
-  }
+  _checkInspectorPin(val, document.getElementById('catPin_' + cat), document.getElementById('catPinName_' + cat),
+    document.getElementById('catPinErr_' + cat), document.getElementById('catPinConfirm_' + cat));
 }
 
 function confirmCatPin(cat) {
   var pinEl = document.getElementById('catPin_' + cat);
-  var name = VEH_EMPLOYEES[pinEl.value];
+  var name = _verifiedInspectorName(pinEl);
   if (!name) return;
   var st = catState(cat);
   st.inspector = name;
@@ -915,6 +901,7 @@ function closeCatDetail(cat) {
 }
 
 function deleteCatRecord(cat) {
+  if (!_managerOnlyDelete('check records')) return;
   var cfg = CHECK_CATEGORIES[cat];
   var id = _catDetailRecordId[cat];
   if (!id || id === 'null' || id === 'undefined') {

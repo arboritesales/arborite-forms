@@ -140,6 +140,15 @@ function checkPass(mode) {
 
 
 
+// Record-viewing and Office passwords are checked on the server (see
+// supabase_security_hardening_2026-11-04.sql), never in this public code.
+function _verifyOfficeCode(kind, code, cb) {
+  supaFetch('POST', 'rpc/verify_office_code', {p_kind: kind, p_code: code})
+    .then(function(r) { return r.ok ? r.json() : false; })
+    .then(function(ok) { cb(ok === true); })
+    .catch(function() { cb(false); });
+}
+
 // ── SAFE DISPLAY ──
 // Anything saved by a user must go through these before being put into
 // innerHTML — otherwise saved text could run as code in whoever opens it.

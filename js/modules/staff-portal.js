@@ -159,13 +159,16 @@ function spSubmitLogin() {
   var isSetup = document.getElementById('spSetupWrap').style.display === 'block';
   btn.disabled = true;
   if (isSetup) {
+    var code = document.getElementById('spSetupCode').value.trim();
     var p1 = document.getElementById('spNewPass').value;
     var p2 = document.getElementById('spNewPass2').value;
-    if (!p1 || p1.length < 4) { spShowErr('spLoginErr', 'Choose a password at least 4 characters long.'); btn.disabled = false; return; }
+    if (!code) { spShowErr('spLoginErr', 'Enter the setup code from your manager.'); btn.disabled = false; return; }
+    if (!p1 || p1.length < 8) { spShowErr('spLoginErr', 'Choose a password at least 8 characters long.'); btn.disabled = false; return; }
     if (p1 !== p2) { spShowErr('spLoginErr', 'Passwords don\'t match.'); btn.disabled = false; return; }
-    spRpc('set_staff_password', { p_name: name, p_new_password: p1, p_current_password: null }).then(function(res) {
+    spRpc('set_staff_password', { p_name: name, p_new_password: p1, p_current_password: null, p_setup_code: code }).then(function(res) {
       btn.disabled = false;
-      if (!res.ok || !Array.isArray(res.data) || !res.data.length) { spShowErr('spLoginErr', (res.data && res.data.message) || 'Could not set password.'); return; }
+      if (!res.ok || !Array.isArray(res.data)) { spShowErr('spLoginErr', (res.data && res.data.message) || 'Could not set password.'); return; }
+      if (!res.data.length) { spShowErr('spLoginErr', 'That setup code isn\'t right or has expired. Ask your manager for a new one.'); return; }
       spCompleteLogin(name, res.data[0]);
     }).catch(function() { btn.disabled = false; spShowErr('spLoginErr', 'Connection error — try again.'); });
   } else {
@@ -174,7 +177,7 @@ function spSubmitLogin() {
     spRpc('verify_staff_login', { p_name: name, p_password: pass }).then(function(res) {
       btn.disabled = false;
       if (!res.ok || !Array.isArray(res.data) || !res.data.length) {
-        spShowErr('spLoginErr', 'Incorrect password — try again.');
+        spShowErr('spLoginErr', 'Incorrect password. After 5 wrong tries the account locks for 15 minutes.');
         document.getElementById('spPass').value = '';
         return;
       }
@@ -189,6 +192,7 @@ function spCompleteLogin(name, row) {
   spSessionStaffId = row.staff_id;
   spSessionIsManager = !!row.is_manager;
   document.getElementById('spPass').value = '';
+  document.getElementById('spSetupCode').value = '';
   document.getElementById('spNewPass').value = '';
   document.getElementById('spNewPass2').value = '';
   spTouchSession();
@@ -363,12 +367,13 @@ function spRenderClockTime() {
   if (d) d.textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-// "On site now": read-only, no token needed — visible to anyone on the
-// Clock In/Out screen or Staff Dashboards, not just the person asking.
+// "On site now": everyone signed in to the portal, and Staff Dashboards. The
+// manager has no staff session, so p_token is null and the server checks the
+// Manager login instead.
 function spRenderOnsite() {
   var elList = [document.getElementById('spOnsiteList'), document.getElementById('spMgrOnsite')].filter(Boolean);
   if (!elList.length) return;
-  spRpc('sp_onsite_now', {}).then(function(res) {
+  spRpc('sp_onsite_now', { p_token: spSessionToken }).then(function(res) {
     var onsite = res.ok && Array.isArray(res.data) ? res.data : [];
     var html = onsite.length
       ? onsite.map(function(o) {
@@ -1019,32 +1024,33 @@ function spOnEditStaffChange() {
   if (spCurrentEditStaff) spRenderStaffHistory();
 }
 
-// Clears one person's password so they land back on "create your password"
-// next time they sign in — the RPC itself already exists (reset_staff_password
-// in supabase_staff_portal.sql) but nothing in the UI called it until now.
+// Clears one person's password and gets a one-time setup code to pass on — it's
+// also how a new starter gets set up. Nobody can create a password without one.
 function spResetOneStaffPassword() {
   if (!spCurrentEditStaff) return;
-  if (!confirm('Reset the password for ' + spCurrentEditStaff + '? They\'ll need to set a new one next time they sign in.')) return;
-  spRpc('reset_staff_password', { p_name: spCurrentEditStaff }).then(function(res) {
-    if (!res.ok || !res.data) { spToast('Could not reset password.'); return; }
-    spToast(spCurrentEditStaff + '’s password has been reset.');
+  if (!confirm('Get a setup code for ' + spCurrentEditStaff + '? Any password they have now stops working, and they\'ll create a new one using the code.')) return;
+  var name = spCurrentEditStaff;
+  spRpc('sp_manager_issue_setup_code', { p_name: name }).then(function(res) {
+    if (!res.ok || !res.data) { spToast('Could not create a setup code.'); return; }
+    alert('Setup code for ' + name + ': ' + res.data + '\n\nGive this to them in person or by text. It works once and lasts 7 days. It won\'t be shown again.');
   }).catch(function() { spToast('Connection error — try again.'); });
 }
 
-// Bulk version — resets every active staff member's password in one go, one
-// RPC call per person (reset_staff_password only takes a single name).
+// Bulk version — one RPC call per person, then shows every code together.
 function spResetAllStaffPasswords() {
-  if (!confirm('Reset EVERY staff member’s password? Everyone will need to create a new password next time they sign in. This cannot be undone.')) return;
+  if (!confirm('Reset EVERY staff member’s password? All their passwords stop working, and each person will need a setup code from you. Write down the list on the next screen. This cannot be undone.')) return;
   spRpc('sp_list_staff_names', {}).then(function(res) {
     var names = (res.ok && Array.isArray(res.data)) ? res.data.map(function(r) { return r.name; }) : [];
     if (!names.length) { spToast('Could not load staff list.'); return; }
-    var done = 0, failed = [];
+    var done = 0, failed = [], codes = [];
     names.forEach(function(name) {
-      spRpc('reset_staff_password', { p_name: name }).then(function(r) {
+      spRpc('sp_manager_issue_setup_code', { p_name: name }).then(function(r) {
         if (!r.ok || !r.data) failed.push(name);
+        else codes.push(name + ': ' + r.data);
       }).catch(function() { failed.push(name); }).then(function() {
         done++;
         if (done === names.length) {
+          if (codes.length) alert('Setup codes (write these down, they won\'t be shown again):\n\n' + codes.sort().join('\n'));
           spToast(failed.length ? ('Reset ' + (names.length - failed.length) + ' of ' + names.length + ' — failed: ' + failed.join(', ')) : ('Reset all ' + names.length + ' staff passwords.'));
         }
       });

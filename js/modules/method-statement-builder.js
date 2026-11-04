@@ -488,6 +488,7 @@ function restoreMSB(ref) {
 }
 
 function permanentlyDeleteMSB(ref) {
+  if (!_managerOnlyDelete('method statements permanently')) return;
   var typed = prompt('This permanently deletes it — it cannot be recovered afterwards. Type DELETE to confirm.');
   if (typed !== 'DELETE') return;
   supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))

@@ -140,6 +140,15 @@ function checkPass(mode) {
 
 
 
+// Record-viewing and Office passwords are checked on the server (see
+// supabase_security_hardening_2026-11-04.sql), never in this public code.
+function _verifyOfficeCode(kind, code, cb) {
+  supaFetch('POST', 'rpc/verify_office_code', {p_kind: kind, p_code: code})
+    .then(function(r) { return r.ok ? r.json() : false; })
+    .then(function(ok) { cb(ok === true); })
+    .catch(function() { cb(false); });
+}
+
 // ── SAFE DISPLAY ──
 // Anything saved by a user must go through these before being put into
 // innerHTML — otherwise saved text could run as code in whoever opens it.
@@ -1256,74 +1265,25 @@ function fetchJobList() {
     });
 }
 
-var _pendingDeleteRef = null;
-var _pendingDeleteIsTBT = false;
-var _pendingDeleteIsAudit = false;
+function _managerOnlyDelete(what) {
+  if (managerUnlocked) return true;
+  alert('Only the Manager login can delete ' + what + '. Log out and sign in with the Manager password.');
+  return false;
+}
 
 function deleteJob(ref) {
-  if (managerUnlocked) {
-    if (confirm('Delete this job? This cannot be undone.')) _executeDelete(ref, false, false);
-    return;
-  }
-  _pendingDeleteRef = ref;
-  _pendingDeleteIsTBT = false;
-  _pendingDeleteIsAudit = false;
-  hideModals();
-  document.getElementById('deletePassInput').value = '';
-  document.getElementById('deletePassErr').textContent = '';
-  document.getElementById('deletePassModal').className = 'modal-bg show';
+  if (!_managerOnlyDelete('jobs')) return;
+  if (confirm('Delete this job? This cannot be undone.')) _executeDelete(ref, false, false);
 }
 
 function deleteTBT(ref) {
-  if (managerUnlocked) {
-    if (confirm('Delete this toolbox talk? This cannot be undone.')) _executeDelete(ref, true, false);
-    return;
-  }
-  _pendingDeleteRef = ref;
-  _pendingDeleteIsTBT = true;
-  _pendingDeleteIsAudit = false;
-  document.getElementById('deletePassInput').value = '';
-  document.getElementById('deletePassErr').textContent = '';
-  document.getElementById('deletePassModal').className = 'modal-bg show';
+  if (!_managerOnlyDelete('toolbox talks')) return;
+  if (confirm('Delete this toolbox talk? This cannot be undone.')) _executeDelete(ref, true, false);
 }
 
 function deleteAudit(ref) {
-  if (managerUnlocked) {
-    if (confirm('Delete this audit? This cannot be undone.')) _executeDelete(ref, false, true);
-    return;
-  }
-  _pendingDeleteRef = ref;
-  _pendingDeleteIsTBT = false;
-  _pendingDeleteIsAudit = true;
-  document.getElementById('deletePassInput').value = '';
-  document.getElementById('deletePassErr').textContent = '';
-  document.getElementById('deletePassModal').className = 'modal-bg show';
-}
-
-function hideDeleteModal() {
-  document.getElementById('deletePassModal').className = 'modal-bg';
-  _pendingDeleteRef = null;
-  _pendingDeleteIsTBT = false;
-  _pendingDeleteIsAudit = false;
-}
-
-function confirmDeletePass() {
-  var p = document.getElementById('deletePassInput').value;
-  if (p !== '2001') {
-    document.getElementById('deletePassErr').textContent = 'Incorrect password — please try again.';
-    document.getElementById('deletePassInput').value = '';
-    document.getElementById('deletePassInput').focus();
-    return;
-  }
-  document.getElementById('deletePassModal').className = 'modal-bg';
-  hideModals();
-  var ref = _pendingDeleteRef;
-  var isTBT = _pendingDeleteIsTBT;
-  var isAudit = _pendingDeleteIsAudit;
-  _pendingDeleteRef = null;
-  _pendingDeleteIsTBT = false;
-  _pendingDeleteIsAudit = false;
-  _executeDelete(ref, isTBT, isAudit);
+  if (!_managerOnlyDelete('audits')) return;
+  if (confirm('Delete this audit? This cannot be undone.')) _executeDelete(ref, false, true);
 }
 
 function _executeDelete(ref, isTBT, isAudit) {
@@ -2806,15 +2766,17 @@ function openOffice() {
 
 function confirmOfficePass() {
   var p = document.getElementById('officePassInput').value;
-  if (p === 'office2024') {
-    officeUnlocked = true;
-    document.getElementById('officePassModal').className = 'modal-bg';
-    showOfficeView();
-  } else {
-    document.getElementById('officePassErr').textContent = 'Incorrect password — please try again.';
-    document.getElementById('officePassInput').value = '';
-    document.getElementById('officePassInput').focus();
-  }
+  _verifyOfficeCode('office', p, function(ok) {
+    if (ok) {
+      officeUnlocked = true;
+      document.getElementById('officePassModal').className = 'modal-bg';
+      showOfficeView();
+    } else {
+      document.getElementById('officePassErr').textContent = 'Incorrect password, or no connection — please try again.';
+      document.getElementById('officePassInput').value = '';
+      document.getElementById('officePassInput').focus();
+    }
+  });
 }
 
 function hideOfficeModal() {
@@ -2996,20 +2958,6 @@ function wireAutoSaveOn(root, panelId) {
 
 
 // ── CHECKS / VEHICLE INSPECTIONS ──
-var VEH_EMPLOYEES = {
-  '1995': 'Joe Grace',
-  '6230': 'Jason Hiscock',
-  '1599': 'Luke Richardson',
-  '1961': 'Dave Norris',
-  '0000': 'James Hilborn',
-  '4033': 'Joel Cripps',
-  '1234': 'Jon Challinor',
-  '0206': 'Liam Couling',
-  '2580': 'Liam Cooper',
-  '6252': 'Jack Fisher',
-  '0712': 'George Sim',
-  '4444': 'Olly Key'
-};
 var _vehInspector = null;
 var _vehAutoSaveTimer = null;
 var _vehCurrentId = null;
@@ -3082,28 +3030,46 @@ function showVehPinPanel() {
   document.getElementById('checksView').scrollTop = 0;
 }
 
-function checkVehPin(val) {
-  var nameEl = document.getElementById('vehPinName');
-  var errEl = document.getElementById('vehPinErr');
-  var confirmBtn = document.getElementById('vehPinConfirm');
+// Checks PINs live on the server (check_pins), never in this public code.
+// Shared by the vehicle and equipment sign-in panels.
+var _pinVerified = null; // {pin, name} once the server has recognised a PIN
+
+function _checkInspectorPin(val, inputEl, nameEl, errEl, confirmBtn) {
+  _pinVerified = null;
   errEl.textContent = '';
   nameEl.style.display = 'none';
   confirmBtn.style.display = 'none';
-  if (val.length >= 3) {
-    var name = VEH_EMPLOYEES[val];
-    if (name) {
-      nameEl.textContent = '✓ ' + name;
-      nameEl.style.display = 'block';
-      confirmBtn.style.display = 'inline-block';
-    } else if (val.length >= 4) {
-      errEl.textContent = 'PIN not recognised — try again';
-    }
-  }
+  if (val.length < 3) return;
+  supaFetch('POST', 'rpc/verify_check_pin', {p_pin: val})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(name) {
+      if (inputEl.value !== val) return; // typed on since this was asked
+      if (name) {
+        _pinVerified = {pin: val, name: name};
+        nameEl.textContent = '✓ ' + name;
+        nameEl.style.display = 'block';
+        confirmBtn.style.display = 'inline-block';
+      } else if (val.length >= 4) {
+        errEl.textContent = 'PIN not recognised — try again';
+      }
+    })
+    .catch(function() {
+      if (inputEl.value === val) errEl.textContent = 'Could not check PIN — check your connection';
+    });
+}
+
+function _verifiedInspectorName(inputEl) {
+  return (_pinVerified && _pinVerified.pin === inputEl.value) ? _pinVerified.name : null;
+}
+
+function checkVehPin(val) {
+  _checkInspectorPin(val, document.getElementById('vehPin'), document.getElementById('vehPinName'),
+    document.getElementById('vehPinErr'), document.getElementById('vehPinConfirm'));
 }
 
 function confirmVehPin() {
   var pinEl = document.getElementById('vehPin');
-  var name = VEH_EMPLOYEES[pinEl.value];
+  var name = _verifiedInspectorName(pinEl);
   if (!name) return;
   _vehInspector = name;
   _vehCurrentId = null;
@@ -3339,17 +3305,19 @@ function confirmVehPass() {
   var inp = document.getElementById('vehPassInp');
   var err = document.getElementById('vehPassErr');
   if (!inp) return;
-  if (inp.value === '2001') {
-    var pending = _pendingManagerRecord;
-    closeVehPassModal();
-    if (!pending) return;
-    if (pending.kind === 'cat') loadCatRecord(pending.cat, pending.id);
-    else loadVehRecord(pending.id);
-  } else {
-    err.textContent = 'Incorrect password — try again';
-    inp.value = '';
-    inp.focus();
-  }
+  _verifyOfficeCode('records', inp.value, function(ok) {
+    if (ok) {
+      var pending = _pendingManagerRecord;
+      closeVehPassModal();
+      if (!pending) return;
+      if (pending.kind === 'cat') loadCatRecord(pending.cat, pending.id);
+      else loadVehRecord(pending.id);
+    } else {
+      err.textContent = 'Incorrect password, or no connection — try again';
+      inp.value = '';
+      inp.focus();
+    }
+  });
 }
 
 var _vehDetailRecordId = null;
@@ -3479,6 +3447,7 @@ function closeVehDetail() {
 }
 
 function deleteVehRecord() {
+  if (!_managerOnlyDelete('check records')) return;
   if (!_vehDetailRecordId || _vehDetailRecordId === 'null' || _vehDetailRecordId === 'undefined') {
     alert('This record can\'t be deleted — it\'s missing an ID. Please let the office know so it can be fixed.');
     return;
@@ -4333,27 +4302,13 @@ function showCatPinPanel(cat) {
 }
 
 function checkCatPin(cat, val) {
-  var nameEl = document.getElementById('catPinName_' + cat);
-  var errEl = document.getElementById('catPinErr_' + cat);
-  var confirmBtn = document.getElementById('catPinConfirm_' + cat);
-  errEl.textContent = '';
-  nameEl.style.display = 'none';
-  confirmBtn.style.display = 'none';
-  if (val.length >= 3) {
-    var name = VEH_EMPLOYEES[val];
-    if (name) {
-      nameEl.textContent = '✓ ' + name;
-      nameEl.style.display = 'block';
-      confirmBtn.style.display = 'inline-block';
-    } else if (val.length >= 4) {
-      errEl.textContent = 'PIN not recognised — try again';
-    }
-  }
+  _checkInspectorPin(val, document.getElementById('catPin_' + cat), document.getElementById('catPinName_' + cat),
+    document.getElementById('catPinErr_' + cat), document.getElementById('catPinConfirm_' + cat));
 }
 
 function confirmCatPin(cat) {
   var pinEl = document.getElementById('catPin_' + cat);
-  var name = VEH_EMPLOYEES[pinEl.value];
+  var name = _verifiedInspectorName(pinEl);
   if (!name) return;
   var st = catState(cat);
   st.inspector = name;
@@ -4609,6 +4564,7 @@ function closeCatDetail(cat) {
 }
 
 function deleteCatRecord(cat) {
+  if (!_managerOnlyDelete('check records')) return;
   var cfg = CHECK_CATEGORIES[cat];
   var id = _catDetailRecordId[cat];
   if (!id || id === 'null' || id === 'undefined') {
@@ -6896,6 +6852,7 @@ function restoreMSB(ref) {
 }
 
 function permanentlyDeleteMSB(ref) {
+  if (!_managerOnlyDelete('method statements permanently')) return;
   var typed = prompt('This permanently deletes it — it cannot be recovered afterwards. Type DELETE to confirm.');
   if (typed !== 'DELETE') return;
   supaFetch('DELETE', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref))
@@ -8485,13 +8442,16 @@ function spSubmitLogin() {
   var isSetup = document.getElementById('spSetupWrap').style.display === 'block';
   btn.disabled = true;
   if (isSetup) {
+    var code = document.getElementById('spSetupCode').value.trim();
     var p1 = document.getElementById('spNewPass').value;
     var p2 = document.getElementById('spNewPass2').value;
-    if (!p1 || p1.length < 4) { spShowErr('spLoginErr', 'Choose a password at least 4 characters long.'); btn.disabled = false; return; }
+    if (!code) { spShowErr('spLoginErr', 'Enter the setup code from your manager.'); btn.disabled = false; return; }
+    if (!p1 || p1.length < 8) { spShowErr('spLoginErr', 'Choose a password at least 8 characters long.'); btn.disabled = false; return; }
     if (p1 !== p2) { spShowErr('spLoginErr', 'Passwords don\'t match.'); btn.disabled = false; return; }
-    spRpc('set_staff_password', { p_name: name, p_new_password: p1, p_current_password: null }).then(function(res) {
+    spRpc('set_staff_password', { p_name: name, p_new_password: p1, p_current_password: null, p_setup_code: code }).then(function(res) {
       btn.disabled = false;
-      if (!res.ok || !Array.isArray(res.data) || !res.data.length) { spShowErr('spLoginErr', (res.data && res.data.message) || 'Could not set password.'); return; }
+      if (!res.ok || !Array.isArray(res.data)) { spShowErr('spLoginErr', (res.data && res.data.message) || 'Could not set password.'); return; }
+      if (!res.data.length) { spShowErr('spLoginErr', 'That setup code isn\'t right or has expired. Ask your manager for a new one.'); return; }
       spCompleteLogin(name, res.data[0]);
     }).catch(function() { btn.disabled = false; spShowErr('spLoginErr', 'Connection error — try again.'); });
   } else {
@@ -8500,7 +8460,7 @@ function spSubmitLogin() {
     spRpc('verify_staff_login', { p_name: name, p_password: pass }).then(function(res) {
       btn.disabled = false;
       if (!res.ok || !Array.isArray(res.data) || !res.data.length) {
-        spShowErr('spLoginErr', 'Incorrect password — try again.');
+        spShowErr('spLoginErr', 'Incorrect password. After 5 wrong tries the account locks for 15 minutes.');
         document.getElementById('spPass').value = '';
         return;
       }
@@ -8515,6 +8475,7 @@ function spCompleteLogin(name, row) {
   spSessionStaffId = row.staff_id;
   spSessionIsManager = !!row.is_manager;
   document.getElementById('spPass').value = '';
+  document.getElementById('spSetupCode').value = '';
   document.getElementById('spNewPass').value = '';
   document.getElementById('spNewPass2').value = '';
   spTouchSession();
@@ -8689,12 +8650,13 @@ function spRenderClockTime() {
   if (d) d.textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-// "On site now": read-only, no token needed — visible to anyone on the
-// Clock In/Out screen or Staff Dashboards, not just the person asking.
+// "On site now": everyone signed in to the portal, and Staff Dashboards. The
+// manager has no staff session, so p_token is null and the server checks the
+// Manager login instead.
 function spRenderOnsite() {
   var elList = [document.getElementById('spOnsiteList'), document.getElementById('spMgrOnsite')].filter(Boolean);
   if (!elList.length) return;
-  spRpc('sp_onsite_now', {}).then(function(res) {
+  spRpc('sp_onsite_now', { p_token: spSessionToken }).then(function(res) {
     var onsite = res.ok && Array.isArray(res.data) ? res.data : [];
     var html = onsite.length
       ? onsite.map(function(o) {
@@ -9345,32 +9307,33 @@ function spOnEditStaffChange() {
   if (spCurrentEditStaff) spRenderStaffHistory();
 }
 
-// Clears one person's password so they land back on "create your password"
-// next time they sign in — the RPC itself already exists (reset_staff_password
-// in supabase_staff_portal.sql) but nothing in the UI called it until now.
+// Clears one person's password and gets a one-time setup code to pass on — it's
+// also how a new starter gets set up. Nobody can create a password without one.
 function spResetOneStaffPassword() {
   if (!spCurrentEditStaff) return;
-  if (!confirm('Reset the password for ' + spCurrentEditStaff + '? They\'ll need to set a new one next time they sign in.')) return;
-  spRpc('reset_staff_password', { p_name: spCurrentEditStaff }).then(function(res) {
-    if (!res.ok || !res.data) { spToast('Could not reset password.'); return; }
-    spToast(spCurrentEditStaff + '’s password has been reset.');
+  if (!confirm('Get a setup code for ' + spCurrentEditStaff + '? Any password they have now stops working, and they\'ll create a new one using the code.')) return;
+  var name = spCurrentEditStaff;
+  spRpc('sp_manager_issue_setup_code', { p_name: name }).then(function(res) {
+    if (!res.ok || !res.data) { spToast('Could not create a setup code.'); return; }
+    alert('Setup code for ' + name + ': ' + res.data + '\n\nGive this to them in person or by text. It works once and lasts 7 days. It won\'t be shown again.');
   }).catch(function() { spToast('Connection error — try again.'); });
 }
 
-// Bulk version — resets every active staff member's password in one go, one
-// RPC call per person (reset_staff_password only takes a single name).
+// Bulk version — one RPC call per person, then shows every code together.
 function spResetAllStaffPasswords() {
-  if (!confirm('Reset EVERY staff member’s password? Everyone will need to create a new password next time they sign in. This cannot be undone.')) return;
+  if (!confirm('Reset EVERY staff member’s password? All their passwords stop working, and each person will need a setup code from you. Write down the list on the next screen. This cannot be undone.')) return;
   spRpc('sp_list_staff_names', {}).then(function(res) {
     var names = (res.ok && Array.isArray(res.data)) ? res.data.map(function(r) { return r.name; }) : [];
     if (!names.length) { spToast('Could not load staff list.'); return; }
-    var done = 0, failed = [];
+    var done = 0, failed = [], codes = [];
     names.forEach(function(name) {
-      spRpc('reset_staff_password', { p_name: name }).then(function(r) {
+      spRpc('sp_manager_issue_setup_code', { p_name: name }).then(function(r) {
         if (!r.ok || !r.data) failed.push(name);
+        else codes.push(name + ': ' + r.data);
       }).catch(function() { failed.push(name); }).then(function() {
         done++;
         if (done === names.length) {
+          if (codes.length) alert('Setup codes (write these down, they won\'t be shown again):\n\n' + codes.sort().join('\n'));
           spToast(failed.length ? ('Reset ' + (names.length - failed.length) + ' of ' + names.length + ' — failed: ' + failed.join(', ')) : ('Reset all ' + names.length + ' staff passwords.'));
         }
       });
@@ -9583,10 +9546,13 @@ function _refreshJobLinkList() {
         label.textContent = row.label || '(no label)';
         var sub = document.createElement('div');
         sub.className = 'job-item-info';
-        sub.textContent = row.revoked ? 'Revoked' : 'Active — created ' + new Date(row.created_at).toLocaleDateString('en-GB');
+        var expired = new Date(row.expires_at) <= new Date();
+        sub.textContent = row.revoked ? 'Revoked'
+          : expired ? 'Expired ' + new Date(row.expires_at).toLocaleDateString('en-GB')
+          : 'Active — expires ' + new Date(row.expires_at).toLocaleDateString('en-GB');
         info.appendChild(label); info.appendChild(sub);
         item.appendChild(info);
-        if (!row.revoked) {
+        if (!row.revoked && !expired) {
           var revokeBtn = document.createElement('button');
           revokeBtn.className = 'job-del-btn'; revokeBtn.title = 'Revoke';
           revokeBtn.innerHTML = '&#x1F5D1;';

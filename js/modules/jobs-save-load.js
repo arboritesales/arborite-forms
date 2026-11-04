@@ -80,74 +80,25 @@ function fetchJobList() {
     });
 }
 
-var _pendingDeleteRef = null;
-var _pendingDeleteIsTBT = false;
-var _pendingDeleteIsAudit = false;
+function _managerOnlyDelete(what) {
+  if (managerUnlocked) return true;
+  alert('Only the Manager login can delete ' + what + '. Log out and sign in with the Manager password.');
+  return false;
+}
 
 function deleteJob(ref) {
-  if (managerUnlocked) {
-    if (confirm('Delete this job? This cannot be undone.')) _executeDelete(ref, false, false);
-    return;
-  }
-  _pendingDeleteRef = ref;
-  _pendingDeleteIsTBT = false;
-  _pendingDeleteIsAudit = false;
-  hideModals();
-  document.getElementById('deletePassInput').value = '';
-  document.getElementById('deletePassErr').textContent = '';
-  document.getElementById('deletePassModal').className = 'modal-bg show';
+  if (!_managerOnlyDelete('jobs')) return;
+  if (confirm('Delete this job? This cannot be undone.')) _executeDelete(ref, false, false);
 }
 
 function deleteTBT(ref) {
-  if (managerUnlocked) {
-    if (confirm('Delete this toolbox talk? This cannot be undone.')) _executeDelete(ref, true, false);
-    return;
-  }
-  _pendingDeleteRef = ref;
-  _pendingDeleteIsTBT = true;
-  _pendingDeleteIsAudit = false;
-  document.getElementById('deletePassInput').value = '';
-  document.getElementById('deletePassErr').textContent = '';
-  document.getElementById('deletePassModal').className = 'modal-bg show';
+  if (!_managerOnlyDelete('toolbox talks')) return;
+  if (confirm('Delete this toolbox talk? This cannot be undone.')) _executeDelete(ref, true, false);
 }
 
 function deleteAudit(ref) {
-  if (managerUnlocked) {
-    if (confirm('Delete this audit? This cannot be undone.')) _executeDelete(ref, false, true);
-    return;
-  }
-  _pendingDeleteRef = ref;
-  _pendingDeleteIsTBT = false;
-  _pendingDeleteIsAudit = true;
-  document.getElementById('deletePassInput').value = '';
-  document.getElementById('deletePassErr').textContent = '';
-  document.getElementById('deletePassModal').className = 'modal-bg show';
-}
-
-function hideDeleteModal() {
-  document.getElementById('deletePassModal').className = 'modal-bg';
-  _pendingDeleteRef = null;
-  _pendingDeleteIsTBT = false;
-  _pendingDeleteIsAudit = false;
-}
-
-function confirmDeletePass() {
-  var p = document.getElementById('deletePassInput').value;
-  if (p !== '2001') {
-    document.getElementById('deletePassErr').textContent = 'Incorrect password — please try again.';
-    document.getElementById('deletePassInput').value = '';
-    document.getElementById('deletePassInput').focus();
-    return;
-  }
-  document.getElementById('deletePassModal').className = 'modal-bg';
-  hideModals();
-  var ref = _pendingDeleteRef;
-  var isTBT = _pendingDeleteIsTBT;
-  var isAudit = _pendingDeleteIsAudit;
-  _pendingDeleteRef = null;
-  _pendingDeleteIsTBT = false;
-  _pendingDeleteIsAudit = false;
-  _executeDelete(ref, isTBT, isAudit);
+  if (!_managerOnlyDelete('audits')) return;
+  if (confirm('Delete this audit? This cannot be undone.')) _executeDelete(ref, false, true);
 }
 
 function _executeDelete(ref, isTBT, isAudit) {

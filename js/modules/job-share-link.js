@@ -82,10 +82,13 @@ function _refreshJobLinkList() {
         label.textContent = row.label || '(no label)';
         var sub = document.createElement('div');
         sub.className = 'job-item-info';
-        sub.textContent = row.revoked ? 'Revoked' : 'Active — created ' + new Date(row.created_at).toLocaleDateString('en-GB');
+        var expired = new Date(row.expires_at) <= new Date();
+        sub.textContent = row.revoked ? 'Revoked'
+          : expired ? 'Expired ' + new Date(row.expires_at).toLocaleDateString('en-GB')
+          : 'Active — expires ' + new Date(row.expires_at).toLocaleDateString('en-GB');
         info.appendChild(label); info.appendChild(sub);
         item.appendChild(info);
-        if (!row.revoked) {
+        if (!row.revoked && !expired) {
           var revokeBtn = document.createElement('button');
           revokeBtn.className = 'job-del-btn'; revokeBtn.title = 'Revoke';
           revokeBtn.innerHTML = '&#x1F5D1;';

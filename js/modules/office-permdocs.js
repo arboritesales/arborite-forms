@@ -14,15 +14,17 @@ function openOffice() {
 
 function confirmOfficePass() {
   var p = document.getElementById('officePassInput').value;
-  if (p === 'office2024') {
-    officeUnlocked = true;
-    document.getElementById('officePassModal').className = 'modal-bg';
-    showOfficeView();
-  } else {
-    document.getElementById('officePassErr').textContent = 'Incorrect password — please try again.';
-    document.getElementById('officePassInput').value = '';
-    document.getElementById('officePassInput').focus();
-  }
+  _verifyOfficeCode('office', p, function(ok) {
+    if (ok) {
+      officeUnlocked = true;
+      document.getElementById('officePassModal').className = 'modal-bg';
+      showOfficeView();
+    } else {
+      document.getElementById('officePassErr').textContent = 'Incorrect password, or no connection — please try again.';
+      document.getElementById('officePassInput').value = '';
+      document.getElementById('officePassInput').focus();
+    }
+  });
 }
 
 function hideOfficeModal() {
