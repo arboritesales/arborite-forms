@@ -339,7 +339,7 @@ function spDoClock(action) {
         note.textContent = '📍 Clocked ' + (action === 'in' ? 'in' : 'out') + ' without a location — ' + reason + '.';
       }
       spRenderClockStatus(action === 'in');
-      spRenderOnsite();
+      spRenderOnsite(true);
     }).catch(function() { btn1.disabled = false; btn2.disabled = false; spToast('Connection error — try again.'); });
   });
 }
@@ -349,7 +349,7 @@ function spDoClock(action) {
 function spRenderClockStatus(isOn) {
   var pill = document.getElementById('spClockPill');
   pill.className = 'sp-pill ' + (isOn ? 'on' : 'off');
-  pill.textContent = isOn ? 'On site' : 'Clocked out';
+  pill.textContent = isOn ? 'Clocked in' : 'Clocked out';
   var inBtn = document.getElementById('spClockInBtn'), outBtn = document.getElementById('spClockOutBtn');
   if (inBtn && outBtn) {
     inBtn.classList.toggle('sp-secondary', isOn);
@@ -358,6 +358,15 @@ function spRenderClockStatus(isOn) {
     if (isOn) inBtn.parentNode.insertBefore(outBtn, inBtn);
     else inBtn.parentNode.insertBefore(inBtn, outBtn);
   }
+}
+
+// Status not known (still asking, or the lookup failed) — never shown as
+// "Clocked out", which would be a false reading.
+function spRenderClockUnknown(text) {
+  var pill = document.getElementById('spClockPill');
+  if (!pill) return;
+  pill.className = 'sp-pill off';
+  pill.textContent = text;
 }
 
 function spRenderClockTime() {
@@ -370,11 +379,28 @@ function spRenderClockTime() {
 // "On site now": everyone signed in to the portal, and Staff Dashboards. The
 // manager has no staff session, so p_token is null and the server checks the
 // Manager login instead.
-function spRenderOnsite() {
+// afterClock: the person has just pressed Clock In/Out, so the status already
+// shows what they pressed and this lookup only refreshes the on-site list.
+var _spOnsiteLookup = 0;
+function spRenderOnsite(afterClock) {
   var elList = [document.getElementById('spOnsiteList'), document.getElementById('spMgrOnsite')].filter(Boolean);
   if (!elList.length) return;
+  var lookup = ++_spOnsiteLookup; // a slower, older answer must not overwrite a newer one
+  function lookupFailed() {
+    if (lookup !== _spOnsiteLookup) return;
+    elList.forEach(function(el) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">Could not check who is on site — try again.</div>'; });
+    if (!afterClock) spRenderClockUnknown('Could not check');
+  }
+  if (!afterClock) spRenderClockUnknown('Checking…');
   spRpc('sp_onsite_now', { p_token: spSessionToken }).then(function(res) {
-    var onsite = res.ok && Array.isArray(res.data) ? res.data : [];
+    if (lookup !== _spOnsiteLookup) return;
+    if (!res.ok || !Array.isArray(res.data)) {
+      var msg = (res.data && res.data.message) || '';
+      if (/session expired/i.test(msg) && spSessionToken) { spLogout(msg); return; }
+      lookupFailed();
+      return;
+    }
+    var onsite = res.data;
     var html = onsite.length
       ? onsite.map(function(o) {
           var t = new Date(o.since);
@@ -383,10 +409,10 @@ function spRenderOnsite() {
         }).join('')
       : '<div style="color:var(--mid);font-size:12px;">Nobody currently clocked in.</div>';
     elList.forEach(function(el) { el.innerHTML = html; });
-    if (document.getElementById('spClockPill')) {
+    if (!afterClock && document.getElementById('spClockPill')) {
       spRenderClockStatus(onsite.some(function(o) { return o.name === spSessionName; }));
     }
-  }).catch(function() {});
+  }).catch(lookupFailed);
 }
 
 // ── MY LEAVE ──
