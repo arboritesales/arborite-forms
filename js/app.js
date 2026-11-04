@@ -3811,7 +3811,7 @@ var CHECK_CATEGORIES = {
     label: 'Chainsaws', icon: '🪚', table: 'chainsaw_checks',
     group: 'handtools', machineLabel: 'Select Machine',
     ratingHeading: 'Overall condition of the machine?',
-    machines: ['MS201 Jason', 'MS201 Jack', 'MS201 Luke', 'MS201 James', 'MS194T Jason', 'MS261 Luke', 'MS261 Jack', 'MS261 Jason', 'MS261 Liam Cooper', 'MS261 Liam Couling', 'MS261 James', 'MS261 Olly', 'MS500I Luke', 'MS500I Jack', 'MS500I Jason', 'MS500I Dave', 'MS660', 'MS880'],
+    machines: ['MS201 Jason', 'MS201 Jack', 'MS201 Luke', 'MS201 James', 'MS201 Liam Cooper', 'MS194T Jason', 'MS261 Luke', 'MS261 Jack', 'MS261 Jason', 'MS261 Liam Cooper', 'MS261 Liam Couling', 'MS261 James', 'MS261 Olly', 'MS500I Luke', 'MS500I Jack', 'MS500I Jason', 'MS500I Dave', 'MS660', 'MS880'],
     fields: [
       {key:'guidebar', label:'Guidebar condition?', options:['Good','Fair','Poor']},
       {key:'safety_features', label:'All safety features present in accordance with industry good practice?', options:['Yes','No']},
