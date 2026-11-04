@@ -36,12 +36,12 @@ function fetchAuditList() {
         var auditor = (row.form_data && row.form_data.aud_auditor) ? row.form_data.aud_auditor : '';
         var ref = row.quote_ref;
         var mainLine = site ? site : ref;
-        var subLine = (auditor ? auditor + ' &nbsp;·&nbsp; ' : '') + (site ? ref + ' &nbsp;·&nbsp; ' : '') + d;
-        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadAudit(\'' + ref + '\')">'
-          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+        var subLine = (auditor ? _esc(auditor) + ' &nbsp;·&nbsp; ' : '') + (site ? _esc(ref) + ' &nbsp;·&nbsp; ' : '') + d;
+        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadAudit(\'' + _escJs(ref) + '\')">'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + _esc(mainLine) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
-          + '<button onclick="event.stopPropagation();deleteAudit(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
+          + '<button onclick="event.stopPropagation();deleteAudit(\'' + _escJs(ref) + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
           + '</div>'
           + '</div>';

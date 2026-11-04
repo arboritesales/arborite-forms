@@ -14,8 +14,6 @@ if (typeof console === 'undefined') {
 if (typeof console.assert !== 'function') { console.assert = function(){}; }
 
 // ── AUTH ──
-var AUDIT_PASS = 'audit2024';
-var auditUnlocked = false;
 var _supaSession = null;
 var _supaSessionRefreshTimer = null;
 function _storeSession(data) {
@@ -141,6 +139,19 @@ function checkPass(mode) {
 }
 
 
+
+// ── SAFE DISPLAY ──
+// Anything saved by a user must go through these before being put into
+// innerHTML — otherwise saved text could run as code in whoever opens it.
+function _esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+// For a value inside a single-quoted string in an onclick="..." attribute
+function _escJs(s) {
+  return _esc(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+}
 
 // ── CONFIG ──
 var SUPA_URL = 'https://labskiotmfvdgcfbhbbl.supabase.co';
@@ -3282,15 +3293,15 @@ function fetchVehList() {
       var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
       var badgeHtml = _isUnfinishedCheck(r)
         ? '<span class="veh-list-badge" style="background:#5a5a50;color:#fff;">&#9203; Not finished</span>'
-        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + r.overall_rating + '</span>';
+        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + _esc(r.overall_rating) + '</span>';
       var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
       var miles = r.mileage ? Number(r.mileage).toLocaleString() + ' miles' : '';
       return '<div class="veh-list-entry" onclick="openVehRecord(\'' + r.id + '\')">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
-        + '<span class="veh-list-reg">' + (r.vehicle || 'Unknown') + '</span>'
+        + '<span class="veh-list-reg">' + _esc(r.vehicle || 'Unknown') + '</span>'
         + badgeHtml
         + '</div>'
-        + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + (miles ? ' · ' + miles : '') + '</div>'
+        + '<div class="veh-list-meta">' + _esc(r.inspector_name) + (dateStr ? ' · ' + dateStr : '') + (miles ? ' · ' + miles : '') + '</div>'
         + '<div style="font-size:11px;color:rgba(126,200,32,.6);margin-top:4px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">🔒 Tap to view</div>'
         + '</div>';
     }).join('');
@@ -3380,7 +3391,7 @@ function loadVehRecord(id) {
     if (!rows || !rows[0]) {
       console.error('vehicle_checks load failed for id=' + id, rows);
       var reason = (rows && (rows.message || rows.hint || rows.code)) ? (rows.message || rows.hint || rows.code) : 'No record returned';
-      document.getElementById('vehDetailContent').innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record<br><span style="font-size:11px;opacity:.7;">' + reason + '</span></div>';
+      document.getElementById('vehDetailContent').innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record<br><span style="font-size:11px;opacity:.7;">' + _esc(reason) + '</span></div>';
       return;
     }
     var d = rows[0];
@@ -3395,21 +3406,23 @@ function loadVehRecord(id) {
       if (!f[1]) return '';
       var val = f[1];
       var colour = '';
-      if (f[2]) val = String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
-      else if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
-      else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
-      else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
+      if (!f[2]) {
+        if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
+        else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
+        else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
+      }
+      val = _esc(val).replace(/\n/g,'<br>');
       return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;' + colour + '">' + val + '</div></div>';
     }).filter(Boolean).join('');
 
     document.getElementById('vehDetailContent').innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding:0 4px;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:white;">' + (d.vehicle || '') + '</div>'
-      + '<span class="veh-list-badge ' + badgeCls + '">' + (d.overall_rating || '') + '</span>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:white;">' + _esc(d.vehicle) + '</div>'
+      + '<span class="veh-list-badge ' + badgeCls + '">' + _esc(d.overall_rating) + '</span>'
       + '</div>'
-      + '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;padding:0 4px;">' + (d.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + '</div>'
+      + '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;padding:0 4px;">' + _esc(d.inspector_name) + (dateStr ? ' · ' + dateStr : '') + '</div>'
       + '<div style="background:white;border-radius:8px;overflow:hidden;margin-bottom:14px;">' + rows_html + '</div>'
-      + (d.remedial_notes ? '<div style="background:#2b2b2b;border-radius:8px;padding:14px 16px;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Remedial Notes</div><div style="font-size:13px;color:white;line-height:1.6;">' + d.remedial_notes + '</div></div>' : '');
+      + (d.remedial_notes ? '<div style="background:#2b2b2b;border-radius:8px;padding:14px 16px;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Remedial Notes</div><div style="font-size:13px;color:white;line-height:1.6;">' + _esc(d.remedial_notes) + '</div></div>' : '');
   })
   .catch(function() {
     document.getElementById('vehDetailContent').innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Failed to load</div>';
@@ -4486,14 +4499,14 @@ function fetchCatList(cat) {
       var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
       var badgeHtml = _isUnfinishedCheck(r)
         ? '<span class="veh-list-badge" style="background:#5a5a50;color:#fff;">&#9203; Not finished</span>'
-        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + r.overall_rating + '</span>';
+        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + _esc(r.overall_rating) + '</span>';
       var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
       return '<div class="veh-list-entry" onclick="openCatRecord(\'' + cat + '\',\'' + r.id + '\')">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
-        + '<span class="veh-list-reg">' + (r.machine || 'Unknown') + '</span>'
+        + '<span class="veh-list-reg">' + _esc(r.machine || 'Unknown') + '</span>'
         + badgeHtml
         + '</div>'
-        + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + '</div>'
+        + '<div class="veh-list-meta">' + _esc(r.inspector_name) + (dateStr ? ' · ' + dateStr : '') + '</div>'
         + '<div style="font-size:11px;color:rgba(126,200,32,.6);margin-top:4px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">🔒 Tap to view</div>'
         + '</div>';
     }).join('');
@@ -4550,7 +4563,7 @@ function loadCatRecord(cat, id) {
     if (!rows || !rows[0]) {
       console.error(cfg.table + ' load failed for id=' + id, rows);
       var reason = (rows && (rows.message || rows.hint || rows.code)) ? (rows.message || rows.hint || rows.code) : 'No record returned';
-      contentEl.innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record<br><span style="font-size:11px;opacity:.7;">' + reason + '</span></div>';
+      contentEl.innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record<br><span style="font-size:11px;opacity:.7;">' + _esc(reason) + '</span></div>';
       return;
     }
     var d = rows[0];
@@ -4565,21 +4578,23 @@ function loadCatRecord(cat, id) {
       if (!f[1] && f[1] !== 0) return '';
       var val = f[1];
       var colour = '';
-      if (f[2]) val = String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
-      else if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
-      else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
-      else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
+      if (!f[2]) {
+        if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
+        else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
+        else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
+      }
+      val = _esc(val).replace(/\n/g,'<br>');
       return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;' + colour + '">' + val + '</div></div>';
     }).filter(Boolean).join('');
 
     contentEl.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding:0 4px;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:white;">' + (d.machine || '') + '</div>'
-      + '<span class="veh-list-badge ' + badgeCls + '">' + (d.overall_rating || '') + '</span>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:white;">' + _esc(d.machine) + '</div>'
+      + '<span class="veh-list-badge ' + badgeCls + '">' + _esc(d.overall_rating) + '</span>'
       + '</div>'
-      + '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;padding:0 4px;">' + (d.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + '</div>'
+      + '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;padding:0 4px;">' + _esc(d.inspector_name) + (dateStr ? ' · ' + dateStr : '') + '</div>'
       + '<div style="background:white;border-radius:8px;overflow:hidden;margin-bottom:14px;">' + rows_html + '</div>'
-      + (d.remedial_notes ? '<div style="background:#2b2b2b;border-radius:8px;padding:14px 16px;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Remedial Notes</div><div style="font-size:13px;color:white;line-height:1.6;">' + d.remedial_notes + '</div></div>' : '');
+      + (d.remedial_notes ? '<div style="background:#2b2b2b;border-radius:8px;padding:14px 16px;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Remedial Notes</div><div style="font-size:13px;color:white;line-height:1.6;">' + _esc(d.remedial_notes) + '</div></div>' : '');
   })
   .catch(function() {
     document.getElementById('catDetailContent_' + cat).innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Failed to load</div>';
@@ -4730,15 +4745,15 @@ function closeSurveyReport() {
 function renderSurveyReport(data) {
   var flaggedHtml = data.flagged.length
     ? data.flagged.map(function(f) {
-        return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;color:#c62828;font-weight:700;">' + f[1] + '</div></div>';
+        return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;color:#c62828;font-weight:700;">' + _esc(f[1]) + '</div></div>';
       }).join('')
     : '<div style="padding:20px;text-align:center;color:#2d5a1b;font-weight:700;">&#10003; Everything scored top marks — nothing flagged.</div>';
 
   document.getElementById('surveyReportContent').innerHTML =
     '<div style="text-align:center;padding:0 0 16px;"><img src="arborite-logo-192.png" style="height:56px;" alt="Arborite"></div>'
     + '<div style="text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:#222;margin-bottom:2px;">Survey Report</div>'
-    + '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:6px;">' + data.title + '</div>'
-    + '<div style="text-align:center;font-size:12px;color:#888;margin-bottom:20px;">' + (data.inspector ? data.inspector + ' &middot; ' : '') + data.dateStr + '</div>'
+    + '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:6px;">' + _esc(data.title) + '</div>'
+    + '<div style="text-align:center;font-size:12px;color:#888;margin-bottom:20px;">' + (data.inspector ? _esc(data.inspector) + ' &middot; ' : '') + data.dateStr + '</div>'
     + '<div style="display:flex;justify-content:center;margin-bottom:10px;">' + _surveyChartSVG(data.counts) + '</div>'
     + '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:24px;">'
       + data.counts.good + ' Good &nbsp;&middot;&nbsp; ' + data.counts.fair + ' Fair &nbsp;&middot;&nbsp; ' + data.counts.poor + ' Poor'
@@ -4942,14 +4957,14 @@ function renderDefectsList(defects) {
   listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px;">' + defects.map(function(e) {
     var isFixed = e.defectStatus === 'fixed';
     var thumbs = (e.defectImages || []).map(function(p) {
-      return '<img data-defect-path="' + p.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();openDefectLightbox(this)" style="width:42px;height:42px;border-radius:5px;object-fit:cover;background:rgba(255,255,255,.08);cursor:pointer;">';
+      return '<img data-defect-path="' + _esc(p) + '" onclick="event.stopPropagation();openDefectLightbox(this)" style="width:42px;height:42px;border-radius:5px;object-fit:cover;background:rgba(255,255,255,.08);cursor:pointer;">';
     }).join('');
     return '<div style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;-webkit-tap-highlight-color:transparent;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')">'
       + '<div style="flex:1;min-width:0;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:white;letter-spacing:.5px;">' + e.name + '</div>'
-      + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + e.categoryLabel + (e.inspector ? ' &middot; ' + e.inspector : '') + ' &middot; ' + e.dateStr + '</div>'
-      + (e.defectComment ? '<div style="font-size:12.5px;color:rgba(255,255,255,.85);margin-top:8px;line-height:1.5;">' + e.defectComment + '</div>' : '')
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:white;letter-spacing:.5px;">' + _esc(e.name) + '</div>'
+      + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + _esc(e.categoryLabel) + (e.inspector ? ' &middot; ' + _esc(e.inspector) : '') + ' &middot; ' + e.dateStr + '</div>'
+      + (e.defectComment ? '<div style="font-size:12.5px;color:rgba(255,255,255,.85);margin-top:8px;line-height:1.5;">' + _esc(e.defectComment) + '</div>' : '')
       + (thumbs ? '<div style="display:flex;gap:6px;margin-top:8px;">' + thumbs + '</div>' : '')
       + '</div>'
       + '<div style="font-size:22px;color:rgba(255,255,255,.4);flex-shrink:0;">&#8250;</div>'
@@ -4959,7 +4974,7 @@ function renderDefectsList(defects) {
       + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (isFixed ? 'background:#7ec820;color:#1a3210;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Resolved</button>'
       + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'not_fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (!isFixed ? 'background:#c62828;color:white;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Not Resolved</button>'
       + '</div>'
-      + '<textarea placeholder="Office note — e.g. what was done to fix it" oninput="scheduleDefectNoteSave(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',this)" style="width:100%;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:7px 9px;font-size:12.5px;font-family:\'Barlow\',sans-serif;background:rgba(255,255,255,.05);color:white;resize:vertical;min-height:36px;">' + e.officeNote + '</textarea>'
+      + '<textarea placeholder="Office note — e.g. what was done to fix it" oninput="scheduleDefectNoteSave(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',this)" style="width:100%;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:7px 9px;font-size:12.5px;font-family:\'Barlow\',sans-serif;background:rgba(255,255,255,.05);color:white;resize:vertical;min-height:36px;">' + _esc(e.officeNote) + '</textarea>'
       + '</div>'
       + '</div>';
   }).join('') + '</div>';
@@ -5353,7 +5368,7 @@ function renderScheduleGrid() {
           var mark = it.not_in_use ? '&#9208; ' : it.completed ? '&#10003; ' : isMissed ? '&#10007; ' : isCarried ? '&#8635; ' : '';
           var bg = it.not_in_use ? '#ececea' : it.completed ? '#d7ecc9' : isMissed ? '#f6dede' : isCarried ? '#fdf0d5' : '#e8f2e3';
           var fg = it.not_in_use ? '#55554d' : isMissed ? '#8a1c1c' : isCarried ? '#7a4d00' : '#2d5a1b';
-          return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + bg + ';color:' + fg + ';line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + mark + meta.icon + ' ' + (it.machine || '') + '</div>';
+          return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + bg + ';color:' + fg + ';line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + mark + meta.icon + ' ' + _esc(it.machine) + '</div>';
         }).join('')
       + '</div>'
       + '<button class="sched-day-action" onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10.5px;font-weight:700;border-radius:4px;padding:5px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (total === 0 ? (managerUnlocked ? '+ Add' : 'Nothing') : 'View (' + total + ') ›') + '</button>'
@@ -5402,7 +5417,7 @@ function renderScheduleModalList() {
   }
   wrap.innerHTML = items.map(function(it) {
     var meta = checksCategoryMeta(it.category);
-    var machineEsc = (it.machine || '').replace(/'/g, "\\'");
+    var machineEsc = _escJs(it.machine);
     var doneBadge = it.not_in_use
       ? '<span style="font-size:10.5px;font-weight:800;color:#55554d;background:#ececea;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#9208; Not in use</span>'
       : '<span style="font-size:10.5px;font-weight:800;color:#2d5a1b;background:#e8f2e3;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10003; Completed</span>';
@@ -5433,7 +5448,7 @@ function renderScheduleModalList() {
     }
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e0e0d8;font-size:12.5px;">'
       + '<span style="font-size:16px;">' + meta.icon + '</span>'
-      + '<span style="flex:1;">' + meta.label + ' — ' + (it.machine || '') + overdueTag + '</span>'
+      + '<span style="flex:1;">' + _esc(meta.label) + ' — ' + _esc(it.machine) + overdueTag + '</span>'
       + actionHtml
       + '</div>';
   }).join('');
@@ -5665,7 +5680,7 @@ function renderWeeklyReport(entries, tables, notInUse) {
     + '</div>'
     + (unfinished.length
       ? '<div style="background:rgba(255,255,255,.1);border-radius:7px;padding:10px 14px;margin-bottom:16px;font-size:12.5px;color:rgba(255,255,255,.8);">&#9203; ' + unfinished.length + ' started but not finished (not counted): '
-        + unfinished.map(function(e) { return e.label + ' — ' + (e.name || 'Unknown') + (e.inspector ? ' (' + e.inspector + ')' : ''); }).join(', ') + '</div>'
+        + unfinished.map(function(e) { return _esc(e.label) + ' — ' + _esc(e.name || 'Unknown') + (e.inspector ? ' (' + _esc(e.inspector) + ')' : ''); }).join(', ') + '</div>'
       : '');
 
   var barsHtml = bars.map(function(b) {
@@ -5673,7 +5688,7 @@ function renderWeeklyReport(entries, tables, notInUse) {
     if (!c) return '';
     var pct = Math.round((c / maxCatCount) * 100);
     return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12.5px;">'
-      + '<div style="width:120px;flex-shrink:0;color:var(--mid);">' + b.label + '</div>'
+      + '<div style="width:120px;flex-shrink:0;color:var(--mid);">' + _esc(b.label) + '</div>'
       + '<div style="flex:1;height:16px;background:#eee;border-radius:3px;overflow:hidden;"><div style="height:100%;border-radius:3px;background:var(--green);width:' + pct + '%;"></div></div>'
       + '<div style="width:28px;text-align:right;color:#8a8a7a;">' + c + '</div>'
       + '</div>';
@@ -5683,8 +5698,8 @@ function renderWeeklyReport(entries, tables, notInUse) {
     ? '<ul style="list-style:none;margin:0;padding:0;">' + entries.map(function(e) {
         var dateStr = e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '';
         return '<li style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;">'
-          + '<a href="#" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\');return false;" style="color:var(--green);text-decoration:none;font-weight:600;">' + e.label + (e.name ? ' — ' + e.name : '') + '</a>'
-          + '<span style="color:#8a8a7a;font-size:11.5px;">' + (e.inspector ? e.inspector + ' · ' : '') + dateStr + '</span>'
+          + '<a href="#" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\');return false;" style="color:var(--green);text-decoration:none;font-weight:600;">' + _esc(e.label) + (e.name ? ' — ' + _esc(e.name) : '') + '</a>'
+          + '<span style="color:#8a8a7a;font-size:11.5px;">' + (e.inspector ? _esc(e.inspector) + ' · ' : '') + dateStr + '</span>'
           + '</li>';
       }).join('') + '</ul>'
     : '<div style="color:#9a9a90;font-size:12.5px;padding:14px 0;text-align:center;">No checks completed this week.</div>';
@@ -5693,7 +5708,7 @@ function renderWeeklyReport(entries, tables, notInUse) {
     ? '<ul style="list-style:none;margin:0;padding:0;">' + notInUse.map(function(n) {
         var dateStr = new Date(n.not_in_use_at).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'});
         return '<li style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;">'
-          + '<span style="font-weight:600;color:#333;">' + checksCategoryMeta(n.category).icon + ' ' + checksCategoryMeta(n.category).label + ' — ' + (n.machine || '') + '</span>'
+          + '<span style="font-weight:600;color:#333;">' + checksCategoryMeta(n.category).icon + ' ' + checksCategoryMeta(n.category).label + ' — ' + _esc(n.machine) + '</span>'
           + '<span style="color:#8a8a7a;font-size:11.5px;white-space:nowrap;">' + dateStr + '</span>'
           + '</li>';
       }).join('') + '</ul>'
@@ -5904,17 +5919,17 @@ function fetchTBTList() {
         var ref = row.quote_ref;
         // Build display: show topic as main heading if available, ref as secondary
         var mainLine = topic ? topic : ref;
-        var subLine = topic ? ref + ' &nbsp;·&nbsp; ' + d : 'Last saved: ' + d;
+        var subLine = topic ? _esc(ref) + ' &nbsp;·&nbsp; ' + d : 'Last saved: ' + d;
         if (typeof row.signed === 'number') {
           subLine += row.signed < TBT_MIN_SIGNATURES
             ? ' &nbsp;·&nbsp; <span style="color:#fac775;font-weight:700;">&#9888; ' + row.signed + ' of ' + TBT_MIN_SIGNATURES + ' signatures</span>'
             : ' &nbsp;·&nbsp; <span style="color:#b6e06e;">&#10003; ' + row.signed + ' signatures</span>';
         }
-        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadTBT(\'' + ref + '\')">'
-          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadTBT(\'' + _escJs(ref) + '\')">'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + _esc(mainLine) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
-          + '<button onclick="event.stopPropagation();deleteTBT(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
+          + '<button onclick="event.stopPropagation();deleteTBT(\'' + _escJs(ref) + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
           + '</div>'
           + '</div>';
@@ -6169,12 +6184,12 @@ function fetchAuditList() {
         var auditor = (row.form_data && row.form_data.aud_auditor) ? row.form_data.aud_auditor : '';
         var ref = row.quote_ref;
         var mainLine = site ? site : ref;
-        var subLine = (auditor ? auditor + ' &nbsp;·&nbsp; ' : '') + (site ? ref + ' &nbsp;·&nbsp; ' : '') + d;
-        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadAudit(\'' + ref + '\')">'
-          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+        var subLine = (auditor ? _esc(auditor) + ' &nbsp;·&nbsp; ' : '') + (site ? _esc(ref) + ' &nbsp;·&nbsp; ' : '') + d;
+        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadAudit(\'' + _escJs(ref) + '\')">'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + _esc(mainLine) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
-          + '<button onclick="event.stopPropagation();deleteAudit(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
+          + '<button onclick="event.stopPropagation();deleteAudit(\'' + _escJs(ref) + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
           + '</div>'
           + '</div>';
@@ -6727,16 +6742,16 @@ function fetchMSBList() {
         var d = row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
         var ref = row.quote_ref;
         var mainLine = job.titleOfDocument || job.client || ref;
-        var subLine = (job.titleOfDocument && job.client ? job.client + ' &nbsp;·&nbsp; ' : '') + (job.siteAddress ? job.siteAddress + ' &nbsp;·&nbsp; ' : '') + d;
+        var subLine = (job.titleOfDocument && job.client ? _esc(job.client) + ' &nbsp;·&nbsp; ' : '') + (job.siteAddress ? _esc(job.siteAddress) + ' &nbsp;·&nbsp; ' : '') + d;
         var badge = fd.status === 'sent'
           ? '<span class="msb-badge sent">Sent to Customer' + (fd.sentAt ? ' — ' + _msbFmtDate(fd.sentAt) : '') + '</span>'
           : '<span class="msb-badge draft">Draft</span>';
-        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadMSB(\'' + ref + '\')">'
-          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadMSB(\'' + _escJs(ref) + '\')">'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + _esc(mainLine) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div>'
           + '<div style="margin-top:6px;">' + badge + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
-          + '<button onclick="event.stopPropagation();deleteMSB(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
+          + '<button onclick="event.stopPropagation();deleteMSB(\'' + _escJs(ref) + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
           + '</div>'
           + '</div>';
@@ -6769,11 +6784,11 @@ function fetchMSBDeletedList() {
         var mainLine = job.titleOfDocument || job.client || ref;
         var deletedWhen = fd.deletedAt ? _msbFmtDate(fd.deletedAt) : '—';
         html += '<div style="background:#3a2010;border:1px solid rgba(255,150,80,.35);border-radius:8px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#ffb066;letter-spacing:.5px;">' + mainLine + '</div>'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#ffb066;letter-spacing:.5px;">' + _esc(mainLine) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">Deleted ' + deletedWhen + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-          + '<button onclick="restoreMSB(\'' + ref + '\')" class="btn btn-clear" style="padding:6px 12px;font-size:12px;">Restore</button>'
-          + '<button onclick="permanentlyDeleteMSB(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:12px;padding:6px 10px;cursor:pointer;">Delete Permanently</button>'
+          + '<button onclick="restoreMSB(\'' + _escJs(ref) + '\')" class="btn btn-clear" style="padding:6px 12px;font-size:12px;">Restore</button>'
+          + '<button onclick="permanentlyDeleteMSB(\'' + _escJs(ref) + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:12px;padding:6px 10px;cursor:pointer;">Delete Permanently</button>'
           + '</div>'
           + '</div>';
       }
@@ -8685,7 +8700,7 @@ function spRenderOnsite() {
       ? onsite.map(function(o) {
           var t = new Date(o.since);
           var hh = String(t.getHours()).padStart(2, '0'), mm = String(t.getMinutes()).padStart(2, '0');
-          return '<div class="sp-onsite-row"><span>' + o.name + '</span><span class="sp-onsite-time">since ' + hh + ':' + mm + '</span></div>';
+          return '<div class="sp-onsite-row"><span>' + spEsc(o.name) + '</span><span class="sp-onsite-time">since ' + hh + ':' + mm + '</span></div>';
         }).join('')
       : '<div style="color:var(--mid);font-size:12px;">Nobody currently clocked in.</div>';
     elList.forEach(function(el) { el.innerHTML = html; });

@@ -137,17 +137,17 @@ function fetchTBTList() {
         var ref = row.quote_ref;
         // Build display: show topic as main heading if available, ref as secondary
         var mainLine = topic ? topic : ref;
-        var subLine = topic ? ref + ' &nbsp;·&nbsp; ' + d : 'Last saved: ' + d;
+        var subLine = topic ? _esc(ref) + ' &nbsp;·&nbsp; ' + d : 'Last saved: ' + d;
         if (typeof row.signed === 'number') {
           subLine += row.signed < TBT_MIN_SIGNATURES
             ? ' &nbsp;·&nbsp; <span style="color:#fac775;font-weight:700;">&#9888; ' + row.signed + ' of ' + TBT_MIN_SIGNATURES + ' signatures</span>'
             : ' &nbsp;·&nbsp; <span style="color:#b6e06e;">&#10003; ' + row.signed + ' signatures</span>';
         }
-        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadTBT(\'' + ref + '\')">'
-          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadTBT(\'' + _escJs(ref) + '\')">'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + _esc(mainLine) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
-          + '<button onclick="event.stopPropagation();deleteTBT(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
+          + '<button onclick="event.stopPropagation();deleteTBT(\'' + _escJs(ref) + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
           + '</div>'
           + '</div>';

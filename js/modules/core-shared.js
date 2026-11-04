@@ -14,8 +14,6 @@ if (typeof console === 'undefined') {
 if (typeof console.assert !== 'function') { console.assert = function(){}; }
 
 // ── AUTH ──
-var AUDIT_PASS = 'audit2024';
-var auditUnlocked = false;
 var _supaSession = null;
 var _supaSessionRefreshTimer = null;
 function _storeSession(data) {
@@ -141,6 +139,19 @@ function checkPass(mode) {
 }
 
 
+
+// ── SAFE DISPLAY ──
+// Anything saved by a user must go through these before being put into
+// innerHTML — otherwise saved text could run as code in whoever opens it.
+function _esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+// For a value inside a single-quoted string in an onclick="..." attribute
+function _escJs(s) {
+  return _esc(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+}
 
 // ── CONFIG ──
 var SUPA_URL = 'https://labskiotmfvdgcfbhbbl.supabase.co';

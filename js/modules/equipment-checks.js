@@ -805,14 +805,14 @@ function fetchCatList(cat) {
       var badgeIcon = badgeCls === 'excellent' ? '✅' : badgeCls === 'unsatisfactory' ? '❌' : '⚠️';
       var badgeHtml = _isUnfinishedCheck(r)
         ? '<span class="veh-list-badge" style="background:#5a5a50;color:#fff;">&#9203; Not finished</span>'
-        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + r.overall_rating + '</span>';
+        : '<span class="veh-list-badge ' + badgeCls + '">' + badgeIcon + ' ' + _esc(r.overall_rating) + '</span>';
       var dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}) : '';
       return '<div class="veh-list-entry" onclick="openCatRecord(\'' + cat + '\',\'' + r.id + '\')">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
-        + '<span class="veh-list-reg">' + (r.machine || 'Unknown') + '</span>'
+        + '<span class="veh-list-reg">' + _esc(r.machine || 'Unknown') + '</span>'
         + badgeHtml
         + '</div>'
-        + '<div class="veh-list-meta">' + (r.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + '</div>'
+        + '<div class="veh-list-meta">' + _esc(r.inspector_name) + (dateStr ? ' · ' + dateStr : '') + '</div>'
         + '<div style="font-size:11px;color:rgba(126,200,32,.6);margin-top:4px;font-family:\'Barlow Condensed\',sans-serif;letter-spacing:.5px;">🔒 Tap to view</div>'
         + '</div>';
     }).join('');
@@ -869,7 +869,7 @@ function loadCatRecord(cat, id) {
     if (!rows || !rows[0]) {
       console.error(cfg.table + ' load failed for id=' + id, rows);
       var reason = (rows && (rows.message || rows.hint || rows.code)) ? (rows.message || rows.hint || rows.code) : 'No record returned';
-      contentEl.innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record<br><span style="font-size:11px;opacity:.7;">' + reason + '</span></div>';
+      contentEl.innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Could not load record<br><span style="font-size:11px;opacity:.7;">' + _esc(reason) + '</span></div>';
       return;
     }
     var d = rows[0];
@@ -884,21 +884,23 @@ function loadCatRecord(cat, id) {
       if (!f[1] && f[1] !== 0) return '';
       var val = f[1];
       var colour = '';
-      if (f[2]) val = String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
-      else if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
-      else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
-      else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
+      if (!f[2]) {
+        if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
+        else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
+        else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
+      }
+      val = _esc(val).replace(/\n/g,'<br>');
       return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;' + colour + '">' + val + '</div></div>';
     }).filter(Boolean).join('');
 
     contentEl.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding:0 4px;">'
-      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:white;">' + (d.machine || '') + '</div>'
-      + '<span class="veh-list-badge ' + badgeCls + '">' + (d.overall_rating || '') + '</span>'
+      + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:white;">' + _esc(d.machine) + '</div>'
+      + '<span class="veh-list-badge ' + badgeCls + '">' + _esc(d.overall_rating) + '</span>'
       + '</div>'
-      + '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;padding:0 4px;">' + (d.inspector_name || '') + (dateStr ? ' · ' + dateStr : '') + '</div>'
+      + '<div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:16px;padding:0 4px;">' + _esc(d.inspector_name) + (dateStr ? ' · ' + dateStr : '') + '</div>'
       + '<div style="background:white;border-radius:8px;overflow:hidden;margin-bottom:14px;">' + rows_html + '</div>'
-      + (d.remedial_notes ? '<div style="background:#2b2b2b;border-radius:8px;padding:14px 16px;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Remedial Notes</div><div style="font-size:13px;color:white;line-height:1.6;">' + d.remedial_notes + '</div></div>' : '');
+      + (d.remedial_notes ? '<div style="background:#2b2b2b;border-radius:8px;padding:14px 16px;margin-bottom:14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Remedial Notes</div><div style="font-size:13px;color:white;line-height:1.6;">' + _esc(d.remedial_notes) + '</div></div>' : '');
   })
   .catch(function() {
     document.getElementById('catDetailContent_' + cat).innerHTML = '<div style="color:#ff6b6b;padding:20px;text-align:center;">Failed to load</div>';

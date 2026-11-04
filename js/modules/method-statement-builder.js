@@ -334,16 +334,16 @@ function fetchMSBList() {
         var d = row.updated_at ? new Date(row.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
         var ref = row.quote_ref;
         var mainLine = job.titleOfDocument || job.client || ref;
-        var subLine = (job.titleOfDocument && job.client ? job.client + ' &nbsp;·&nbsp; ' : '') + (job.siteAddress ? job.siteAddress + ' &nbsp;·&nbsp; ' : '') + d;
+        var subLine = (job.titleOfDocument && job.client ? _esc(job.client) + ' &nbsp;·&nbsp; ' : '') + (job.siteAddress ? _esc(job.siteAddress) + ' &nbsp;·&nbsp; ' : '') + d;
         var badge = fd.status === 'sent'
           ? '<span class="msb-badge sent">Sent to Customer' + (fd.sentAt ? ' — ' + _msbFmtDate(fd.sentAt) : '') + '</span>'
           : '<span class="msb-badge draft">Draft</span>';
-        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadMSB(\'' + ref + '\')">'
-          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + mainLine + '</div>'
+        html += '<div style="background:#305818;border:1px solid rgba(126,200,32,.4);border-radius:8px;padding:16px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;" onclick="loadMSB(\'' + _escJs(ref) + '\')">'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#7ec820;letter-spacing:.5px;">' + _esc(mainLine) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">' + subLine + '</div>'
           + '<div style="margin-top:6px;">' + badge + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">'
-          + '<button onclick="event.stopPropagation();deleteMSB(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
+          + '<button onclick="event.stopPropagation();deleteMSB(\'' + _escJs(ref) + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:14px;padding:3px 8px;cursor:pointer;line-height:1.4;" title="Delete">&#x1F5D1;</button>'
           + '<div style="font-size:22px;color:rgba(126,200,32,.6);">&#8250;</div>'
           + '</div>'
           + '</div>';
@@ -376,11 +376,11 @@ function fetchMSBDeletedList() {
         var mainLine = job.titleOfDocument || job.client || ref;
         var deletedWhen = fd.deletedAt ? _msbFmtDate(fd.deletedAt) : '—';
         html += '<div style="background:#3a2010;border:1px solid rgba(255,150,80,.35);border-radius:8px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#ffb066;letter-spacing:.5px;">' + mainLine + '</div>'
+          + '<div style="flex:1;min-width:0;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#ffb066;letter-spacing:.5px;">' + _esc(mainLine) + '</div>'
           + '<div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;">Deleted ' + deletedWhen + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-          + '<button onclick="restoreMSB(\'' + ref + '\')" class="btn btn-clear" style="padding:6px 12px;font-size:12px;">Restore</button>'
-          + '<button onclick="permanentlyDeleteMSB(\'' + ref + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:12px;padding:6px 10px;cursor:pointer;">Delete Permanently</button>'
+          + '<button onclick="restoreMSB(\'' + _escJs(ref) + '\')" class="btn btn-clear" style="padding:6px 12px;font-size:12px;">Restore</button>'
+          + '<button onclick="permanentlyDeleteMSB(\'' + _escJs(ref) + '\')" style="background:none;border:1px solid rgba(255,100,100,.5);border-radius:3px;color:#ff8888;font-size:12px;padding:6px 10px;cursor:pointer;">Delete Permanently</button>'
           + '</div>'
           + '</div>';
       }

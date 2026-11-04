@@ -86,15 +86,15 @@ function closeSurveyReport() {
 function renderSurveyReport(data) {
   var flaggedHtml = data.flagged.length
     ? data.flagged.map(function(f) {
-        return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;color:#c62828;font-weight:700;">' + f[1] + '</div></div>';
+        return '<div class="field-row lw"><div class="fc lbl">' + f[0] + '</div><div class="fc" style="padding:10px 14px;color:#c62828;font-weight:700;">' + _esc(f[1]) + '</div></div>';
       }).join('')
     : '<div style="padding:20px;text-align:center;color:#2d5a1b;font-weight:700;">&#10003; Everything scored top marks — nothing flagged.</div>';
 
   document.getElementById('surveyReportContent').innerHTML =
     '<div style="text-align:center;padding:0 0 16px;"><img src="arborite-logo-192.png" style="height:56px;" alt="Arborite"></div>'
     + '<div style="text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:#222;margin-bottom:2px;">Survey Report</div>'
-    + '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:6px;">' + data.title + '</div>'
-    + '<div style="text-align:center;font-size:12px;color:#888;margin-bottom:20px;">' + (data.inspector ? data.inspector + ' &middot; ' : '') + data.dateStr + '</div>'
+    + '<div style="text-align:center;font-size:13px;color:#555;margin-bottom:6px;">' + _esc(data.title) + '</div>'
+    + '<div style="text-align:center;font-size:12px;color:#888;margin-bottom:20px;">' + (data.inspector ? _esc(data.inspector) + ' &middot; ' : '') + data.dateStr + '</div>'
     + '<div style="display:flex;justify-content:center;margin-bottom:10px;">' + _surveyChartSVG(data.counts) + '</div>'
     + '<div style="text-align:center;font-size:12px;color:#555;margin-bottom:24px;">'
       + data.counts.good + ' Good &nbsp;&middot;&nbsp; ' + data.counts.fair + ' Fair &nbsp;&middot;&nbsp; ' + data.counts.poor + ' Poor'

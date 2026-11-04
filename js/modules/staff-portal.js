@@ -374,7 +374,7 @@ function spRenderOnsite() {
       ? onsite.map(function(o) {
           var t = new Date(o.since);
           var hh = String(t.getHours()).padStart(2, '0'), mm = String(t.getMinutes()).padStart(2, '0');
-          return '<div class="sp-onsite-row"><span>' + o.name + '</span><span class="sp-onsite-time">since ' + hh + ':' + mm + '</span></div>';
+          return '<div class="sp-onsite-row"><span>' + spEsc(o.name) + '</span><span class="sp-onsite-time">since ' + hh + ':' + mm + '</span></div>';
         }).join('')
       : '<div style="color:var(--mid);font-size:12px;">Nobody currently clocked in.</div>';
     elList.forEach(function(el) { el.innerHTML = html; });

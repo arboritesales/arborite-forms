@@ -1,16 +1,15 @@
-const CACHE_NAME = 'arborite-field-forms-v1.9.93';
+const CACHE_NAME = 'arborite-field-forms-v1.9.94';
 const APP_SHELL = [
   './',
   './index.html',
-  './css/app.css?v=1.9.93',
-  './js/app.js?v=1.9.93',
+  './css/app.css?v=1.9.94',
+  './js/app.js?v=1.9.94',
   './manifest.json',
   './arborite-logo-192.png',
   './arborite-logo-512.png',
   './arborite-leaf.svg',
   './arborite-logo-full.svg',
   './crm/index.html',
-  './crm/data.json',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js',
@@ -88,8 +87,7 @@ self.addEventListener('fetch', event => {
   const isAppShell = event.request.mode === 'navigate'
     || url.includes('/app.js')
     || url.includes('/app.css')
-    || url.includes('index.html')
-    || url.includes('/crm/data.json');
+    || url.includes('index.html');
 
   if (isAppShell) {
     event.respondWith(networkFirstWithTimeout(event.request));

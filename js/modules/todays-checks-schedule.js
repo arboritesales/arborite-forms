@@ -360,7 +360,7 @@ function renderScheduleGrid() {
           var mark = it.not_in_use ? '&#9208; ' : it.completed ? '&#10003; ' : isMissed ? '&#10007; ' : isCarried ? '&#8635; ' : '';
           var bg = it.not_in_use ? '#ececea' : it.completed ? '#d7ecc9' : isMissed ? '#f6dede' : isCarried ? '#fdf0d5' : '#e8f2e3';
           var fg = it.not_in_use ? '#55554d' : isMissed ? '#8a1c1c' : isCarried ? '#7a4d00' : '#2d5a1b';
-          return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + bg + ';color:' + fg + ';line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + mark + meta.icon + ' ' + (it.machine || '') + '</div>';
+          return '<div style="font-size:11px;font-weight:700;padding:4px 6px;border-radius:3px;background:' + bg + ';color:' + fg + ';line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + mark + meta.icon + ' ' + _esc(it.machine) + '</div>';
         }).join('')
       + '</div>'
       + '<button class="sched-day-action" onclick="openScheduleDayModal(\'' + iso + '\')" style="margin-top:auto;background:none;border:1.5px dashed var(--border);color:var(--mid);font-size:10.5px;font-weight:700;border-radius:4px;padding:5px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;">' + (total === 0 ? (managerUnlocked ? '+ Add' : 'Nothing') : 'View (' + total + ') ›') + '</button>'
@@ -409,7 +409,7 @@ function renderScheduleModalList() {
   }
   wrap.innerHTML = items.map(function(it) {
     var meta = checksCategoryMeta(it.category);
-    var machineEsc = (it.machine || '').replace(/'/g, "\\'");
+    var machineEsc = _escJs(it.machine);
     var doneBadge = it.not_in_use
       ? '<span style="font-size:10.5px;font-weight:800;color:#55554d;background:#ececea;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#9208; Not in use</span>'
       : '<span style="font-size:10.5px;font-weight:800;color:#2d5a1b;background:#e8f2e3;padding:4px 10px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">&#10003; Completed</span>';
@@ -440,7 +440,7 @@ function renderScheduleModalList() {
     }
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e0e0d8;font-size:12.5px;">'
       + '<span style="font-size:16px;">' + meta.icon + '</span>'
-      + '<span style="flex:1;">' + meta.label + ' — ' + (it.machine || '') + overdueTag + '</span>'
+      + '<span style="flex:1;">' + _esc(meta.label) + ' — ' + _esc(it.machine) + overdueTag + '</span>'
       + actionHtml
       + '</div>';
   }).join('');
@@ -672,7 +672,7 @@ function renderWeeklyReport(entries, tables, notInUse) {
     + '</div>'
     + (unfinished.length
       ? '<div style="background:rgba(255,255,255,.1);border-radius:7px;padding:10px 14px;margin-bottom:16px;font-size:12.5px;color:rgba(255,255,255,.8);">&#9203; ' + unfinished.length + ' started but not finished (not counted): '
-        + unfinished.map(function(e) { return e.label + ' — ' + (e.name || 'Unknown') + (e.inspector ? ' (' + e.inspector + ')' : ''); }).join(', ') + '</div>'
+        + unfinished.map(function(e) { return _esc(e.label) + ' — ' + _esc(e.name || 'Unknown') + (e.inspector ? ' (' + _esc(e.inspector) + ')' : ''); }).join(', ') + '</div>'
       : '');
 
   var barsHtml = bars.map(function(b) {
@@ -680,7 +680,7 @@ function renderWeeklyReport(entries, tables, notInUse) {
     if (!c) return '';
     var pct = Math.round((c / maxCatCount) * 100);
     return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12.5px;">'
-      + '<div style="width:120px;flex-shrink:0;color:var(--mid);">' + b.label + '</div>'
+      + '<div style="width:120px;flex-shrink:0;color:var(--mid);">' + _esc(b.label) + '</div>'
       + '<div style="flex:1;height:16px;background:#eee;border-radius:3px;overflow:hidden;"><div style="height:100%;border-radius:3px;background:var(--green);width:' + pct + '%;"></div></div>'
       + '<div style="width:28px;text-align:right;color:#8a8a7a;">' + c + '</div>'
       + '</div>';
@@ -690,8 +690,8 @@ function renderWeeklyReport(entries, tables, notInUse) {
     ? '<ul style="list-style:none;margin:0;padding:0;">' + entries.map(function(e) {
         var dateStr = e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '';
         return '<li style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;">'
-          + '<a href="#" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\');return false;" style="color:var(--green);text-decoration:none;font-weight:600;">' + e.label + (e.name ? ' — ' + e.name : '') + '</a>'
-          + '<span style="color:#8a8a7a;font-size:11.5px;">' + (e.inspector ? e.inspector + ' · ' : '') + dateStr + '</span>'
+          + '<a href="#" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\');return false;" style="color:var(--green);text-decoration:none;font-weight:600;">' + _esc(e.label) + (e.name ? ' — ' + _esc(e.name) : '') + '</a>'
+          + '<span style="color:#8a8a7a;font-size:11.5px;">' + (e.inspector ? _esc(e.inspector) + ' · ' : '') + dateStr + '</span>'
           + '</li>';
       }).join('') + '</ul>'
     : '<div style="color:#9a9a90;font-size:12.5px;padding:14px 0;text-align:center;">No checks completed this week.</div>';
@@ -700,7 +700,7 @@ function renderWeeklyReport(entries, tables, notInUse) {
     ? '<ul style="list-style:none;margin:0;padding:0;">' + notInUse.map(function(n) {
         var dateStr = new Date(n.not_in_use_at).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'});
         return '<li style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;">'
-          + '<span style="font-weight:600;color:#333;">' + checksCategoryMeta(n.category).icon + ' ' + checksCategoryMeta(n.category).label + ' — ' + (n.machine || '') + '</span>'
+          + '<span style="font-weight:600;color:#333;">' + checksCategoryMeta(n.category).icon + ' ' + checksCategoryMeta(n.category).label + ' — ' + _esc(n.machine) + '</span>'
           + '<span style="color:#8a8a7a;font-size:11.5px;white-space:nowrap;">' + dateStr + '</span>'
           + '</li>';
       }).join('') + '</ul>'
