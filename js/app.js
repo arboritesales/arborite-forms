@@ -177,7 +177,7 @@ var JOB_LINK_TOKEN = null;
 
 function init() {
   CUSTOM_STAFF = []; CUSTOM_MACHINES = []; allJobs = []; currentJobRef = ''; pads = {}; drCount = 0; docStore = {};
-  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware", "Olly Key", "George Sim", "Shai Kelleher"];
+  STAFF    = ["Joe Grace", "Liam Cooper", "Liam Couling", "Jason Hiscock", "Jack Fisher", "Luke Richardson", "James Hilborn", "Dave Norris", "Jon Challinor", "Joel Cripps", "Brook Taylor-Ware", "Olly Key", "George Sim", "Shai Kelleher", "Graham Calvert"];
   MACHINES = ["ARB Team", "Kubota 2.7", "CC145", "Cutter", "LV800", "Climber", "MEWP", "Hinowa 2010", "TPF", "FSID74", "Sub Contractor"];
 }
 
@@ -3783,10 +3783,81 @@ var CHECK_CATEGORIES = {
       {key:'decals', label:'Are all warning decals present and clearly visible?', options:['Yes','No']}
     ]
   },
+  // Hand Held Tools — sub-tabs reached from the Hand Held Tools tile (group: 'handtools').
   handheld: {
-    label: 'Hand Held Tools', icon: '🔧', table: 'handheld_tool_checks',
+    label: 'Hand Held Tools', shortLabel: 'Hedgetrimmer, Brushcutter & Blower', icon: '🔧', table: 'handheld_tool_checks',
+    group: 'handtools',
     machineLabel: 'Serial / Reference / Model / Reg No',
     machines: ['Hedgetrimmer', 'Brushcutter', 'Blower'],
+    fields: [
+      {key:'used_since_last', label:'Has this machine been used since its last inspection?', options:['Yes','No']},
+      {key:'guards', label:'Are all the machine guards in place?', options:['Yes','No']},
+      {key:'fasteners', label:'Are all retaining nuts, bolts and fasteners present and secure?', options:['Yes','No']},
+      {key:'av_system', label:'AV system condition and/or function?', options:['Good','Fair','Poor']},
+      {key:'exhaust', label:'Exhaust system condition and function?', options:['Good','Fair','Poor']},
+      {key:'harness_point', label:'Harness attachment point secure?', options:['Yes','No','N/A']},
+      {key:'warning_stickers', label:'Warning stickers present?', options:['Yes','No']},
+      {key:'filler_caps', label:'No leaks from filler caps?', options:['Yes','No']},
+      {key:'air_filter', label:'Air filter clean and undamaged?', options:['Yes','No']},
+      {key:'cooling_ports', label:'Air cooling ports clear of debris?', options:['Yes','No']},
+      {key:'starter_cord', label:'Starter cord and housing inspected and condition noted?', options:['Good','Fair','Poor']},
+      {key:'throttle_interlock', label:'Throttle interlock and/or blade lock functions?', options:['Yes','No','Could not test at point of inspection']},
+      {key:'onoff_switch', label:'Clearly marked on/off system which is operable?', options:['Yes','No']},
+      {key:'blade_condition', label:'Overall blade condition?', options:['Good','Fair','Poor','N/A']},
+      {key:'grease_levels', label:'Grease levels?', options:['Correct','Too Low','Topped Up','N/A']}
+    ]
+  },
+  chainsaw: {
+    label: 'Chainsaws', icon: '🪚', table: 'chainsaw_checks',
+    group: 'handtools', machineLabel: 'Select Machine',
+    ratingHeading: 'Overall condition of the machine?',
+    machines: ['MS201 Jason', 'MS201 Jack', 'MS201 Luke', 'MS201 James', 'MS194T Jason', 'MS261 Luke', 'MS261 Jack', 'MS261 Jason', 'MS261 Liam Cooper', 'MS261 Liam Couling', 'MS261 James', 'MS261 Olly', 'MS500I Luke', 'MS500I Jack', 'MS500I Jason', 'MS500I Dave', 'MS660', 'MS880'],
+    fields: [
+      {key:'guidebar', label:'Guidebar condition?', options:['Good','Fair','Poor']},
+      {key:'safety_features', label:'All safety features present in accordance with industry good practice?', options:['Yes','No']},
+      {key:'chain_condition', label:'Chain condition and tension?', options:['Good','Fair','Poor']},
+      {key:'fasteners', label:'Are all the retaining nuts, bolts and fasteners present and secure?', options:['Yes','No']},
+      {key:'av_system', label:'AV system condition and/or function?', options:['Good','Fair','Poor']},
+      {key:'exhaust', label:'Exhaust system condition and function?', options:['Good','Fair','Poor']},
+      {key:'warning_stickers', label:'Warning stickers present?', options:['Yes','No']},
+      {key:'chain_catcher', label:'Chain catcher present?', options:['Yes','No']},
+      {key:'filler_caps', label:'No leaks from filler caps?', options:['Yes','No']},
+      {key:'cooling_ports', label:'Air cooling ports clear of debris?', options:['Yes','No']},
+      {key:'starter_cord', label:'Starter cord and housing inspected and condition noted?', options:['Good','Fair','Poor']},
+      {key:'sprocket_wear', label:'Sprocket wear within tolerance?', options:['Yes','No']},
+      {key:'throttle_interlock', label:'Throttle interlock functions?', options:['Yes','No','Could not test at point of inspection']},
+      {key:'chain_brake', label:'Chain brake function and condition?', options:['Good','Fair','Poor']},
+      {key:'onoff_switch', label:'Clearly marked on/off system which is operable?', options:['Yes','No']}
+    ]
+  },
+  polesaw: {
+    label: 'Pole Saw', icon: '🪚', table: 'pole_saw_checks',
+    group: 'handtools', machineLabel: 'Select Machine',
+    ratingHeading: 'Overall condition of the machine?',
+    machines: ['Pole Saw'],
+    fields: [
+      {key:'guidebar', label:'Guidebar condition?', options:['Good','Fair','Poor']},
+      {key:'telescopic_mechanism', label:'Is the telescopic extension mechanism functioning correctly, with all locking clamps secure?', options:['Yes','No']},
+      {key:'safety_features', label:'All safety features present in accordance with industry good practice?', options:['Yes','No']},
+      {key:'chain_condition', label:'Chain condition and tension?', options:['Good','Fair','Poor']},
+      {key:'fasteners', label:'Are all the retaining nuts, bolts and fasteners present and secure?', options:['Yes','No']},
+      {key:'av_system', label:'AV system condition and/or function?', options:['Good','Fair','Poor']},
+      {key:'exhaust', label:'Exhaust system condition and function?', options:['Good','Fair','Poor']},
+      {key:'warning_stickers', label:'Warning stickers present?', options:['Yes','No']},
+      {key:'chain_catcher', label:'Chain catcher present?', options:['Yes','No']},
+      {key:'filler_caps', label:'No leaks from filler caps?', options:['Yes','No']},
+      {key:'cooling_ports', label:'Air cooling ports clear of debris?', options:['Yes','No']},
+      {key:'starter_cord', label:'Starter cord and housing inspected and condition noted?', options:['Good','Fair','Poor']},
+      {key:'sprocket_wear', label:'Sprocket wear within tolerance?', options:['Yes','No']},
+      {key:'throttle_interlock', label:'Throttle interlock functions?', options:['Yes','No','Could not test at point of inspection']},
+      {key:'chain_brake', label:'Chain brake function and condition?', options:['Good','Fair','Poor']},
+      {key:'onoff_switch', label:'Clearly marked on/off system which is operable?', options:['Yes','No']}
+    ]
+  },
+  backpackblower: {
+    label: 'Backpack Blower', icon: '🍃', table: 'backpack_blower_checks',
+    group: 'handtools', machineLabel: 'Select Machine',
+    machines: ['Backpack Blower Jason', 'Backpack Blower Jack', 'Backpack Blower Luke'],
     fields: [
       {key:'used_since_last', label:'Has this machine been used since its last inspection?', options:['Yes','No']},
       {key:'guards', label:'Are all the machine guards in place?', options:['Yes','No']},
@@ -4035,6 +4106,7 @@ var CHECK_CATEGORIES = {
 
 // Group tiles on the Checks home that open a sub-tab picker instead of a form
 var CHECK_GROUPS = {
+  handtools: { heading: 'Select tool', label: 'Hand Held Tools' },
   climbingkit: { heading: 'Select climber', label: 'Climbing Kit' },
   riggingkit: { heading: 'Select kit', label: 'Rigging Kit' }
 };
@@ -4196,7 +4268,7 @@ function renderCategoryPanel(cat) {
     + commentsHtml
     + '</div>'
     + '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
-    + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#11088; Overall Rating</div>'
+    + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#11088; ' + (cfg.ratingHeading || 'Overall Rating') + '</div>'
     + '<div style="padding:14px;display:flex;gap:10px;" id="catRating_' + cat + '">'
     + '<button class="veh-rating-btn" onclick="catRating(\'' + cat + '\',this,\'Excellent\')">&#9989; Excellent<br><span style="font-size:9px;font-weight:400;text-transform:none;font-family:\'Barlow\',sans-serif;">No areas of non-compliance</span></button>'
     + '<button class="veh-rating-btn" onclick="catRating(\'' + cat + '\',this,\'Satisfactory\')">&#9888;&#65039; Satisfactory<br><span style="font-size:9px;font-weight:400;text-transform:none;font-family:\'Barlow\',sans-serif;">Minor non-compliance</span></button>'

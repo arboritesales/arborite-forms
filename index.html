@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.9.91">
+  <link rel="stylesheet" href="css/app.css?v=1.9.92">
 </head>
 <body>
 
@@ -60,7 +60,7 @@
       <div class="lock-err" id="lockMgrErr"></div>
     </div>
   </div>
-  <div class="lock-ver">v1.9.91</div>
+  <div class="lock-ver">v1.9.92</div>
   </div>
 </div>
 
@@ -378,7 +378,7 @@
   <div style="position:relative;z-index:1;">
   <div class="ws-header">
     <div class="ws-brand">
-      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.9.91<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
+      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.9.92<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
     </div>
     <button id="logoutBtn" class="ws-icon-btn" onclick="logoutToTeamLogin()" style="display:none;" aria-label="Log out" title="Log out"><svg class="ic"><use href="#i-logout"/></svg><span>Log out</span></button>
   </div>
@@ -451,7 +451,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.91</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.92</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -547,6 +547,7 @@
       <option value="Brook Taylor-Ware">Brook Taylor-Ware</option>
       <option value="Joel Cripps">Joel Cripps</option>
       <option value="Jon Challinor">Jon Challinor</option>
+      <option value="Graham Calvert">Graham Calvert</option>
       </select></div>
       <div class="fc lbl">Audit Date</div><div class="fc"><input type="date" id="aud_date"></div>
     </div>
@@ -1196,6 +1197,8 @@
     <div style="padding:14px 16px;border-right:1px solid var(--border);">
       <div class="sig-lbl">Name (Print)</div>
       <input type="text" id="so_client_name" style="width:100%;border-bottom:1.5px solid var(--border);font-size:13px;padding:4px 0;background:transparent;border-top:none;border-left:none;border-right:none;outline:none;">
+      <div class="sig-lbl" style="margin-top:12px;">Comments (optional)</div>
+      <textarea id="so_client_comments" rows="2" style="min-height:50px;border:1px solid var(--border);border-radius:3px;padding:6px 8px;"></textarea>
     </div>
     <div style="padding:14px 16px;border-right:1px solid var(--border);">
       <div class="sig-lbl">Signature</div><div class="sig-wrap"><canvas id="s-client" height="90"></canvas><button class="sig-clr" data-sig="s-client" onclick="clrSig(this.dataset.sig)">Clear</button></div>
@@ -2707,7 +2710,7 @@
         <div class="dash-tile-icon">&#128667;</div>
         <div class="dash-tile-name">Trailers</div>
       </div>
-      <div class="dash-tile" data-checkstab="handheld" style="text-align:center;padding:22px 16px;" onclick="switchChecksTab('handheld')">
+      <div class="dash-tile" data-checkstab="handtools" style="text-align:center;padding:22px 16px;" onclick="switchChecksTab('handtools')">
         <div class="dash-tile-icon">&#128296;</div>
         <div class="dash-tile-name">Hand Held Tools</div>
       </div>
@@ -2908,6 +2911,7 @@
   <div id="checksTab_handheld" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;">
     <div class="checks-coming-soon">&#128296; Hand Held Tools checks — coming soon</div>
   </div>
+  <div id="checksTab_handtools" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;"></div>
   <div id="checksTab_riggingkit" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;"></div>
   <div id="checksTab_climbingkit" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;"></div>
   <div id="checksTab_defects" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;">
@@ -3035,7 +3039,7 @@
   </div>
 </div>
 
-  <script src="js/app.js?v=1.9.91"></script>
+  <script src="js/app.js?v=1.9.92"></script>
 </body>
 </html>
 
