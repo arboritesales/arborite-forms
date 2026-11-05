@@ -19,6 +19,7 @@ var _supaSessionRefreshTimer = null;
 function _storeSession(data) {
   _supaSession = data;
   _scheduleSupaSessionRefresh();
+  setTimeout(_resyncPendingJobs, 1500); // send anything saved offline on this device
 }
 
 function _clearSession() {

@@ -18,9 +18,13 @@ function bootstrapJobLink() {
     .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
     .then(function(res){
       if (!res.ok || !res.data || !res.data.length) { _showJobLinkError(); return; }
-      _applyLoadedJobData(res.data[0].quote_ref, res.data[0].form_data);
+      // Changes still waiting to sync are newer than the server's copy.
+      var linkRef = res.data[0].quote_ref;
+      var unsynced = _isOfflinePending(linkRef) ? _loadJobLocalCache(linkRef) : null;
+      _applyLoadedJobData(linkRef, unsynced || res.data[0].form_data);
       showDashboard();
       _applyJobLinkUiRestrictions();
+      if (unsynced) setStatus('Showing your unsynced changes — save to send them', 'warn');
     })
     .catch(function(){ _showJobLinkError(); });
 }

@@ -19,6 +19,7 @@ var _supaSessionRefreshTimer = null;
 function _storeSession(data) {
   _supaSession = data;
   _scheduleSupaSessionRefresh();
+  setTimeout(_resyncPendingJobs, 1500); // send anything saved offline on this device
 }
 
 function _clearSession() {
@@ -1113,11 +1114,32 @@ function _loadJobListCache() {
 // base64 signature data, until the device's storage quota choked the page).
 var LOCAL_JOB_CACHE_LIMIT = 15;
 
+// Returns true only if the copy really was written. If the device's storage is
+// full, older cached jobs that are already on the server are dropped to make
+// room; jobs still waiting to sync are never dropped.
 function _saveJobLocalCache(ref, data) {
-  try {
-    localStorage.setItem('arb_job_' + ref, JSON.stringify(data));
-    _touchJobCacheOrder(ref);
-  } catch(e) {}
+  var json;
+  try { json = JSON.stringify(data); } catch(e) { return false; }
+  while (true) {
+    try {
+      localStorage.setItem('arb_job_' + ref, json);
+      _touchJobCacheOrder(ref);
+      return true;
+    } catch(e) {
+      if (!_evictOldestCachedJob(ref)) return false;
+    }
+  }
+}
+function _evictOldestCachedJob(keepRef) {
+  var order = _loadJobCacheOrder();
+  for (var i = 0; i < order.length; i++) {
+    if (order[i] === keepRef || _isOfflinePending(order[i])) continue;
+    try { localStorage.removeItem('arb_job_' + order[i]); } catch(e) {}
+    order.splice(i, 1);
+    _saveJobCacheOrder(order);
+    return true;
+  }
+  return false;
 }
 function _loadJobLocalCache(ref) {
   try { var s = localStorage.getItem('arb_job_' + ref); return s ? JSON.parse(s) : null; } catch(e) { return null; }
@@ -1135,11 +1157,8 @@ function _saveJobCacheOrder(order) {
 function _touchJobCacheOrder(ref) {
   var order = _loadJobCacheOrder().filter(function(r){ return r !== ref; });
   order.push(ref);
-  while (order.length > LOCAL_JOB_CACHE_LIMIT) {
-    var evicted = order.shift();
-    try { localStorage.removeItem('arb_job_' + evicted); } catch(e) {}
-  }
   _saveJobCacheOrder(order);
+  while (_loadJobCacheOrder().length > LOCAL_JOB_CACHE_LIMIT && _evictOldestCachedJob(ref)) {}
 }
 // One-time (per load) sweep for devices that built up cached jobs before this
 // cap existed — any arb_job_* entry not tracked in the order list predates
@@ -1150,37 +1169,112 @@ function _pruneJobLocalCache() {
     var order = _loadJobCacheOrder();
     var tracked = {};
     for (var i = 0; i < order.length; i++) tracked[order[i]] = true;
+    _loadOfflinePending().forEach(function(p){ tracked[p.ref] = true; });
     for (var k in localStorage) {
       if (k.indexOf('arb_job_') !== 0) continue;
       if (k === 'arb_job_list' || k === 'arb_job_cache_order') continue;
       var ref = k.substring('arb_job_'.length);
       if (!tracked[ref]) { try { localStorage.removeItem(k); } catch(e) {} }
     }
-    while (order.length > LOCAL_JOB_CACHE_LIMIT) {
-      var evicted = order.shift();
-      try { localStorage.removeItem('arb_job_' + evicted); } catch(e) {}
-    }
-    _saveJobCacheOrder(order);
+    while (_loadJobCacheOrder().length > LOCAL_JOB_CACHE_LIMIT && _evictOldestCachedJob(null)) {}
   } catch(e) {}
 }
+
+// ── JOBS WAITING TO SYNC ──
+// A list of {ref, savedAt}, so saving a second job offline can't make the app
+// forget the first. arb_offline_pending is the old one-job format: anything in
+// it is moved across, with no savedAt because its age is unknown.
+function _loadOfflinePending() {
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem('arb_offline_pending_list') || '[]'); } catch(e) {}
+  try {
+    var legacy = localStorage.getItem('arb_offline_pending');
+    if (legacy) {
+      if (!list.some(function(p){ return p.ref === legacy; })) list.push({ref: legacy, savedAt: ''});
+      localStorage.setItem('arb_offline_pending_list', JSON.stringify(list));
+      localStorage.removeItem('arb_offline_pending');
+    }
+  } catch(e) {}
+  return list;
+}
+function _isOfflinePending(ref) {
+  return _loadOfflinePending().some(function(p){ return p.ref === ref; });
+}
 function _markOfflinePending(ref) {
-  try { localStorage.setItem('arb_offline_pending', ref); } catch(e) {}
+  var list = _loadOfflinePending().filter(function(p){ return p.ref !== ref; });
+  list.push({ref: ref, savedAt: new Date().toISOString()});
+  try { localStorage.setItem('arb_offline_pending_list', JSON.stringify(list)); return true; } catch(e) { return false; }
 }
-function _clearOfflinePending() {
-  try { localStorage.removeItem('arb_offline_pending'); } catch(e) {}
+function _clearOfflinePending(ref) {
+  var list = _loadOfflinePending().filter(function(p){ return p.ref !== ref; });
+  try { localStorage.setItem('arb_offline_pending_list', JSON.stringify(list)); } catch(e) {}
 }
-function _getOfflinePending() {
-  try { return localStorage.getItem('arb_offline_pending'); } catch(e) { return null; }
+
+// Sends every job waiting to sync. Runs when the connection returns, at login
+// and after any successful save. A link session can only write to its own job,
+// so it never pushes other jobs held on the device.
+var _jobResyncBusy = false;
+function _resyncPendingJobs() {
+  if (_jobResyncBusy) return;
+  var pending = _loadOfflinePending();
+  if (!pending.length) return;
+  if (currentJobRef && _isOfflinePending(currentJobRef)) {
+    setStatus('Back online — syncing…', '');
+    saveJob(); // the open form may hold newer edits than the cached copy
+  }
+  if (JOB_LINK_TOKEN || !_supaSession) return;
+  var others = pending.filter(function(p){ return p.ref !== currentJobRef; });
+  if (!others.length) return;
+  _jobResyncBusy = true;
+  others.reduce(function(chain, item) {
+    return chain.then(function(){ return _pushPendingJob(item); }).catch(function(){});
+  }, Promise.resolve()).then(function(){ _jobResyncBusy = false; });
+}
+function _pushPendingJob(item) {
+  var ref = item.ref;
+  var cached = _loadJobLocalCache(ref);
+  if (!cached) { _clearOfflinePending(ref); return Promise.resolve(); }
+  return supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=updated_at&limit=1')
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(rows) {
+      // Saved elsewhere since this copy was made: never overwrite that without
+      // a person looking. It stays waiting and opens with this device's copy.
+      if (rows[0] && (!item.savedAt || new Date(rows[0].updated_at) > new Date(item.savedAt))) {
+        setStatus('Job "' + ref + '" was also changed elsewhere — open it to check, then save', 'warn');
+        return;
+      }
+      return _uploadCachedSigs(ref, cached)
+        .then(function() {
+          return supaFetch('POST', TABLE + '?on_conflict=quote_ref', {quote_ref: ref, form_data: cached, updated_at: new Date().toISOString()});
+        })
+        .then(function(r) {
+          if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('HTTP ' + r.status);
+          _clearOfflinePending(ref);
+          _saveJobLocalCache(ref, cached);
+          setStatus('Offline changes to job "' + ref + '" synced', 'ok');
+          fetchJobList();
+        });
+    });
+}
+// Same as a normal save: signatures go to Storage, not into the saved record.
+// One that won't upload stays as it is rather than stopping the sync.
+function _uploadCachedSigs(ref, formData) {
+  var sigs = formData.signatures || {};
+  return Object.keys(sigs).reduce(function(chain, id) {
+    if (!sigs[id] || sigs[id].indexOf('data:') !== 0 || sigs[id].length <= 100) return chain;
+    return chain.then(function() {
+      var path = _storagePath(ref, id);
+      return _uploadSig(path, sigs[id])
+        .then(function(r) { if (r.ok) sigs[id] = 'storage:' + path; })
+        .catch(function() {});
+    });
+  }, Promise.resolve());
 }
 window.addEventListener('online', function() {
-  var pending = _getOfflinePending();
-  if (!pending) return;
-  if (currentJobRef && currentJobRef === pending) {
-    setStatus('Back online — syncing…', '');
-    setTimeout(saveJob, 800);
-  } else {
-    setStatus('Back online — open job "' + pending + '" and save to sync', '');
-  }
+  setTimeout(_resyncPendingJobs, 800);
 });
 
 // ── LOCAL DOC PERSISTENCE (survives page reload even if Storage upload pending) ──
@@ -1396,12 +1490,16 @@ function loadJobByRef(ref) {
     .then(function(r){ return r.json(); })
     .then(function(rows){
       if (!rows || rows.length === 0) { setStatus('Not found: ' + ref, 'err'); return; }
-      _applyLoadedJobData(rows[0].quote_ref, rows[0].form_data);
+      // Changes still waiting to sync are newer than the server's copy: show
+      // those, or the next save would replace them with the old version.
+      var unsynced = _isOfflinePending(ref) ? _loadJobLocalCache(ref) : null;
+      _applyLoadedJobData(rows[0].quote_ref, unsynced || rows[0].form_data);
       if (_fromJobSelect) {
         _fromJobSelect = false;
         hideModals();
         showDashboard();
       }
+      if (unsynced) setStatus('Showing your unsynced changes — save to send them', 'warn');
     })
     .catch(function(e){
       var cached = _loadJobLocalCache(ref);
@@ -1560,8 +1658,26 @@ function _jobFormsUpsert(payload) {
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload);
 }
 
+function _saveSucceeded(payload) {
+  _saveJobLocalCache(payload.quote_ref, payload.form_data);
+  _clearOfflinePending(payload.quote_ref);
+  setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
+  if (!JOB_LINK_TOKEN) fetchJobList();
+  _resyncPendingJobs();
+}
+
+// Only says "Saved offline" if the copy really is on the device. Otherwise
+// staff are told plainly, so they don't close the job and lose the work.
+function _saveOfflineFallback(payload) {
+  if (_saveJobLocalCache(payload.quote_ref, payload.form_data) && _markOfflinePending(payload.quote_ref)) {
+    setStatus('Saved offline ✓ — will sync when connected', 'warn');
+  } else {
+    setStatus('NOT SAVED — no connection and this device\'s storage is full. Keep this job open and save again once connected.', 'err');
+  }
+}
+
 function sendSave(formData) {
-  var payload = {quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
+  var payload ={quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
 
   // Use a timeout to detect iOS silent failures
   var saveTimeout = setTimeout(function() {
@@ -1573,23 +1689,14 @@ function sendSave(formData) {
     .then(function(r){
       clearTimeout(saveTimeout);
       if (r.ok || r.status === 201 || r.status === 204) {
-        _saveJobLocalCache(currentJobRef, payload.form_data);
-        _clearOfflinePending();
-        setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
-        if (!JOB_LINK_TOKEN) fetchJobList();
+        _saveSucceeded(payload);
       } else {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
       }
     })
     .catch(function(e){
       clearTimeout(saveTimeout);
-      try {
-        _saveJobLocalCache(currentJobRef, payload.form_data);
-        _markOfflinePending(currentJobRef);
-        setStatus('Saved offline ✓ — will sync when connected', 'warn');
-      } catch(ex) {
-        setStatus('Save failed: ' + (e && e.message ? e.message : 'check connection'), 'err');
-      }
+      _saveOfflineFallback(payload);
     })
     .finally(function(){
       var en = !!currentJobRef;
@@ -1603,15 +1710,12 @@ function sendSaveRaw(payload) {
   _jobFormsUpsert(payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
-        _saveJobLocalCache(currentJobRef, payload.form_data);
-        _clearOfflinePending();
-        setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
-        if (!JOB_LINK_TOKEN) fetchJobList();
+        _saveSucceeded(payload);
       } else {
-        setStatus('Save error — check connection', 'err');
+        _saveOfflineFallback(payload);
       }
     })
-    .catch(function(){ setStatus('Save error — check connection', 'err'); })
+    .catch(function(){ _saveOfflineFallback(payload); })
     .finally(function(){
       var en = !!currentJobRef;
       var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
@@ -1695,6 +1799,7 @@ function _finishSaveAndClose(formData, savedRef) {
   supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
+        _clearOfflinePending(savedRef);
         setStatus('Saved & closed', 'ok');
         fetchJobList();
         setTimeout(function(){
@@ -2322,7 +2427,7 @@ function _renderPdfPages(container, url, onFail) {
     if (err) { fail(); return; }
     fetch(url)
       .then(function(r) { return r.arrayBuffer(); })
-      .then(function(buf) { return pdfjsLib.getDocument({data: buf}).promise; })
+      .then(function(buf) { return pdfjsLib.getDocument({data: buf, isEvalSupported: false}).promise; })
       .then(function(pdf) {
         if (state.closed) { pdf.destroy(); return; }
         state.pdf = pdf;
@@ -6411,17 +6516,27 @@ var msbRefLibPromise = null;
 // and retry automatically once the connection is back, instead of the
 // work just being lost.
 var MSB_LOCAL_CACHE_LIMIT = 10;
+// Returns true only if the copy really was written. Records still waiting to
+// sync are never dropped to make room.
 function _saveMSBLocalCache(ref, formData) {
-  try {
-    localStorage.setItem('msb_local_' + ref, JSON.stringify(formData));
-    var order = _loadMSBCacheOrder().filter(function(r) { return r !== ref; });
-    order.push(ref);
-    while (order.length > MSB_LOCAL_CACHE_LIMIT) {
-      var evicted = order.shift();
-      try { localStorage.removeItem('msb_local_' + evicted); } catch (e) {}
-    }
-    localStorage.setItem('msb_local_cache_order', JSON.stringify(order));
-  } catch (e) {}
+  var json;
+  try { json = JSON.stringify(formData); } catch (e) { return false; }
+  var pending = _getMSBOfflinePending();
+  var order = _loadMSBCacheOrder().filter(function(r) { return r !== ref; });
+  var removable = order.filter(function(r) { return pending.indexOf(r) < 0; });
+  var dropOldest = function() {
+    var evicted = removable.shift();
+    order = order.filter(function(r) { return r !== evicted; });
+    try { localStorage.removeItem('msb_local_' + evicted); } catch (e) {}
+  };
+  while (true) {
+    try { localStorage.setItem('msb_local_' + ref, json); break; }
+    catch (e) { if (!removable.length) return false; dropOldest(); }
+  }
+  while (order.length >= MSB_LOCAL_CACHE_LIMIT && removable.length) dropOldest();
+  order.push(ref);
+  try { localStorage.setItem('msb_local_cache_order', JSON.stringify(order)); } catch (e) {}
+  return true;
 }
 function _loadMSBCacheOrder() {
   try { var s = localStorage.getItem('msb_local_cache_order'); return s ? JSON.parse(s) : []; } catch (e) { return []; }
@@ -6429,14 +6544,29 @@ function _loadMSBCacheOrder() {
 function _loadMSBLocalCache(ref) {
   try { var s = localStorage.getItem('msb_local_' + ref); return s ? JSON.parse(s) : null; } catch (e) { return null; }
 }
-function _markMSBOfflinePending(ref) {
-  try { localStorage.setItem('msb_offline_pending', ref); } catch (e) {}
-}
-function _clearMSBOfflinePending() {
-  try { localStorage.removeItem('msb_offline_pending'); } catch (e) {}
-}
+// A list of refs, so a second record saved offline can't make the app forget
+// the first. msb_offline_pending is the old one-record format, moved across here.
 function _getMSBOfflinePending() {
-  try { return localStorage.getItem('msb_offline_pending'); } catch (e) { return null; }
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem('msb_offline_pending_list') || '[]'); } catch (e) {}
+  try {
+    var legacy = localStorage.getItem('msb_offline_pending');
+    if (legacy) {
+      if (list.indexOf(legacy) < 0) list.push(legacy);
+      localStorage.setItem('msb_offline_pending_list', JSON.stringify(list));
+      localStorage.removeItem('msb_offline_pending');
+    }
+  } catch (e) {}
+  return list;
+}
+function _markMSBOfflinePending(ref) {
+  var list = _getMSBOfflinePending().filter(function(r) { return r !== ref; });
+  list.push(ref);
+  try { localStorage.setItem('msb_offline_pending_list', JSON.stringify(list)); return true; } catch (e) { return false; }
+}
+function _clearMSBOfflinePending(ref) {
+  var list = _getMSBOfflinePending().filter(function(r) { return r !== ref; });
+  try { localStorage.setItem('msb_offline_pending_list', JSON.stringify(list)); } catch (e) {}
 }
 window.addEventListener('online', function() {
   // _msbResyncPendingOnOpen() (defined below) handles this generically —
@@ -6956,6 +7086,7 @@ function _msbDoSaveRecord() {
   var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(msbState) };
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
     if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('Save failed (' + r.status + ')');
+    _clearMSBOfflinePending(payload.quote_ref);
   });
 }
 
@@ -6968,16 +7099,19 @@ function _msbDoSaveRecord() {
 // time the MSB tool is opened, on ANY device where that pending cache
 // exists, instead of relying solely on the online-event listener.
 function _msbResyncPendingOnOpen() {
-  var ref = _getMSBOfflinePending();
-  if (!ref) return;
+  _getMSBOfflinePending().forEach(function(ref) {
+    try { _msbResyncOne(ref); } catch (e) {} // a damaged copy mustn't stop the others syncing
+  });
+}
+function _msbResyncOne(ref) {
   var cached = _loadMSBLocalCache(ref);
-  if (!cached) { _clearMSBOfflinePending(); return; }
+  if (!cached) { _clearMSBOfflinePending(ref); return; }
   var job = cached.job || {};
   var cachedLooksBlank = !job.titleOfDocument && !job.client && !job.siteAddress && !(cached.team || []).length;
   var push = function() {
     var payload = { quote_ref: ref, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(cached) };
     return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
-      if (r.ok || r.status === 201 || r.status === 204) _clearMSBOfflinePending();
+      if (r.ok || r.status === 201 || r.status === 204) _clearMSBOfflinePending(ref);
     });
   };
   if (!cachedLooksBlank) { push().catch(function() {}); return; }
@@ -7000,7 +7134,6 @@ function saveMSBDraft() {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
   var ref = currentMSBRef;
   saveMSBRecord().then(function() {
-    _clearMSBOfflinePending();
     if (btn) { btn.textContent = '✓ Saved'; setTimeout(function() { btn.textContent = 'Save Draft'; btn.disabled = false; }, 1800); }
   }).catch(function(e) {
     if (e && e._msbBlankGuard) {
@@ -7013,8 +7146,11 @@ function saveMSBDraft() {
     }
     // Couldn't reach the server for any reason — keep the work safe locally
     // and it'll sync automatically the moment the connection comes back.
-    _saveMSBLocalCache(ref, msbState);
-    _markMSBOfflinePending(ref);
+    if (!(_saveMSBLocalCache(ref, msbState) && _markMSBOfflinePending(ref))) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Draft'; }
+      alert('NOT SAVED — no connection and this device\'s storage is full. Keep this open and save again once you\'re connected.');
+      return;
+    }
     if (btn) { btn.textContent = 'Saved offline ✓'; btn.disabled = false; setTimeout(function() { btn.textContent = 'Save Draft'; }, 2400); }
   });
 }
@@ -8236,8 +8372,10 @@ function generateMSBPDF() {
     // Couldn't reach the server — the PDF can't be built from a saved copy
     // right now, but the work itself isn't lost: cache it and it'll sync
     // automatically once the connection is back.
-    if (ref) { _saveMSBLocalCache(ref, msbState); _markMSBOfflinePending(ref); }
-    alert('Could not save the method statement — check your connection and try again. Your work is safe and saved on this device — it will sync automatically once you\'re back online.' + (e && e.message ? ' (' + e.message + ')' : ''));
+    var keptLocally = !!ref && _saveMSBLocalCache(ref, msbState) && _markMSBOfflinePending(ref);
+    alert(keptLocally
+      ? 'Could not save the method statement — check your connection and try again. Your work is safe and saved on this device — it will sync automatically once you\'re back online.' + (e && e.message ? ' (' + e.message + ')' : '')
+      : 'NOT SAVED — no connection and this device\'s storage is full. Keep this open and try again once you\'re connected.');
     throw { _msbHandled: true };
   }).then(function() {
     var routeMapPath = msbState.emergency.routeMap && msbState.emergency.routeMap.storagePath;
@@ -9508,9 +9646,13 @@ function bootstrapJobLink() {
     .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
     .then(function(res){
       if (!res.ok || !res.data || !res.data.length) { _showJobLinkError(); return; }
-      _applyLoadedJobData(res.data[0].quote_ref, res.data[0].form_data);
+      // Changes still waiting to sync are newer than the server's copy.
+      var linkRef = res.data[0].quote_ref;
+      var unsynced = _isOfflinePending(linkRef) ? _loadJobLocalCache(linkRef) : null;
+      _applyLoadedJobData(linkRef, unsynced || res.data[0].form_data);
       showDashboard();
       _applyJobLinkUiRestrictions();
+      if (unsynced) setStatus('Showing your unsynced changes — save to send them', 'warn');
     })
     .catch(function(){ _showJobLinkError(); });
 }

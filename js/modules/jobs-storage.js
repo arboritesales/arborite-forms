@@ -480,11 +480,32 @@ function _loadJobListCache() {
 // base64 signature data, until the device's storage quota choked the page).
 var LOCAL_JOB_CACHE_LIMIT = 15;
 
+// Returns true only if the copy really was written. If the device's storage is
+// full, older cached jobs that are already on the server are dropped to make
+// room; jobs still waiting to sync are never dropped.
 function _saveJobLocalCache(ref, data) {
-  try {
-    localStorage.setItem('arb_job_' + ref, JSON.stringify(data));
-    _touchJobCacheOrder(ref);
-  } catch(e) {}
+  var json;
+  try { json = JSON.stringify(data); } catch(e) { return false; }
+  while (true) {
+    try {
+      localStorage.setItem('arb_job_' + ref, json);
+      _touchJobCacheOrder(ref);
+      return true;
+    } catch(e) {
+      if (!_evictOldestCachedJob(ref)) return false;
+    }
+  }
+}
+function _evictOldestCachedJob(keepRef) {
+  var order = _loadJobCacheOrder();
+  for (var i = 0; i < order.length; i++) {
+    if (order[i] === keepRef || _isOfflinePending(order[i])) continue;
+    try { localStorage.removeItem('arb_job_' + order[i]); } catch(e) {}
+    order.splice(i, 1);
+    _saveJobCacheOrder(order);
+    return true;
+  }
+  return false;
 }
 function _loadJobLocalCache(ref) {
   try { var s = localStorage.getItem('arb_job_' + ref); return s ? JSON.parse(s) : null; } catch(e) { return null; }
@@ -502,11 +523,8 @@ function _saveJobCacheOrder(order) {
 function _touchJobCacheOrder(ref) {
   var order = _loadJobCacheOrder().filter(function(r){ return r !== ref; });
   order.push(ref);
-  while (order.length > LOCAL_JOB_CACHE_LIMIT) {
-    var evicted = order.shift();
-    try { localStorage.removeItem('arb_job_' + evicted); } catch(e) {}
-  }
   _saveJobCacheOrder(order);
+  while (_loadJobCacheOrder().length > LOCAL_JOB_CACHE_LIMIT && _evictOldestCachedJob(ref)) {}
 }
 // One-time (per load) sweep for devices that built up cached jobs before this
 // cap existed — any arb_job_* entry not tracked in the order list predates
@@ -517,36 +535,111 @@ function _pruneJobLocalCache() {
     var order = _loadJobCacheOrder();
     var tracked = {};
     for (var i = 0; i < order.length; i++) tracked[order[i]] = true;
+    _loadOfflinePending().forEach(function(p){ tracked[p.ref] = true; });
     for (var k in localStorage) {
       if (k.indexOf('arb_job_') !== 0) continue;
       if (k === 'arb_job_list' || k === 'arb_job_cache_order') continue;
       var ref = k.substring('arb_job_'.length);
       if (!tracked[ref]) { try { localStorage.removeItem(k); } catch(e) {} }
     }
-    while (order.length > LOCAL_JOB_CACHE_LIMIT) {
-      var evicted = order.shift();
-      try { localStorage.removeItem('arb_job_' + evicted); } catch(e) {}
-    }
-    _saveJobCacheOrder(order);
+    while (_loadJobCacheOrder().length > LOCAL_JOB_CACHE_LIMIT && _evictOldestCachedJob(null)) {}
   } catch(e) {}
 }
+
+// ── JOBS WAITING TO SYNC ──
+// A list of {ref, savedAt}, so saving a second job offline can't make the app
+// forget the first. arb_offline_pending is the old one-job format: anything in
+// it is moved across, with no savedAt because its age is unknown.
+function _loadOfflinePending() {
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem('arb_offline_pending_list') || '[]'); } catch(e) {}
+  try {
+    var legacy = localStorage.getItem('arb_offline_pending');
+    if (legacy) {
+      if (!list.some(function(p){ return p.ref === legacy; })) list.push({ref: legacy, savedAt: ''});
+      localStorage.setItem('arb_offline_pending_list', JSON.stringify(list));
+      localStorage.removeItem('arb_offline_pending');
+    }
+  } catch(e) {}
+  return list;
+}
+function _isOfflinePending(ref) {
+  return _loadOfflinePending().some(function(p){ return p.ref === ref; });
+}
 function _markOfflinePending(ref) {
-  try { localStorage.setItem('arb_offline_pending', ref); } catch(e) {}
+  var list = _loadOfflinePending().filter(function(p){ return p.ref !== ref; });
+  list.push({ref: ref, savedAt: new Date().toISOString()});
+  try { localStorage.setItem('arb_offline_pending_list', JSON.stringify(list)); return true; } catch(e) { return false; }
 }
-function _clearOfflinePending() {
-  try { localStorage.removeItem('arb_offline_pending'); } catch(e) {}
+function _clearOfflinePending(ref) {
+  var list = _loadOfflinePending().filter(function(p){ return p.ref !== ref; });
+  try { localStorage.setItem('arb_offline_pending_list', JSON.stringify(list)); } catch(e) {}
 }
-function _getOfflinePending() {
-  try { return localStorage.getItem('arb_offline_pending'); } catch(e) { return null; }
+
+// Sends every job waiting to sync. Runs when the connection returns, at login
+// and after any successful save. A link session can only write to its own job,
+// so it never pushes other jobs held on the device.
+var _jobResyncBusy = false;
+function _resyncPendingJobs() {
+  if (_jobResyncBusy) return;
+  var pending = _loadOfflinePending();
+  if (!pending.length) return;
+  if (currentJobRef && _isOfflinePending(currentJobRef)) {
+    setStatus('Back online — syncing…', '');
+    saveJob(); // the open form may hold newer edits than the cached copy
+  }
+  if (JOB_LINK_TOKEN || !_supaSession) return;
+  var others = pending.filter(function(p){ return p.ref !== currentJobRef; });
+  if (!others.length) return;
+  _jobResyncBusy = true;
+  others.reduce(function(chain, item) {
+    return chain.then(function(){ return _pushPendingJob(item); }).catch(function(){});
+  }, Promise.resolve()).then(function(){ _jobResyncBusy = false; });
+}
+function _pushPendingJob(item) {
+  var ref = item.ref;
+  var cached = _loadJobLocalCache(ref);
+  if (!cached) { _clearOfflinePending(ref); return Promise.resolve(); }
+  return supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=updated_at&limit=1')
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(rows) {
+      // Saved elsewhere since this copy was made: never overwrite that without
+      // a person looking. It stays waiting and opens with this device's copy.
+      if (rows[0] && (!item.savedAt || new Date(rows[0].updated_at) > new Date(item.savedAt))) {
+        setStatus('Job "' + ref + '" was also changed elsewhere — open it to check, then save', 'warn');
+        return;
+      }
+      return _uploadCachedSigs(ref, cached)
+        .then(function() {
+          return supaFetch('POST', TABLE + '?on_conflict=quote_ref', {quote_ref: ref, form_data: cached, updated_at: new Date().toISOString()});
+        })
+        .then(function(r) {
+          if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('HTTP ' + r.status);
+          _clearOfflinePending(ref);
+          _saveJobLocalCache(ref, cached);
+          setStatus('Offline changes to job "' + ref + '" synced', 'ok');
+          fetchJobList();
+        });
+    });
+}
+// Same as a normal save: signatures go to Storage, not into the saved record.
+// One that won't upload stays as it is rather than stopping the sync.
+function _uploadCachedSigs(ref, formData) {
+  var sigs = formData.signatures || {};
+  return Object.keys(sigs).reduce(function(chain, id) {
+    if (!sigs[id] || sigs[id].indexOf('data:') !== 0 || sigs[id].length <= 100) return chain;
+    return chain.then(function() {
+      var path = _storagePath(ref, id);
+      return _uploadSig(path, sigs[id])
+        .then(function(r) { if (r.ok) sigs[id] = 'storage:' + path; })
+        .catch(function() {});
+    });
+  }, Promise.resolve());
 }
 window.addEventListener('online', function() {
-  var pending = _getOfflinePending();
-  if (!pending) return;
-  if (currentJobRef && currentJobRef === pending) {
-    setStatus('Back online — syncing…', '');
-    setTimeout(saveJob, 800);
-  } else {
-    setStatus('Back online — open job "' + pending + '" and save to sync', '');
-  }
+  setTimeout(_resyncPendingJobs, 800);
 });
 

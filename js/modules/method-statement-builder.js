@@ -47,17 +47,27 @@ var msbRefLibPromise = null;
 // and retry automatically once the connection is back, instead of the
 // work just being lost.
 var MSB_LOCAL_CACHE_LIMIT = 10;
+// Returns true only if the copy really was written. Records still waiting to
+// sync are never dropped to make room.
 function _saveMSBLocalCache(ref, formData) {
-  try {
-    localStorage.setItem('msb_local_' + ref, JSON.stringify(formData));
-    var order = _loadMSBCacheOrder().filter(function(r) { return r !== ref; });
-    order.push(ref);
-    while (order.length > MSB_LOCAL_CACHE_LIMIT) {
-      var evicted = order.shift();
-      try { localStorage.removeItem('msb_local_' + evicted); } catch (e) {}
-    }
-    localStorage.setItem('msb_local_cache_order', JSON.stringify(order));
-  } catch (e) {}
+  var json;
+  try { json = JSON.stringify(formData); } catch (e) { return false; }
+  var pending = _getMSBOfflinePending();
+  var order = _loadMSBCacheOrder().filter(function(r) { return r !== ref; });
+  var removable = order.filter(function(r) { return pending.indexOf(r) < 0; });
+  var dropOldest = function() {
+    var evicted = removable.shift();
+    order = order.filter(function(r) { return r !== evicted; });
+    try { localStorage.removeItem('msb_local_' + evicted); } catch (e) {}
+  };
+  while (true) {
+    try { localStorage.setItem('msb_local_' + ref, json); break; }
+    catch (e) { if (!removable.length) return false; dropOldest(); }
+  }
+  while (order.length >= MSB_LOCAL_CACHE_LIMIT && removable.length) dropOldest();
+  order.push(ref);
+  try { localStorage.setItem('msb_local_cache_order', JSON.stringify(order)); } catch (e) {}
+  return true;
 }
 function _loadMSBCacheOrder() {
   try { var s = localStorage.getItem('msb_local_cache_order'); return s ? JSON.parse(s) : []; } catch (e) { return []; }
@@ -65,14 +75,29 @@ function _loadMSBCacheOrder() {
 function _loadMSBLocalCache(ref) {
   try { var s = localStorage.getItem('msb_local_' + ref); return s ? JSON.parse(s) : null; } catch (e) { return null; }
 }
-function _markMSBOfflinePending(ref) {
-  try { localStorage.setItem('msb_offline_pending', ref); } catch (e) {}
-}
-function _clearMSBOfflinePending() {
-  try { localStorage.removeItem('msb_offline_pending'); } catch (e) {}
-}
+// A list of refs, so a second record saved offline can't make the app forget
+// the first. msb_offline_pending is the old one-record format, moved across here.
 function _getMSBOfflinePending() {
-  try { return localStorage.getItem('msb_offline_pending'); } catch (e) { return null; }
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem('msb_offline_pending_list') || '[]'); } catch (e) {}
+  try {
+    var legacy = localStorage.getItem('msb_offline_pending');
+    if (legacy) {
+      if (list.indexOf(legacy) < 0) list.push(legacy);
+      localStorage.setItem('msb_offline_pending_list', JSON.stringify(list));
+      localStorage.removeItem('msb_offline_pending');
+    }
+  } catch (e) {}
+  return list;
+}
+function _markMSBOfflinePending(ref) {
+  var list = _getMSBOfflinePending().filter(function(r) { return r !== ref; });
+  list.push(ref);
+  try { localStorage.setItem('msb_offline_pending_list', JSON.stringify(list)); return true; } catch (e) { return false; }
+}
+function _clearMSBOfflinePending(ref) {
+  var list = _getMSBOfflinePending().filter(function(r) { return r !== ref; });
+  try { localStorage.setItem('msb_offline_pending_list', JSON.stringify(list)); } catch (e) {}
 }
 window.addEventListener('online', function() {
   // _msbResyncPendingOnOpen() (defined below) handles this generically —
@@ -592,6 +617,7 @@ function _msbDoSaveRecord() {
   var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(msbState) };
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
     if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('Save failed (' + r.status + ')');
+    _clearMSBOfflinePending(payload.quote_ref);
   });
 }
 
@@ -604,16 +630,19 @@ function _msbDoSaveRecord() {
 // time the MSB tool is opened, on ANY device where that pending cache
 // exists, instead of relying solely on the online-event listener.
 function _msbResyncPendingOnOpen() {
-  var ref = _getMSBOfflinePending();
-  if (!ref) return;
+  _getMSBOfflinePending().forEach(function(ref) {
+    try { _msbResyncOne(ref); } catch (e) {} // a damaged copy mustn't stop the others syncing
+  });
+}
+function _msbResyncOne(ref) {
   var cached = _loadMSBLocalCache(ref);
-  if (!cached) { _clearMSBOfflinePending(); return; }
+  if (!cached) { _clearMSBOfflinePending(ref); return; }
   var job = cached.job || {};
   var cachedLooksBlank = !job.titleOfDocument && !job.client && !job.siteAddress && !(cached.team || []).length;
   var push = function() {
     var payload = { quote_ref: ref, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(cached) };
     return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
-      if (r.ok || r.status === 201 || r.status === 204) _clearMSBOfflinePending();
+      if (r.ok || r.status === 201 || r.status === 204) _clearMSBOfflinePending(ref);
     });
   };
   if (!cachedLooksBlank) { push().catch(function() {}); return; }
@@ -636,7 +665,6 @@ function saveMSBDraft() {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
   var ref = currentMSBRef;
   saveMSBRecord().then(function() {
-    _clearMSBOfflinePending();
     if (btn) { btn.textContent = '✓ Saved'; setTimeout(function() { btn.textContent = 'Save Draft'; btn.disabled = false; }, 1800); }
   }).catch(function(e) {
     if (e && e._msbBlankGuard) {
@@ -649,8 +677,11 @@ function saveMSBDraft() {
     }
     // Couldn't reach the server for any reason — keep the work safe locally
     // and it'll sync automatically the moment the connection comes back.
-    _saveMSBLocalCache(ref, msbState);
-    _markMSBOfflinePending(ref);
+    if (!(_saveMSBLocalCache(ref, msbState) && _markMSBOfflinePending(ref))) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save Draft'; }
+      alert('NOT SAVED — no connection and this device\'s storage is full. Keep this open and save again once you\'re connected.');
+      return;
+    }
     if (btn) { btn.textContent = 'Saved offline ✓'; btn.disabled = false; setTimeout(function() { btn.textContent = 'Save Draft'; }, 2400); }
   });
 }
@@ -1872,8 +1903,10 @@ function generateMSBPDF() {
     // Couldn't reach the server — the PDF can't be built from a saved copy
     // right now, but the work itself isn't lost: cache it and it'll sync
     // automatically once the connection is back.
-    if (ref) { _saveMSBLocalCache(ref, msbState); _markMSBOfflinePending(ref); }
-    alert('Could not save the method statement — check your connection and try again. Your work is safe and saved on this device — it will sync automatically once you\'re back online.' + (e && e.message ? ' (' + e.message + ')' : ''));
+    var keptLocally = !!ref && _saveMSBLocalCache(ref, msbState) && _markMSBOfflinePending(ref);
+    alert(keptLocally
+      ? 'Could not save the method statement — check your connection and try again. Your work is safe and saved on this device — it will sync automatically once you\'re back online.' + (e && e.message ? ' (' + e.message + ')' : '')
+      : 'NOT SAVED — no connection and this device\'s storage is full. Keep this open and try again once you\'re connected.');
     throw { _msbHandled: true };
   }).then(function() {
     var routeMapPath = msbState.emergency.routeMap && msbState.emergency.routeMap.storagePath;

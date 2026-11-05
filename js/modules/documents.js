@@ -108,7 +108,7 @@ function _renderPdfPages(container, url, onFail) {
     if (err) { fail(); return; }
     fetch(url)
       .then(function(r) { return r.arrayBuffer(); })
-      .then(function(buf) { return pdfjsLib.getDocument({data: buf}).promise; })
+      .then(function(buf) { return pdfjsLib.getDocument({data: buf, isEvalSupported: false}).promise; })
       .then(function(pdf) {
         if (state.closed) { pdf.destroy(); return; }
         state.pdf = pdf;

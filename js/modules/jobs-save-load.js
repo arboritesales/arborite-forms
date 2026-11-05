@@ -211,12 +211,16 @@ function loadJobByRef(ref) {
     .then(function(r){ return r.json(); })
     .then(function(rows){
       if (!rows || rows.length === 0) { setStatus('Not found: ' + ref, 'err'); return; }
-      _applyLoadedJobData(rows[0].quote_ref, rows[0].form_data);
+      // Changes still waiting to sync are newer than the server's copy: show
+      // those, or the next save would replace them with the old version.
+      var unsynced = _isOfflinePending(ref) ? _loadJobLocalCache(ref) : null;
+      _applyLoadedJobData(rows[0].quote_ref, unsynced || rows[0].form_data);
       if (_fromJobSelect) {
         _fromJobSelect = false;
         hideModals();
         showDashboard();
       }
+      if (unsynced) setStatus('Showing your unsynced changes — save to send them', 'warn');
     })
     .catch(function(e){
       var cached = _loadJobLocalCache(ref);
@@ -375,8 +379,26 @@ function _jobFormsUpsert(payload) {
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload);
 }
 
+function _saveSucceeded(payload) {
+  _saveJobLocalCache(payload.quote_ref, payload.form_data);
+  _clearOfflinePending(payload.quote_ref);
+  setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
+  if (!JOB_LINK_TOKEN) fetchJobList();
+  _resyncPendingJobs();
+}
+
+// Only says "Saved offline" if the copy really is on the device. Otherwise
+// staff are told plainly, so they don't close the job and lose the work.
+function _saveOfflineFallback(payload) {
+  if (_saveJobLocalCache(payload.quote_ref, payload.form_data) && _markOfflinePending(payload.quote_ref)) {
+    setStatus('Saved offline ✓ — will sync when connected', 'warn');
+  } else {
+    setStatus('NOT SAVED — no connection and this device\'s storage is full. Keep this job open and save again once connected.', 'err');
+  }
+}
+
 function sendSave(formData) {
-  var payload = {quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
+  var payload ={quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
 
   // Use a timeout to detect iOS silent failures
   var saveTimeout = setTimeout(function() {
@@ -388,23 +410,14 @@ function sendSave(formData) {
     .then(function(r){
       clearTimeout(saveTimeout);
       if (r.ok || r.status === 201 || r.status === 204) {
-        _saveJobLocalCache(currentJobRef, payload.form_data);
-        _clearOfflinePending();
-        setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
-        if (!JOB_LINK_TOKEN) fetchJobList();
+        _saveSucceeded(payload);
       } else {
         return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
       }
     })
     .catch(function(e){
       clearTimeout(saveTimeout);
-      try {
-        _saveJobLocalCache(currentJobRef, payload.form_data);
-        _markOfflinePending(currentJobRef);
-        setStatus('Saved offline ✓ — will sync when connected', 'warn');
-      } catch(ex) {
-        setStatus('Save failed: ' + (e && e.message ? e.message : 'check connection'), 'err');
-      }
+      _saveOfflineFallback(payload);
     })
     .finally(function(){
       var en = !!currentJobRef;
@@ -418,15 +431,12 @@ function sendSaveRaw(payload) {
   _jobFormsUpsert(payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
-        _saveJobLocalCache(currentJobRef, payload.form_data);
-        _clearOfflinePending();
-        setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
-        if (!JOB_LINK_TOKEN) fetchJobList();
+        _saveSucceeded(payload);
       } else {
-        setStatus('Save error — check connection', 'err');
+        _saveOfflineFallback(payload);
       }
     })
-    .catch(function(){ setStatus('Save error — check connection', 'err'); })
+    .catch(function(){ _saveOfflineFallback(payload); })
     .finally(function(){
       var en = !!currentJobRef;
       var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
@@ -510,6 +520,7 @@ function _finishSaveAndClose(formData, savedRef) {
   supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
     .then(function(r){
       if (r.ok || r.status === 201 || r.status === 204) {
+        _clearOfflinePending(savedRef);
         setStatus('Saved & closed', 'ok');
         fetchJobList();
         setTimeout(function(){
