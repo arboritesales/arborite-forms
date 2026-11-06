@@ -8870,7 +8870,7 @@ function spRenderMyRequests() {
     }
     // Label each line with its type — otherwise a sick entry a manager added
     // looks identical to an approved holiday.
-    var typeLabels = { holiday: 'Holiday', sick: 'Sick', other: 'Other' };
+    var typeLabels = { holiday: 'Holiday', sick: 'Sick', other: 'Other', unpaid: 'Unpaid' };
     function itemHtml(r) {
       var typeTag = '<span class="sp-pill sp-type-tag ' + spEsc(r.type) + '" style="margin-right:8px;">' + spEsc(typeLabels[r.type] || r.type) + '</span>';
       return '<div class="sp-req-item"><div class="sp-req-top"><span class="sp-req-dates">' + typeTag + spFmtDateRange(r.start_date, r.end_date) + ' (' + r.days + (r.days == 1 ? ' day' : ' days') + ')</span><span class="sp-pill ' + r.status + '">' + r.status + '</span></div>'
@@ -9076,6 +9076,7 @@ function spBackToReportDirectory() { spReportSelectedStaff = null; spRenderClock
 function spRenderClockReport() {
   var el = document.getElementById('spClockReport');
   if (!el) return;
+  spLoadPayPeriod();
   var y = spReportMonth.getFullYear(), m = spReportMonth.getMonth();
   document.getElementById('spReportTitle').textContent = spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
   var weeklyEl = document.getElementById('spWeeklyHours');
@@ -9110,19 +9111,27 @@ function spRenderClockReport() {
     // as an empty string.
     var body = rows.map(function(r, i) {
       if (r.name !== spReportSelectedStaff) return '';
-      var dateStr = new Date(r.work_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      var ot = r.overtime_claimed || 0;
-      // Approved overtime is entered as hours + minutes; stored as decimal
-      // hours (staff_overtime_approvals.hours_approved) exactly as before.
-      var apprMins = Math.round((r.overtime_approved || 0) * 60);
-      var otCell = ot > 0
-        ? spFmtHoursMins(ot) + '<br><input type="number" step="1" min="0" style="width:44px;" id="spOtHrs' + i + '" value="' + Math.floor(apprMins / 60) + '"> h '
-          + '<input type="number" step="1" min="0" max="59" style="width:44px;" id="spOtMins' + i + '" value="' + (apprMins % 60) + '"> m '
-          + '<button class="sp-btn-approve" style="padding:2px 8px;font-size:11px;" onclick="spSaveOvertime(' + i + ')">Save</button>'
-        : '—';
+      var dateStr = spFmtPayDate(r.work_date);
+      if (r.is_bank_holiday) dateStr += '<br><span style="font-size:11px;">Bank holiday</span>';
+      var pay = spDayPay(r);
+      // Boxes show what's been approved, or what the clock suggests until then.
+      var shown = r.is_approved ? pay.paid : pay.suggest;
+      var status = r.is_approved
+        ? '<b style="color:var(--green);">Approved</b>'
+        : (pay.awaiting > 0 ? '<b>Not approved yet</b> (' + spNum(pay.awaiting) + 'h from clock)' : '');
+      var early = pay.earlyMins > 0
+        ? '<div style="margin:4px 0;">Left early: ' + spFmtHoursMins(pay.earlyMins / 60)
+          + ' <label style="white-space:nowrap;"><input type="checkbox" id="spOtFull' + i + '"' + (r.early_full_pay ? ' checked' : '') + '> Full pay, no deduction</label></div>'
+        : '';
+      var box = function(label, id, val) {
+        return '<label style="white-space:nowrap;margin-right:8px;">' + label + ' <input type="number" step="0.25" min="0" style="width:56px;" id="' + id + i + '" value="' + spNum(val) + '"></label>';
+      };
+      var otCell = (status ? '<div style="margin-bottom:4px;">' + status + '</div>' : '') + early
+        + box('Basic', 'spOtBasic', shown.basic) + box('@ 1.5', 'spOtHalf', shown.half) + box('@ 2', 'spOtDouble', shown.dbl)
+        + '<button class="sp-btn-approve" style="padding:2px 8px;font-size:11px;" onclick="spSaveOvertime(' + i + ')">Approve</button>';
       return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td><td>' + otCell + '</td></tr>';
     }).join('');
-    el.innerHTML = header + '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Overtime (claimed / approve)</th></tr>' + body + '</table>';
+    el.innerHTML = header + '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Overtime hours to approve</th></tr>' + body + '</table>';
     if (weeklyEl) {
       var weekly = spComputeWeeklyHours(personRows);
       weeklyEl.innerHTML = '<h3 style="margin:14px 0 8px;">Hours per week</h3><table class="sp-dash-table"><tr><th>Name</th><th>Week starting</th><th>Hours</th></tr>'
@@ -9146,8 +9155,7 @@ function spLocalDateStr(d) {
 }
 
 // Decimal hours -> "1h 15m" / "37m" / "2h", for the on-screen overtime
-// column. The Excel export writes real Excel time values formatted "1h 15m"
-// instead (see spMinsColsToTime), so they still add up with SUM().
+// column and the Daily tab.
 function spFmtHoursMins(h) {
   var totalMin = Math.round(h * 60);
   var hh = Math.floor(totalMin / 60), mm = totalMin % 60;
@@ -9172,15 +9180,23 @@ function spComputeWeeklyHours(rows) {
   });
 }
 
+// Approving a day saves the three figures typed in. Saving at all is what marks
+// a day as approved: the export only pays overtime on approved days, and lists
+// the rest under "Awaiting Approval".
 function spSaveOvertime(i) {
   var r = spLastClockReportRows[i];
   if (!r) return;
-  var hVal = document.getElementById('spOtHrs' + i).value.trim();
-  var mVal = document.getElementById('spOtMins' + i).value.trim();
-  var h = hVal === '' ? 0 : Number(hVal), m = mVal === '' ? 0 : Number(mVal);
-  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || m < 0 || m > 59) { spToast('Enter whole hours, and minutes from 0 to 59.'); return; }
-  var hrs = h + m / 60;
-  spRpc('sp_manager_set_overtime', { p_staff_name: r.name, p_work_date: r.work_date, p_hours_approved: hrs }).then(function(res) {
+  var read = function(id) {
+    var v = document.getElementById(id + i).value.trim();
+    return v === '' ? 0 : Number(v);
+  };
+  var basic = read('spOtBasic'), half = read('spOtHalf'), dbl = read('spOtDouble');
+  if (![basic, half, dbl].every(function(n) { return isFinite(n) && n >= 0; })) { spToast('Enter hours as numbers, e.g. 1.5.'); return; }
+  var fullEl = document.getElementById('spOtFull' + i);
+  spRpc('sp_manager_set_day_pay', {
+    p_staff_name: r.name, p_work_date: r.work_date, p_hours_basic: basic, p_hours_time_half: half, p_hours_double: dbl,
+    p_early_full_pay: fullEl ? fullEl.checked : !!r.early_full_pay
+  }).then(function(res) {
     if (!res.ok) { spToast((res.data && res.data.message) || 'Could not save overtime.'); return; }
     spToast('Overtime approved.');
     spRenderClockReport();
@@ -9193,135 +9209,294 @@ function spTimeToMins(t) {
   var p = t.split(':');
   return parseInt(p[0], 10) * 60 + parseInt(p[1], 10) + (parseFloat(p[2]) || 0) / 60;
 }
-// Decimal hours -> whole minutes.
-function spHoursToMins(h) { return Math.round((h || 0) * 60); }
 
-// Splits the claimed overtime into its two halves, in whole minutes, using
-// the same rule as sp_clock_report's overtime_claimed (normal hours
-// 07:00-16:00): morning = clocked in before 07:00, evening = clocked out
-// after 16:00.
-function spSplitOvertime(r) {
+// ── PAYROLL RULES ──
+// Normal hours are 07:00-16:00, Monday to Friday. Morning and evening overtime
+// are each rounded to the nearest half hour per day. Saturdays and bank holidays
+// suggest all hours at time and a half, Sundays all hours at double. Time before
+// 16:00 is added up over the period, rounded to the nearest half hour, and taken
+// off basic overtime, unless the day is marked full pay or has approved leave.
+function spRoundHalf(mins) { return Math.round(mins / 30) / 2; }
+function spNum(h) { return Math.round((Number(h) || 0) * 100) / 100; }
+
+// "Mon 2 Nov" from "2026-11-02".
+function spFmtPayDate(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
+}
+
+function spDayPay(r) {
+  var dow = new Date(r.work_date + 'T00:00:00').getDay();
+  var kind = dow === 0 ? 'sun' : dow === 6 ? 'sat' : r.is_bank_holiday ? 'bh' : 'week';
   var inM = spTimeToMins(r.clock_in), outM = spTimeToMins(r.clock_out);
-  var morning = inM != null ? Math.round(Math.max(0, 7 * 60 - inM)) : 0;
-  var evening = outM != null ? Math.round(Math.max(0, outM - 16 * 60)) : 0;
-  return { morning: morning, evening: evening, total: morning + evening };
-}
-
-// Turns every numeric cell in the given columns (0-based, below the header
-// row) from minutes into an Excel time shown as e.g. "1h 15m" / "100h 14m".
-// They stay real time values, so SUM() still works; [h] keeps totals over 24
-// hours as e.g. "37h 30m" rather than wrapping round to "13h 30m".
-function spMinsColsToTime(ws, cols) {
-  var range = XLSX.utils.decode_range(ws['!ref']);
-  for (var row = 1; row <= range.e.r; row++) {
-    cols.forEach(function(c) {
-      var cell = ws[XLSX.utils.encode_cell({ r: row, c: c })];
-      if (cell && typeof cell.v === 'number') { cell.v = cell.v / 1440; cell.t = 'n'; cell.z = '[h]"h" mm"m"'; }
-    });
-  }
-}
-
-// Shared by both the "everyone" and "one person" export buttons — just
-// varies which rows it's handed. Rows arrive sorted by name then date.
-// Three tabs:
-//   Summary      — one row per person for the month (the payroll view)
-//   Daily        — every day worked, with a TOTAL row after each person
-//   Weekly Hours — hours per Monday-starting week
-// Durations are worked in whole minutes, so every total is an exact sum of
-// the days it covers.
-function spClockReportWorkbook(rows) {
-  var people = [], byName = {}, daily = [];
-  rows.forEach(function(r) {
-    var p = byName[r.name];
-    if (!p) {
-      p = byName[r.name] = { name: r.name, days: [], worked: 0, noOut: 0, hours: 0, morning: 0, evening: 0, total: 0, approved: 0 };
-      people.push(p);
+  // Whole minutes, so the sums match the HH:MM shown beside them.
+  if (inM != null) inM = Math.floor(inM);
+  if (outM != null) outM = Math.floor(outM);
+  var morning = 0, evening = 0, earlyMins = 0;
+  if (kind === 'week') {
+    if (inM != null) morning = spRoundHalf(Math.max(0, 7 * 60 - inM));
+    if (outM != null) {
+      evening = spRoundHalf(Math.max(0, outM - 16 * 60));
+      if (!r.has_leave) earlyMins = Math.max(0, 16 * 60 - outM);
     }
-    var ot = spSplitOvertime(r);
-    var hours = r.hours != null ? spHoursToMins(r.hours) : null;
-    var approved = spHoursToMins(r.overtime_approved);
+  }
+  var worked = r.hours != null ? spRoundHalf(Number(r.hours) * 60) : 0;
+  var suggest = {
+    basic: morning + evening,
+    half: (kind === 'sat' || kind === 'bh') ? worked : 0,
+    dbl: kind === 'sun' ? worked : 0
+  };
+  var paid = r.is_approved
+    ? { basic: Number(r.overtime_approved) || 0, half: Number(r.overtime_time_half) || 0, dbl: Number(r.overtime_double) || 0 }
+    : { basic: 0, half: 0, dbl: 0 };
+  return {
+    morning: morning, evening: evening, suggest: suggest, paid: paid, earlyMins: earlyMins,
+    deductMins: r.early_full_pay ? 0 : earlyMins,
+    awaiting: r.is_approved ? 0 : suggest.basic + suggest.half + suggest.dbl
+  };
+}
+
+// ── PAY PERIOD ──
+// The closing date moves each month, so it's chosen when exporting and saved.
+// The next month's export then starts the day after it, so no day is paid twice
+// or missed.
+var spPayPeriodKey = null;
+function spLoadPayPeriod() {
+  var fromEl = document.getElementById('spPayFrom'), closeEl = document.getElementById('spPayClose');
+  if (!fromEl || !closeEl) return;
+  var y = spReportMonth.getFullYear(), m = spReportMonth.getMonth(), key = y + '-' + m;
+  if (spPayPeriodKey === key) return;
+  spPayPeriodKey = key;
+  fromEl.value = spLocalDateStr(new Date(y, m, 1));
+  closeEl.value = spLocalDateStr(new Date(y, m + 1, 0));
+  spRpc('sp_get_payroll_closing', { p_year: y, p_month: m + 1 }).then(function(res) {
+    var row = res.ok && Array.isArray(res.data) ? res.data[0] : null;
+    if (!row || spPayPeriodKey !== key) return;
+    if (row.this_closing) closeEl.value = row.this_closing;
+    if (row.prev_closing) {
+      var d = new Date(row.prev_closing + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      fromEl.value = spLocalDateStr(d);
+    }
+  });
+}
+
+// Leave days falling inside the period. An entry wholly inside it counts its own
+// days figure, which allows for half days. One crossing the edge counts its
+// Monday-to-Friday days inside the period, never more than the entry's total.
+function spLeaveDaysInPeriod(l, from, to) {
+  if (l.start_date >= from && l.end_date <= to) return Number(l.days) || 0;
+  var start = l.start_date > from ? l.start_date : from, end = l.end_date < to ? l.end_date : to, count = 0;
+  for (var d = new Date(start + 'T00:00:00'); spLocalDateStr(d) <= end; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+  }
+  return Math.min(count, Number(l.days) || 0);
+}
+
+var SP_LEAVE_LABELS = { sick: 'Sick', unpaid: 'Unpaid', holiday: 'Holiday', other: 'Other', bank_holiday: 'Bank Holiday', shutdown: 'Shutdown' };
+
+// Bank holidays and shutdowns apply to everyone, so they don't put someone on
+// the export by themselves.
+function spBuildPayPeople(rows, leave, from, to) {
+  var byName = {};
+  function person(name) {
+    if (!byName[name]) byName[name] = { name: name, days: [], leave: [], worked: 0, noOut: 0, basic: 0, half: 0, dbl: 0, earlyMins: 0, awaiting: 0, sick: 0, unpaid: 0 };
+    return byName[name];
+  }
+  rows.forEach(function(r) {
+    var p = person(r.name), pay = spDayPay(r);
     p.worked++;
     if (!r.clock_out) p.noOut++;
-    p.hours += hours || 0;
-    p.morning += ot.morning;
-    p.evening += ot.evening;
-    p.total += ot.total;
-    p.approved += approved;
-    p.days.push({
-      Name: r.name,
-      Date: r.work_date,
-      'Clock In': r.clock_in ? r.clock_in.slice(0, 5) : '',
-      'Clock Out': r.clock_out ? r.clock_out.slice(0, 5) : '',
-      Hours: hours != null ? hours : '',
-      'Morning Overtime (before 07:00)': ot.morning,
-      'Evening Overtime (after 16:00)': ot.evening,
-      'Total Overtime Claimed': ot.total,
-      'Overtime Approved': approved
-    });
+    p.basic += pay.paid.basic;
+    p.half += pay.paid.half;
+    p.dbl += pay.paid.dbl;
+    p.earlyMins += pay.deductMins;
+    p.awaiting += pay.awaiting;
+    p.days.push({ row: r, pay: pay });
   });
-
-  var summary = people.map(function(p) {
-    return {
-      Name: p.name,
-      'Days Worked': p.worked,
-      'Days Missing Clock-Out': p.noOut,
-      'Total Hours': p.hours,
-      'Morning Overtime (before 07:00)': p.morning,
-      'Evening Overtime (after 16:00)': p.evening,
-      'Total Overtime Claimed': p.total,
-      'Overtime Approved': p.approved
-    };
+  leave.forEach(function(l) {
+    if (l.type !== 'bank_holiday' && l.type !== 'shutdown') person(l.name);
   });
+  leave.forEach(function(l) {
+    var p = byName[l.name];
+    if (!p) return;
+    p.leave.push(l);
+    if (l.type === 'sick') p.sick += spLeaveDaysInPeriod(l, from, to);
+    if (l.type === 'unpaid') p.unpaid += spLeaveDaysInPeriod(l, from, to);
+  });
+  return Object.keys(byName).sort().map(function(n) {
+    var p = byName[n];
+    p.early = spRoundHalf(p.earlyMins);
+    p.basicNet = p.basic - p.early;
+    return p;
+  });
+}
 
+function spFmtPeriod(from, to) {
+  var f = function(iso) { return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
+  return f(from) + ' to ' + f(to);
+}
+
+// Same layout as the overtime spreadsheet: a row per date, AM and PM columns per
+// person, and the totals underneath. Excel cells can't be coloured from here, so
+// what the colours used to show is written in the cell.
+function spPayGridSheet(people, from, to) {
+  var aoa = [['MONTHLY STAFF OVERTIME'], [spFmtPeriod(from, to)], ['Date'], ['']];
+  var merges = [];
   people.forEach(function(p, i) {
+    var c = 1 + i * 2;
+    aoa[2][c] = p.name; aoa[2][c + 1] = '';
+    aoa[3][c] = 'AM'; aoa[3][c + 1] = 'PM';
+    merges.push({ s: { r: 2, c: c }, e: { r: 2, c: c + 1 } });
+  });
+  merges.push({ s: { r: 2, c: 0 }, e: { r: 3, c: 0 } });
+  for (var d = new Date(from + 'T00:00:00'); spLocalDateStr(d) <= to; d.setDate(d.getDate() + 1)) {
+    var iso = spLocalDateStr(d), weekend = d.getDay() === 0 || d.getDay() === 6, line = [spFmtPayDate(iso)];
+    people.forEach(function(p, i) {
+      var c = 1 + i * 2, label = '';
+      p.leave.forEach(function(l) {
+        if (iso < l.start_date || iso > l.end_date) return;
+        if (weekend && l.type !== 'bank_holiday' && l.type !== 'shutdown') return;
+        // Personal leave shows over a bank holiday, which is everyone's.
+        if (label && l.type === 'bank_holiday') return;
+        label = (SP_LEAVE_LABELS[l.type] || l.type) + (Number(l.days) === 0.5 ? ' (half)' : '');
+      });
+      var day = p.days.filter(function(x) { return x.row.work_date === iso; })[0];
+      if (day) {
+        var out = day.row.clock_out ? day.row.clock_out.slice(0, 5) : '';
+        if (out && day.pay.earlyMins > 0) out += day.row.early_full_pay ? ' full pay' : ' early';
+        line[c] = day.row.clock_in ? day.row.clock_in.slice(0, 5) : label;
+        line[c + 1] = out || label;
+      } else {
+        line[c] = label; line[c + 1] = '';
+        if (label) merges.push({ s: { r: aoa.length, c: c }, e: { r: aoa.length, c: c + 1 } });
+      }
+    });
+    aoa.push(line);
+  }
+  [['Basic Overtime', 'basicNet'], ['Left Early (taken off basic)', 'early'], ['Overtime @ 1.5', 'half'], ['Overtime @ 2', 'dbl'],
+   ['Sickness (days)', 'sick'], ['Unpaid Leave (days)', 'unpaid'], ['Awaiting Approval', 'awaiting']].forEach(function(t) {
+    var line = [t[0]];
+    people.forEach(function(p, i) {
+      var c = 1 + i * 2;
+      line[c] = spNum(p[t[1]]); line[c + 1] = '';
+      merges.push({ s: { r: aoa.length, c: c }, e: { r: aoa.length, c: c + 1 } });
+    });
+    aoa.push(line);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = merges;
+  ws['!cols'] = [{ wch: 28 }];
+  people.forEach(function(p, i) { ws['!cols'][1 + i * 2] = { wch: 10 }; ws['!cols'][2 + i * 2] = { wch: 14 }; });
+  return ws;
+}
+
+// Shared by both the "everyone" and "one person" export buttons — just varies
+// which rows it's handed. Hours are decimals, like the spreadsheet, because
+// basic overtime can go negative and Excel can't show a negative time value.
+// Four tabs:
+//   Summary       — one row per person for the pay period (the payroll view)
+//   Monthly Sheet — laid out like the overtime spreadsheet
+//   Daily         — every day worked, with a TOTAL row after each person
+//   Weekly Hours  — hours per Monday-starting week
+function spClockReportWorkbook(rows, leave, from, to) {
+  var people = spBuildPayPeople(rows, leave, from, to);
+
+  var summaryAoa = [
+    ['Staff overtime: ' + spFmtPeriod(from, to)],
+    ['Only approved overtime is counted. Anything not yet approved is under Awaiting Approval.'],
+    [],
+    ['Name', 'Basic Overtime', 'Overtime @ 1.5', 'Overtime @ 2', 'Sickness (days)', 'Unpaid Leave (days)',
+     'Basic Before Deductions', 'Left Early', 'Awaiting Approval', 'Days Worked', 'Days Missing Clock-Out']
+  ];
+  people.forEach(function(p) {
+    summaryAoa.push([p.name, spNum(p.basicNet), spNum(p.half), spNum(p.dbl), spNum(p.sick), spNum(p.unpaid),
+      spNum(p.basic), spNum(p.early), spNum(p.awaiting), p.worked, p.noOut]);
+  });
+  var summarySheet = XLSX.utils.aoa_to_sheet(summaryAoa);
+  summarySheet['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 10 }, { wch: 17 }, { wch: 11 }, { wch: 22 }];
+
+  var daily = [];
+  people.filter(function(p) { return p.days.length; }).forEach(function(p, i) {
     if (i) daily.push({});
-    daily.push.apply(daily, p.days);
+    p.days.forEach(function(x) {
+      var r = x.row, pay = x.pay;
+      daily.push({
+        Name: r.name,
+        Date: spFmtPayDate(r.work_date),
+        'Clock In': r.clock_in ? r.clock_in.slice(0, 5) : '',
+        'Clock Out': r.clock_out ? r.clock_out.slice(0, 5) : '',
+        Hours: r.hours != null ? spNum(r.hours) : '',
+        'Morning OT': pay.morning,
+        'Evening OT': pay.evening,
+        'Approved?': r.is_approved ? 'Yes' : 'No',
+        Basic: spNum(pay.paid.basic),
+        '@ 1.5': spNum(pay.paid.half),
+        '@ 2': spNum(pay.paid.dbl),
+        'Left Early': pay.earlyMins ? spFmtHoursMins(pay.earlyMins / 60) + (r.early_full_pay ? ' (full pay)' : '') : '',
+        'Awaiting Approval': spNum(pay.awaiting)
+      });
+    });
     daily.push({
-      Name: p.name + ' — TOTAL', Date: '', 'Clock In': '', 'Clock Out': '',
-      Hours: p.hours,
-      'Morning Overtime (before 07:00)': p.morning,
-      'Evening Overtime (after 16:00)': p.evening,
-      'Total Overtime Claimed': p.total,
-      'Overtime Approved': p.approved
+      Name: p.name + ' — TOTAL', Date: '', 'Clock In': '', 'Clock Out': '', Hours: '', 'Morning OT': '', 'Evening OT': '', 'Approved?': '',
+      Basic: spNum(p.basic), '@ 1.5': spNum(p.half), '@ 2': spNum(p.dbl), 'Left Early': spNum(p.early), 'Awaiting Approval': spNum(p.awaiting)
     });
   });
 
   var weekly = spComputeWeeklyHours(rows).map(function(w) {
-    return { Name: w.name, 'Week Starting': w.weekStart, Hours: spHoursToMins(w.hours) };
+    return { Name: w.name, 'Week Starting': w.weekStart, Hours: spNum(w.hours) };
   });
 
   var wb = XLSX.utils.book_new();
-  var summarySheet = XLSX.utils.json_to_sheet(summary);
-  spMinsColsToTime(summarySheet, [3, 4, 5, 6, 7]);
-  summarySheet['!cols'] = [{ wch: 24 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 30 }, { wch: 29 }, { wch: 22 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+  XLSX.utils.book_append_sheet(wb, spPayGridSheet(people, from, to), 'Monthly Sheet');
   var dailySheet = XLSX.utils.json_to_sheet(daily);
-  spMinsColsToTime(dailySheet, [4, 5, 6, 7, 8]);
-  dailySheet['!cols'] = [{ wch: 28 }, { wch: 11 }, { wch: 9 }, { wch: 9 }, { wch: 10 }, { wch: 30 }, { wch: 29 }, { wch: 22 }, { wch: 18 }];
+  dailySheet['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 9 }, { wch: 9 }, { wch: 8 }, { wch: 11 }, { wch: 11 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 20 }, { wch: 17 }];
   XLSX.utils.book_append_sheet(wb, dailySheet, 'Daily');
   var weeklySheet = XLSX.utils.json_to_sheet(weekly);
-  spMinsColsToTime(weeklySheet, [2]);
   weeklySheet['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 10 }];
   XLSX.utils.book_append_sheet(wb, weeklySheet, 'Weekly Hours');
   return wb;
 }
 
-function spExportClockReport() {
-  var rows = spLastClockReportRows;
-  if (!rows.length) { spToast('Nothing to export for this month.'); return; }
-  if (typeof XLSX === 'undefined') { _withXlsx(spExportClockReport); return; }
-  var wb = spClockReportWorkbook(rows);
-  XLSX.writeFile(wb, 'Clock Report - ' + spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + '.xlsx');
+// Saves the closing date, then loads every month the period touches, since it
+// usually starts in the month before.
+function spExportPayroll(personName) {
+  if (typeof XLSX === 'undefined') { _withXlsx(function() { spExportPayroll(personName); }); return; }
+  var from = document.getElementById('spPayFrom').value, to = document.getElementById('spPayClose').value;
+  if (!from || !to) { spToast('Enter the pay period start and closing dates.'); return; }
+  if (from > to) { spToast('The pay period starts after the closing date.'); return; }
+  var y = spReportMonth.getFullYear(), m = spReportMonth.getMonth();
+  if (to.slice(0, 7) !== spLocalDateStr(new Date(y, m, 1)).slice(0, 7)) { spToast('The closing date must be in the month shown.'); return; }
+  if (parseInt(to.slice(8), 10) < 26 && !confirm('The closing date is normally between the 26th and 31st. Export with ' + spFmtPayDate(to) + ' anyway?')) return;
+
+  var months = [], end = new Date(to + 'T00:00:00');
+  for (var d = new Date(from.slice(0, 7) + '-01T00:00:00'); d <= end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    months.push({ p_year: d.getFullYear(), p_month: d.getMonth() + 1 });
+  }
+  spRpc('sp_set_payroll_closing', { p_year: y, p_month: m + 1, p_closing_date: to }).then(function(saved) {
+    if (!saved.ok) throw new Error((saved.data && saved.data.message) || 'Could not save the closing date.');
+    return Promise.all(months.map(function(b) { return spRpc('sp_clock_report', b); }).concat(spRpc('sp_payroll_leave', { p_from: from, p_to: to })));
+  }).then(function(results) {
+    results.forEach(function(res) {
+      if (!res.ok || !Array.isArray(res.data)) throw new Error((res.data && res.data.message) || 'Could not load the report.');
+    });
+    var leave = results.pop().data, rows = [];
+    results.forEach(function(res) { rows = rows.concat(res.data); });
+    rows = rows.filter(function(r) { return r.work_date >= from && r.work_date <= to; });
+    if (personName) {
+      rows = rows.filter(function(r) { return r.name === personName; });
+      leave = leave.filter(function(l) { return l.name === personName; });
+    }
+    rows.sort(function(a, b) { return a.name === b.name ? (a.work_date < b.work_date ? -1 : 1) : (a.name < b.name ? -1 : 1); });
+    var hasPersonalLeave = leave.some(function(l) { return l.type !== 'bank_holiday' && l.type !== 'shutdown'; });
+    if (!rows.length && !hasPersonalLeave) { spToast('Nothing to export for this pay period.'); return; }
+    var title = 'Staff Overtime - ' + (personName ? personName + ' - ' : '') + spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + '.xlsx';
+    XLSX.writeFile(spClockReportWorkbook(rows, leave, from, to), title);
+  }).catch(function(e) { spToast(e.message || 'Could not export.'); });
 }
 
-function spExportClockReportPerson() {
-  if (!spReportSelectedStaff) return;
-  var rows = spLastClockReportRows.filter(function(r) { return r.name === spReportSelectedStaff; });
-  if (!rows.length) { spToast('Nothing to export for ' + spReportSelectedStaff + ' this month.'); return; }
-  if (typeof XLSX === 'undefined') { _withXlsx(spExportClockReportPerson); return; }
-  var wb = spClockReportWorkbook(rows);
-  XLSX.writeFile(wb, 'Clock Report - ' + spReportSelectedStaff + ' - ' + spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + '.xlsx');
-}
+function spExportClockReport() { spExportPayroll(null); }
+function spExportClockReportPerson() { if (spReportSelectedStaff) spExportPayroll(spReportSelectedStaff); }
 
 function spMapLink(lat, lng) {
   if (lat == null || lng == null) return '';
@@ -9525,7 +9700,7 @@ function spHistoryRowHtml(r) {
     + '</div>';
 }
 
-var SP_LEAVE_TYPES = ['holiday', 'sick', 'other', 'bank_holiday', 'shutdown'];
+var SP_LEAVE_TYPES = ['holiday', 'sick', 'other', 'unpaid', 'bank_holiday', 'shutdown'];
 var SP_LEAVE_STATUSES = ['pending', 'approved', 'declined'];
 
 function spOptions(values, selected) {

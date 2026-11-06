@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.9.97">
+  <link rel="stylesheet" href="css/app.css?v=1.9.98">
 </head>
 <body>
 
@@ -61,7 +61,7 @@
       <div class="lock-err" id="lockMgrErr"></div>
     </div>
   </div>
-  <div class="lock-ver">v1.9.97</div>
+  <div class="lock-ver">v1.9.98</div>
   </div>
 </div>
 
@@ -282,7 +282,7 @@
           <div class="sp-field"><label>End date</label><input type="date" id="spReqEnd" onchange="spRecalcReqDays()"></div>
         </div>
         <div class="sp-field"><label>Days (weekdays auto-calculated &mdash; adjust if it spans a bank holiday)</label><input type="number" step="0.5" min="0.5" id="spReqDays"></div>
-        <div class="sp-field"><label>Type</label><select id="spReqType"><option value="holiday">Holiday</option><option value="sick">Sick</option><option value="other">Other</option></select></div>
+        <div class="sp-field"><label>Type</label><select id="spReqType"><option value="holiday">Holiday</option><option value="sick">Sick</option><option value="other">Other</option><option value="unpaid">Unpaid</option></select></div>
         <div class="sp-field"><label>Note (optional)</label><textarea id="spReqNote" rows="2" placeholder="e.g. family holiday"></textarea></div>
         <button class="sp-btn sp-btn-primary" onclick="spSubmitRequest()">Submit request</button>
         <div class="sp-err-inline" id="spReqErr"></div>
@@ -317,6 +317,7 @@
       <div class="sp-card"><h3>Recent clock activity</h3><div id="spClockActivity"></div></div>
       <div class="sp-card">
         <div class="sp-cal-head"><button onclick="spShiftReportMonth(-1)">&lsaquo;</button><div class="sp-cal-title" id="spReportTitle">Monthly Clock Report</div><button onclick="spShiftReportMonth(1)">&rsaquo;</button></div>
+        <div class="sp-row2"><div class="sp-field"><label>Pay period from</label><input type="date" id="spPayFrom"></div><div class="sp-field"><label>Closing date</label><input type="date" id="spPayClose"></div></div>
         <button class="sp-btn sp-btn-primary" style="margin-bottom:10px;" onclick="spExportClockReport()">Export everyone to Excel</button>
         <div style="overflow-x:auto;" id="spClockReport"></div>
         <div style="overflow-x:auto;" id="spWeeklyHours"></div>
@@ -340,7 +341,7 @@
             </div>
             <div class="sp-row2">
               <div class="sp-field"><label>Days</label><input type="number" step="0.5" id="spAddDays"></div>
-              <div class="sp-field"><label>Type</label><select id="spAddType"><option value="sick">Sick</option><option value="holiday">Holiday</option><option value="other">Other</option></select></div>
+              <div class="sp-field"><label>Type</label><select id="spAddType"><option value="sick">Sick</option><option value="holiday">Holiday</option><option value="other">Other</option><option value="unpaid">Unpaid</option></select></div>
             </div>
             <div class="sp-field"><label>Note</label><input type="text" id="spAddNote" placeholder="e.g. sick pay for 12-13 Aug"></div>
             <button class="sp-btn sp-btn-primary" onclick="spSubmitManagerAddEntry()">Add entry</button>
@@ -379,7 +380,7 @@
   <div style="position:relative;z-index:1;">
   <div class="ws-header">
     <div class="ws-brand">
-      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.9.97<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
+      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.9.98<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
     </div>
     <button id="logoutBtn" class="ws-icon-btn" onclick="logoutToTeamLogin()" style="display:none;" aria-label="Log out" title="Log out"><svg class="ic"><use href="#i-logout"/></svg><span>Log out</span></button>
   </div>
@@ -452,7 +453,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.97</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.98</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -3024,7 +3025,7 @@
   </div>
 </div>
 
-  <script src="js/app.js?v=1.9.97"></script>
+  <script src="js/app.js?v=1.9.98"></script>
 </body>
 </html>
 
