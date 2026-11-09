@@ -3,8 +3,13 @@ var _vehInspector = null;
 var _vehAutoSaveTimer = null;
 var _vehCurrentId = null;
 
+// Managers see the check categories above the schedule on the Checks landing
+// page; employees land on the schedule alone, with categories one tap away.
 function switchChecksTab(tab) {
-  document.getElementById('checksHome').style.display = 'none';
+  var withCategories = tab === 'schedule' && managerUnlocked;
+  document.getElementById('checksHome').style.display = withCategories ? 'block' : 'none';
+  var allBtn = document.getElementById('checksAllCategoriesBtn');
+  if (allBtn) allBtn.style.display = managerUnlocked ? 'none' : '';
   document.querySelectorAll('.checks-tab-content').forEach(function(c) {
     c.style.display = (c.id === 'checksTab_' + tab) ? 'block' : 'none';
   });
@@ -17,15 +22,16 @@ function switchChecksTab(tab) {
 }
 
 function showChecksHome() {
+  if (managerUnlocked) { switchChecksTab('schedule'); return; }
   document.getElementById('checksHome').style.display = 'block';
   document.querySelectorAll('.checks-tab-content').forEach(function(c) { c.style.display = 'none'; });
 }
 
 function checksBack() {
-  var home = document.getElementById('checksHome');
-  if (home && home.style.display !== 'none') { switchChecksTab('schedule'); return; }
   var scheduleTab = document.getElementById('checksTab_schedule');
   if (scheduleTab && scheduleTab.style.display !== 'none') { closeChecksView(); return; }
+  var home = document.getElementById('checksHome');
+  if (home && home.style.display !== 'none') { switchChecksTab('schedule'); return; }
   // From a group's sub-tab (e.g. one climber's kit) go back to the group picker
   var groupCat = Object.keys(CHECK_CATEGORIES).filter(function(k) {
     var el = document.getElementById('checksTab_' + k);

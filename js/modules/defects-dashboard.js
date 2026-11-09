@@ -3,7 +3,7 @@
 // entirely (no network calls, badges hidden) when managerUnlocked is false,
 // per the requirement that this stays out of the employee view. "Unresolved"
 // mirrors renderDefectsList's own isFixed check — anything whose
-// defect_status isn't exactly 'fixed' (including unset/null) counts. ──
+// defect_status isn't 'fixed' or 'cleared' (including unset/null) counts. ──
 function refreshDefectsBadge() {
   var welcomeBadge = document.getElementById('checksDefectTileBadge');
   var tileBadge = document.getElementById('defectsTileBadge');
@@ -29,7 +29,7 @@ function refreshDefectsBadge() {
   });
   Promise.all(jobs).then(function(results) {
     var all = [].concat.apply([], results.map(function(r){ return Array.isArray(r) ? r : []; }));
-    var count = all.filter(function(d){ return d.defect_status !== 'fixed'; }).length;
+    var count = all.filter(function(d){ return d.defect_status !== 'fixed' && d.defect_status !== 'cleared'; }).length;
     [welcomeBadge, tileBadge].forEach(function(b) {
       if (!b) return;
       if (count > 0) { b.textContent = '⚠ ' + count; b.style.display = ''; }
@@ -76,7 +76,8 @@ function fetchDefects() {
 
   Promise.all(jobs).then(function(results) {
     var all = [].concat.apply([], results);
-    var defects = all.filter(function(e){ return e.hasDefect; });
+    // 'cleared' = resolved and then removed from the list (removeDefectFromList)
+    var defects = all.filter(function(e){ return e.hasDefect && e.defectStatus !== 'cleared'; });
     defects.sort(function(a,b){ return (b.createdAt || '').localeCompare(a.createdAt || ''); });
     renderDefectsList(defects);
   });
@@ -138,6 +139,8 @@ function setDefectStatus(kind, cat, id, status, btn) {
   wrap.querySelectorAll('button').forEach(function(b){ b.style.background = 'rgba(255,255,255,.08)'; b.style.color = 'rgba(255,255,255,.6)'; });
   if (status === 'fixed') { btn.style.background = '#7ec820'; btn.style.color = '#1a3210'; }
   else { btn.style.background = '#c62828'; btn.style.color = 'white'; }
+  var removeBtn = wrap.parentElement.querySelector('.defect-remove-btn');
+  if (removeBtn) removeBtn.style.display = status === 'fixed' ? '' : 'none';
   // 'fixed'/'not_fixed' are the stored values (unchanged, existing records
   // already use them) — only the button labels read "Resolved" to the manager.
   fetch(SUPA_URL + '/rest/v1/' + _defectTableFor(kind, cat) + '?id=eq.' + id, {
@@ -146,6 +149,28 @@ function setDefectStatus(kind, cat, id, status, btn) {
     body: JSON.stringify({defect_status: status})
   }).then(function(){ refreshDefectsBadge(); }).catch(function(){});
 }
+// Once a defect is resolved it can be taken off the list. The check record
+// keeps the defect (status 'cleared', still counted as resolved), so it's
+// still on the check's own report.
+function removeDefectFromList(kind, cat, id, btn) {
+  if (!confirm('Remove this resolved defect from the list?\n\nThe check record keeps it — it just won\'t show here any more.')) return;
+  btn.disabled = true;
+  fetch(SUPA_URL + '/rest/v1/' + _defectTableFor(kind, cat) + '?id=eq.' + id, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken(),'Prefer':'return=minimal'},
+    body: JSON.stringify({defect_status: 'cleared'})
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('remove failed');
+    var card = btn.closest('.defect-card');
+    if (card) card.remove();
+    var listEl = document.getElementById('defectsList');
+    if (listEl && !listEl.querySelector('.defect-card')) renderDefectsList([]);
+    refreshDefectsBadge();
+  })
+  .catch(function() { btn.disabled = false; alert('Could not remove the defect — check connection and try again.'); });
+}
+
 var _defectNoteTimers = {};
 function scheduleDefectNoteSave(kind, cat, id, textarea) {
   var key = kind + '_' + cat + '_' + id;
@@ -172,7 +197,7 @@ function renderDefectsList(defects) {
     var thumbs = (e.defectImages || []).map(function(p) {
       return '<img data-defect-path="' + _esc(p) + '" onclick="event.stopPropagation();openDefectLightbox(this)" style="width:42px;height:42px;border-radius:5px;object-fit:cover;background:rgba(255,255,255,.08);cursor:pointer;">';
     }).join('');
-    return '<div style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;-webkit-tap-highlight-color:transparent;">'
+    return '<div class="defect-card" style="background:#305818;border:1px solid rgba(198,40,40,.5);border-radius:8px;padding:16px 18px;-webkit-tap-highlight-color:transparent;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;" onclick="openDefectRecord(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')">'
       + '<div style="flex:1;min-width:0;">'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:white;letter-spacing:.5px;">' + _esc(e.name) + '</div>'
@@ -183,9 +208,12 @@ function renderDefectsList(defects) {
       + '<div style="font-size:22px;color:rgba(255,255,255,.4);flex-shrink:0;">&#8250;</div>'
       + '</div>'
       + '<div style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,.15);" onclick="event.stopPropagation()">'
-      + '<div style="display:flex;border-radius:4px;overflow:hidden;border:1px solid rgba(255,255,255,.2);width:fit-content;margin-bottom:8px;">'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">'
+      + '<div style="display:flex;border-radius:4px;overflow:hidden;border:1px solid rgba(255,255,255,.2);width:fit-content;">'
       + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (isFixed ? 'background:#7ec820;color:#1a3210;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Resolved</button>'
       + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'not_fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (!isFixed ? 'background:#c62828;color:white;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Not Resolved</button>'
+      + '</div>'
+      + '<button class="defect-remove-btn" onclick="removeDefectFromList(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',this)" style="' + (isFixed ? '' : 'display:none;') + 'background:none;border:1px solid rgba(255,255,255,.35);color:white;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#10005; Remove from list</button>'
       + '</div>'
       + '<textarea placeholder="Office note — e.g. what was done to fix it" oninput="scheduleDefectNoteSave(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',this)" style="width:100%;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:7px 9px;font-size:12.5px;font-family:\'Barlow\',sans-serif;background:rgba(255,255,255,.05);color:white;resize:vertical;min-height:36px;">' + _esc(e.officeNote) + '</textarea>'
       + '</div>'

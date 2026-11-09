@@ -13,6 +13,7 @@ equipment-checks.js
 survey-reports.js
 defects-dashboard.js
 todays-checks-schedule.js
+check-report-downloads.js
 toolbox-talks.js
 audits.js
 method-statement-builder.js

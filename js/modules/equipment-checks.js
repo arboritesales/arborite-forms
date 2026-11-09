@@ -198,7 +198,9 @@ var CHECK_CATEGORIES = {
   trailer: {
     label: 'Trailers', icon: '🚛', table: 'trailer_checks',
     machineLabel: 'Serial / Reference / Model / Reg No',
-    machines: ['Brian James trailer', 'Ifor Williams Trailer', 'Ifor Williams 3.5t trailer', 'Ifor Williams Cage trailer', 'Ifor Williams GH27', 'Ifor Williams GH94', 'Towmate Trailer'],
+    // Named as on the check schedule (WEEKLY_CHECKS), which matches by name
+    machines: ['Ifor Williams GH94 – Stump Grinder Trailer', 'Ifor Williams GH94 – New TR8 Trailer', 'Ifor Williams GH94 – Old TR8 Trailer',
+               'Towmate MEWP Trailer', 'Brian James – Digger Trailer', 'Ifor Williams – Cage Trailer', 'Ifor Williams – LV800 Trailer'],
     fields: [
       {key:'used_since_last', label:'Has this item of equipment been used since its last inspection?', options:['Yes','No']},
       {key:'tyres', label:'Tyre pressure and condition', options:['Good','Fair','Poor']},
