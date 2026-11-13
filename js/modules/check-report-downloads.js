@@ -120,6 +120,162 @@ function _pdfBlob(doc) {
   return new Promise(function(resolve) { pdfMake.createPdf(doc).getBlob(resolve); });
 }
 
+// ── DEFECTS EXPORT (Checks → Defects, Manager Access) — every defect ever
+// logged, including resolved ones already removed from the list, as one ZIP:
+// a spreadsheet (CSV, opens in Excel), a PDF register with the photos in it,
+// and the original photos in a Photos folder. Pass a single record
+// (kind, cat, id) to export just that one defect. Read-only — it never
+// changes anything in the database. ──
+function _defectStatusWord(s) {
+  if (s === 'cleared') return 'Resolved (removed from list)';
+  if (s === 'fixed') return 'Resolved';
+  return 'Not resolved';
+}
+function _csvCell(v) {
+  var s = String(v === undefined || v === null ? '' : v);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function _blobToDataUrl(blob) {
+  return new Promise(function(resolve) {
+    var fr = new FileReader();
+    fr.onload = function() { resolve(fr.result); };
+    fr.onerror = function() { resolve(null); };
+    fr.readAsDataURL(blob);
+  });
+}
+
+function exportDefects(btn, kind, cat, id) {
+  var single = !!id;
+  var done = _busy(btn, single ? '&#8987;' : '&#8987; Fetching defects…');
+  var sources = single
+    ? [{ kind: kind, cat: cat || null }]
+    : [{ kind: 'vehicle', cat: null }].concat(Object.keys(CHECK_CATEGORIES).map(function(c) { return { kind: 'cat', cat: c }; }));
+  Promise.all(sources.map(function(s) {
+    var src = _reportSource(s.kind, s.cat);
+    var q = single ? 'id=eq.' + id : 'has_defect=eq.true&order=created_at.asc';
+    return fetch(SUPA_URL + '/rest/v1/' + src.table + '?' + q, { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() } })
+      .then(function(r) { if (!r.ok) throw new Error(src.table); return r.json(); })
+      .then(function(rows) { return (Array.isArray(rows) ? rows : []).map(function(d) { return { kind: s.kind, cat: s.cat, src: src, d: d }; }); });
+  }))
+  .then(function(lists) {
+    var all = [].concat.apply([], lists);
+    all.sort(function(a, b) { return (a.d.created_at || '').localeCompare(b.d.created_at || ''); });
+    if (!all.length) { done('No defects to export.'); return; }
+    _withPdfMake(function() {
+      _withJsZip(function(err) {
+        if (err) { done('ZIP download is unavailable — please check your internet connection and try again.'); return; }
+        _buildDefectsZip(all, btn, single, done);
+      });
+    }, done);
+  })
+  .catch(function() { done('Could not fetch the defects — check connection and try again.'); });
+}
+
+function _buildDefectsZip(all, btn, single, done) {
+  var zip = new JSZip();
+  var photosDir = zip.folder('Photos');
+  var missing = 0;
+  // Download every photo first (one at a time — phones on site signal)
+  var jobs = [];
+  all.forEach(function(it) {
+    var d = it.d, when = d.created_at ? new Date(d.created_at) : null;
+    it.base = (when ? _isoDate(when) : 'undated') + '_' + safeFileSegment(it.src.label) + '_' + safeFileSegment(it.src.name(d)) + '_' + String(d.id).slice(0, 6);
+    it.photos = [];
+    (Array.isArray(d.defect_images) ? d.defect_images : []).forEach(function(p, n) {
+      jobs.push({ it: it, path: p, file: it.base + '_photo' + (n + 1) + '.jpg' });
+    });
+  });
+  var i = 0;
+  (function nextPhoto() {
+    if (i >= jobs.length) { finish(); return; }
+    var j = jobs[i++];
+    if (btn && !single) btn.innerHTML = '&#8987; Photo ' + i + ' of ' + jobs.length + '…';
+    fetch(_defectPhotoAuthUrl(j.path), { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() } })
+      .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
+      .then(function(blob) {
+        photosDir.file(j.file, blob);
+        return _blobToDataUrl(blob).then(function(url) { j.it.photos.push({ file: j.file, url: url }); });
+      })
+      .catch(function() { missing++; j.it.photos.push({ file: j.file + ' (could not be downloaded)', url: null }); })
+      .then(nextPhoto);
+  })();
+
+  function finish() {
+    if (btn && !single) btn.innerHTML = '&#8987; Building register…';
+    // Spreadsheet
+    var header = ['Date', 'Time', 'Category', 'Item', 'Inspector', 'Defect', 'Status', 'Office note', 'Photos', 'Record ID'];
+    var lines = [header.map(_csvCell).join(',')];
+    all.forEach(function(it) {
+      var d = it.d, when = d.created_at ? new Date(d.created_at) : null;
+      lines.push([
+        when ? when.toLocaleDateString('en-GB') : '', when ? when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '',
+        it.src.label, it.src.name(d) || '', d.inspector_name || '', d.defect_comment || '',
+        _defectStatusWord(d.defect_status), d.office_note || '',
+        it.photos.map(function(p) { return p.file; }).join('; '), d.id
+      ].map(_csvCell).join(','));
+    });
+    var stamp = _isoDate(new Date());
+    var label = single ? 'Defect_' + all[0].base : 'Defects_Register_' + stamp;
+    zip.file(label + '.csv', '﻿' + lines.join('\r\n'));
+    // PDF register with the photos in it
+    _pdfBlob(_defectsPdfDoc(all, single)).then(function(pdf) {
+      zip.file(label + '.pdf', pdf);
+      if (btn && !single) btn.innerHTML = '&#8987; Zipping…';
+      return zip.generateAsync({ type: 'blob' });
+    }).then(function(blob) {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = label + '.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function() { URL.revokeObjectURL(a.href); }, 5000);
+      done(missing ? missing + ' photo' + (missing === 1 ? '' : 's') + ' could not be downloaded — everything else is in the ZIP.' : '');
+    }).catch(function() { done('Could not build the export — please try again.'); });
+  }
+}
+
+function _defectsPdfDoc(all, single) {
+  var open = all.filter(function(it) { return it.d.defect_status !== 'fixed' && it.d.defect_status !== 'cleared'; }).length;
+  var content = [
+    { text: 'ARBORITE TREE SERVICES', style: 'brand' },
+    { text: single ? 'Defect Record' : 'Defects Register', style: 'title' },
+    { text: 'Exported ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + (single ? '' : ' · ' + all.length + ' defect' + (all.length === 1 ? '' : 's') + ' · ' + open + ' not resolved'), style: 'small', margin: [0, 0, 0, 12] }
+  ];
+  all.forEach(function(it, n) {
+    var d = it.d, when = d.created_at ? new Date(d.created_at) : null;
+    var resolved = d.defect_status === 'fixed' || d.defect_status === 'cleared';
+    var block = [
+      { text: (single ? '' : (n + 1) + '. ') + (it.src.name(d) || 'Unknown') + ' — ' + it.src.label, style: 'h2' },
+      { table: { widths: [90, '*'], body: [
+        [{ text: 'Date', style: 'metaLbl' }, { text: when ? when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '', style: 'cell' }],
+        [{ text: 'Inspector', style: 'metaLbl' }, { text: d.inspector_name || '', style: 'cell' }],
+        [{ text: 'Defect', style: 'metaLbl' }, { text: d.defect_comment || 'Defect reported (no comment).', style: 'cell', color: '#c62828' }],
+        [{ text: 'Status', style: 'metaLbl' }, { text: _defectStatusWord(d.defect_status), style: 'cell', bold: true, color: resolved ? '#2d5a1b' : '#c62828' }],
+        [{ text: 'Office note', style: 'metaLbl' }, { text: d.office_note || '—', style: 'cell' }]
+      ] }, layout: 'lightHorizontalLines' }
+    ];
+    var pics = it.photos.filter(function(p) { return p.url; });
+    for (var k = 0; k < pics.length; k += 3) {
+      block.push({ columns: pics.slice(k, k + 3).map(function(p) { return { image: p.url, fit: [160, 160] }; }), columnGap: 8, margin: [0, 8, 0, 0] });
+    }
+    it.photos.filter(function(p) { return !p.url; }).forEach(function(p) { block.push({ text: 'Photo missing: ' + p.file, style: 'small' }); });
+    content.push({ stack: block, margin: [0, 0, 0, 16], unbreakable: pics.length <= 3 });
+  });
+  return {
+    pageSize: 'A4', pageMargins: [40, 40, 40, 40],
+    content: content,
+    footer: function(page, pages) { return { text: 'Defects register · page ' + page + ' of ' + pages, style: 'small', alignment: 'center', margin: [0, 10, 0, 0] }; },
+    styles: {
+      brand: { fontSize: 9, bold: true, color: '#2d5218', characterSpacing: 1.5, margin: [0, 0, 0, 2] },
+      title: { fontSize: 17, bold: true, margin: [0, 0, 0, 4] },
+      h2: { fontSize: 12, bold: true, color: '#2d5218', margin: [0, 6, 0, 4] },
+      metaLbl: { fontSize: 9.5, bold: true, color: '#555555' },
+      cell: { fontSize: 9.5 },
+      small: { fontSize: 8.5, color: '#777777', margin: [0, 3, 0, 0] }
+    },
+    defaultStyle: { fontSize: 9.5 }
+  };
+}
+
 // Every finished check (the categories picked in the report) for the week on
 // screen, or for the calendar month that week starts in, as one ZIP with a
 // folder per category.

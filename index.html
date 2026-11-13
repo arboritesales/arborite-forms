@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.9.101">
+  <link rel="stylesheet" href="css/app.css?v=1.9.102">
 </head>
 <body>
 
@@ -61,7 +61,7 @@
       <div class="lock-err" id="lockMgrErr"></div>
     </div>
   </div>
-  <div class="lock-ver">v1.9.101</div>
+  <div class="lock-ver">v1.9.102</div>
   </div>
 </div>
 
@@ -380,7 +380,7 @@
   <div style="position:relative;z-index:1;">
   <div class="ws-header">
     <div class="ws-brand">
-      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.9.101<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
+      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.9.102<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
     </div>
     <button id="logoutBtn" class="ws-icon-btn" onclick="logoutToTeamLogin()" style="display:none;" aria-label="Log out" title="Log out"><svg class="ic"><use href="#i-logout"/></svg><span>Log out</span></button>
   </div>
@@ -453,7 +453,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.101</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.9.102</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -2903,8 +2903,9 @@
   <div id="checksTab_defects" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:2px;">Logged Defects</div>
+      <button onclick="exportDefects(this)" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:white;padding:8px 14px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#11015; Export all defects</button>
     </div>
-    <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:14px;">Only checks where "Are there any defects?" was answered Yes.</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:14px;">Only checks where "Are there any defects?" was answered Yes. Export all defects downloads a ZIP of every defect ever logged — including resolved ones removed from this list — with a spreadsheet, a PDF register and the photos.</div>
     <div id="defectsList"><div style="color:rgba(255,255,255,.5);padding:30px;text-align:center;font-size:13px;">Loading...</div></div>
   </div>
   <div id="checksTab_schedule" class="checks-tab-content" style="display:none;max-width:1400px;margin:0 auto;padding:20px;">
@@ -3025,7 +3026,7 @@
   </div>
 </div>
 
-  <script src="js/app.js?v=1.9.101"></script>
+  <script src="js/app.js?v=1.9.102"></script>
 </body>
 </html>
 

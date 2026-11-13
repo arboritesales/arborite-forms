@@ -153,7 +153,7 @@ function setDefectStatus(kind, cat, id, status, btn) {
 // keeps the defect (status 'cleared', still counted as resolved), so it's
 // still on the check's own report.
 function removeDefectFromList(kind, cat, id, btn) {
-  if (!confirm('Remove this resolved defect from the list?\n\nThe check record keeps it — it just won\'t show here any more.')) return;
+  if (!confirm('Remove this resolved defect from the list?\n\nThe check record keeps it — it just won\'t show here any more, and it is still included in Export all defects.')) return;
   btn.disabled = true;
   fetch(SUPA_URL + '/rest/v1/' + _defectTableFor(kind, cat) + '?id=eq.' + id, {
     method: 'PATCH',
@@ -214,6 +214,7 @@ function renderDefectsList(defects) {
       + '<button onclick="setDefectStatus(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',\'not_fixed\',this)" style="border:none;padding:7px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;' + (!isFixed ? 'background:#c62828;color:white;' : 'background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);') + '">Not Resolved</button>'
       + '</div>'
       + '<button class="defect-remove-btn" onclick="removeDefectFromList(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',this)" style="' + (isFixed ? '' : 'display:none;') + 'background:none;border:1px solid rgba(255,255,255,.35);color:white;padding:6px 12px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#10005; Remove from list</button>'
+      + '<button onclick="exportDefects(this,\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\')" title="Download this defect (PDF, spreadsheet and photos)" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.8);padding:6px 10px;border-radius:4px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;">&#11015; Download</button>'
       + '</div>'
       + '<textarea placeholder="Office note — e.g. what was done to fix it" oninput="scheduleDefectNoteSave(\'' + e.kind + '\',\'' + (e.cat || '') + '\',\'' + e.id + '\',this)" style="width:100%;border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:7px 9px;font-size:12.5px;font-family:\'Barlow\',sans-serif;background:rgba(255,255,255,.05);color:white;resize:vertical;min-height:36px;">' + _esc(e.officeNote) + '</textarea>'
       + '</div>'
