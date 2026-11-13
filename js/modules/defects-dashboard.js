@@ -153,7 +153,7 @@ function setDefectStatus(kind, cat, id, status, btn) {
 // keeps the defect (status 'cleared', still counted as resolved), so it's
 // still on the check's own report.
 function removeDefectFromList(kind, cat, id, btn) {
-  if (!confirm('Remove this resolved defect from the list?\n\nThe check record keeps it — it just won\'t show here any more, and it is still included in Export all defects.')) return;
+  if (!confirm('Remove this resolved defect from the list?\n\nThe check record keeps it — it just won\'t show here any more, and it is still included in Export resolved defects.')) return;
   btn.disabled = true;
   fetch(SUPA_URL + '/rest/v1/' + _defectTableFor(kind, cat) + '?id=eq.' + id, {
     method: 'PATCH',

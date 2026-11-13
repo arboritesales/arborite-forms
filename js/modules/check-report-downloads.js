@@ -120,8 +120,8 @@ function _pdfBlob(doc) {
   return new Promise(function(resolve) { pdfMake.createPdf(doc).getBlob(resolve); });
 }
 
-// ── DEFECTS EXPORT (Checks → Defects, Manager Access) — every defect ever
-// logged, including resolved ones already removed from the list, as one ZIP:
+// ── DEFECTS EXPORT (Checks → Defects, Manager Access) — every resolved
+// defect, including ones already removed from the list, as one ZIP:
 // a spreadsheet (CSV, opens in Excel), a PDF register with the photos in it,
 // and the original photos in a Photos folder. Pass a single record
 // (kind, cat, id) to export just that one defect. Read-only — it never
@@ -152,7 +152,9 @@ function exportDefects(btn, kind, cat, id) {
     : [{ kind: 'vehicle', cat: null }].concat(Object.keys(CHECK_CATEGORIES).map(function(c) { return { kind: 'cat', cat: c }; }));
   Promise.all(sources.map(function(s) {
     var src = _reportSource(s.kind, s.cat);
-    var q = single ? 'id=eq.' + id : 'has_defect=eq.true&order=created_at.asc';
+    // The full export is resolved defects only ('fixed', or 'cleared' = resolved
+    // and removed from the list); a card's own Download works on any defect.
+    var q = single ? 'id=eq.' + id : 'has_defect=eq.true&defect_status=in.(fixed,cleared)&order=created_at.asc';
     return fetch(SUPA_URL + '/rest/v1/' + src.table + '?' + q, { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + _authToken() } })
       .then(function(r) { if (!r.ok) throw new Error(src.table); return r.json(); })
       .then(function(rows) { return (Array.isArray(rows) ? rows : []).map(function(d) { return { kind: s.kind, cat: s.cat, src: src, d: d }; }); });
@@ -160,7 +162,7 @@ function exportDefects(btn, kind, cat, id) {
   .then(function(lists) {
     var all = [].concat.apply([], lists);
     all.sort(function(a, b) { return (a.d.created_at || '').localeCompare(b.d.created_at || ''); });
-    if (!all.length) { done('No defects to export.'); return; }
+    if (!all.length) { done(single ? 'Could not load that defect — it may have been deleted.' : 'No resolved defects to export yet.'); return; }
     _withPdfMake(function() {
       _withJsZip(function(err) {
         if (err) { done('ZIP download is unavailable — please check your internet connection and try again.'); return; }
@@ -215,7 +217,7 @@ function _buildDefectsZip(all, btn, single, done) {
       ].map(_csvCell).join(','));
     });
     var stamp = _isoDate(new Date());
-    var label = single ? 'Defect_' + all[0].base : 'Defects_Register_' + stamp;
+    var label = single ? 'Defect_' + all[0].base : 'Resolved_Defects_' + stamp;
     zip.file(label + '.csv', '﻿' + lines.join('\r\n'));
     // PDF register with the photos in it
     _pdfBlob(_defectsPdfDoc(all, single)).then(function(pdf) {
@@ -234,11 +236,10 @@ function _buildDefectsZip(all, btn, single, done) {
 }
 
 function _defectsPdfDoc(all, single) {
-  var open = all.filter(function(it) { return it.d.defect_status !== 'fixed' && it.d.defect_status !== 'cleared'; }).length;
   var content = [
     { text: 'ARBORITE TREE SERVICES', style: 'brand' },
-    { text: single ? 'Defect Record' : 'Defects Register', style: 'title' },
-    { text: 'Exported ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + (single ? '' : ' · ' + all.length + ' defect' + (all.length === 1 ? '' : 's') + ' · ' + open + ' not resolved'), style: 'small', margin: [0, 0, 0, 12] }
+    { text: single ? 'Defect Record' : 'Resolved Defects Register', style: 'title' },
+    { text: 'Exported ' + new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + (single ? '' : ' · ' + all.length + ' resolved defect' + (all.length === 1 ? '' : 's')), style: 'small', margin: [0, 0, 0, 12] }
   ];
   all.forEach(function(it, n) {
     var d = it.d, when = d.created_at ? new Date(d.created_at) : null;
@@ -263,7 +264,7 @@ function _defectsPdfDoc(all, single) {
   return {
     pageSize: 'A4', pageMargins: [40, 40, 40, 40],
     content: content,
-    footer: function(page, pages) { return { text: 'Defects register · page ' + page + ' of ' + pages, style: 'small', alignment: 'center', margin: [0, 10, 0, 0] }; },
+    footer: function(page, pages) { return { text: (single ? 'Defect record' : 'Resolved defects register') + ' · page ' + page + ' of ' + pages, style: 'small', alignment: 'center', margin: [0, 10, 0, 0] }; },
     styles: {
       brand: { fontSize: 9, bold: true, color: '#2d5218', characterSpacing: 1.5, margin: [0, 0, 0, 2] },
       title: { fontSize: 17, bold: true, margin: [0, 0, 0, 4] },
