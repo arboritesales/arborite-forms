@@ -520,6 +520,55 @@ function _handleSaveConflict(payload, res) {
   if (confirm(msg)) loadJobByRef(ref);
 }
 
+// ── SAME CHECK FOR THE OTHER FORMS (toolbox talks, method statements, audits) ──
+// They live in the same table and also save the whole form at once, so they
+// get the same rule: a save only goes through over the version that was
+// opened. Their references are unique per form (TBT-, MSB-, AUD-), so one
+// list keyed by reference covers all three.
+var _formBases = {};    // ref -> updated_at of the saved copy that's open
+var _formBlocked = {};  // ref -> true once a save was refused (asked once)
+
+function _formBaseOf(ref) { return Object.prototype.hasOwnProperty.call(_formBases, ref) ? _formBases[ref] : undefined; }
+function _formSetBase(ref, at) {
+  if (!ref) return;
+  _formBases[ref] = at;
+  _rememberJobBase(ref, at);
+  delete _formBlocked[ref];
+}
+function _formForget(ref) { delete _formBases[ref]; delete _formBlocked[ref]; }
+
+// Resolves {ok, at} or {conflict, ...}; rejects on a network/server error.
+function _saveFormRow(ref, formData) {
+  if (_formBlocked[ref]) return Promise.resolve({conflict: true, blocked: true});
+  var payload = {quote_ref: ref, form_data: formData, updated_at: new Date().toISOString()};
+  return _jobFormsSaveChecked(payload, _formBaseOf(ref)).then(function(res) {
+    if (res.ok) _formSetBase(ref, res.at);
+    else { _formBlocked[ref] = true; _keepConflictCopy(ref, formData); }
+    return res;
+  });
+}
+
+// what: e.g. 'toolbox talk'. reopen(ref) opens the latest saved version.
+function _formConflictAsk(what, ref, res, reopen) {
+  if (res.blocked) return; // already asked about this one
+  if (res.deleted) {
+    alert('This ' + what + ' (' + ref + ') has been deleted, so your changes were NOT saved.\n\nA copy has been kept — ask the office if it needs bringing back.');
+    return;
+  }
+  var msg;
+  if (res.isNew) {
+    msg = 'A ' + what + ' called "' + ref + '" already exists, so this was NOT saved and the existing one has not been touched.\n\n' +
+          'Press OK to open the existing one, or Cancel to stay here (it will not save).';
+  } else {
+    var when = res.serverAt ? new Date(res.serverAt).toLocaleString('en-GB', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'recently';
+    msg = 'This ' + what + ' (' + ref + ') was saved on another device (' + when + ') after you opened it.\n\n' +
+          'Your changes were NOT saved, so the other changes are safe. A copy of your screen has been kept.\n\n' +
+          'Press OK to open the latest version, then add your changes again.\n' +
+          'Press Cancel to stay on this screen (it will not save).';
+  }
+  if (confirm(msg)) reopen(ref);
+}
+
 function _enableSaveButtons() {
   var en = !!currentJobRef;
   var btns = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');

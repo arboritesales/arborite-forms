@@ -1058,8 +1058,11 @@ function uploadDocsToStorage(formData, done) {
   uploadNext();
 }
 
+// Each new signature gets its own file. With one fixed file per box, signing a
+// box again replaced the old picture for every saved copy that pointed at it
+// (QU2960 lost its 12 Nov daily-register signatures that way).
 function _storagePath(quoteRef, sigId) {
-  return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + sigId + '.jpg';
+  return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + sigId + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + '.jpg';
 }
 function _storageAuthUrl(path) {
   return SUPA_URL + '/storage/v1/object/authenticated/' + SIG_BUCKET + '/' + path;
@@ -1813,6 +1816,55 @@ function _handleSaveConflict(payload, res) {
           'Press Cancel to stay on this screen (it will not save).';
   }
   if (confirm(msg)) loadJobByRef(ref);
+}
+
+// ── SAME CHECK FOR THE OTHER FORMS (toolbox talks, method statements, audits) ──
+// They live in the same table and also save the whole form at once, so they
+// get the same rule: a save only goes through over the version that was
+// opened. Their references are unique per form (TBT-, MSB-, AUD-), so one
+// list keyed by reference covers all three.
+var _formBases = {};    // ref -> updated_at of the saved copy that's open
+var _formBlocked = {};  // ref -> true once a save was refused (asked once)
+
+function _formBaseOf(ref) { return Object.prototype.hasOwnProperty.call(_formBases, ref) ? _formBases[ref] : undefined; }
+function _formSetBase(ref, at) {
+  if (!ref) return;
+  _formBases[ref] = at;
+  _rememberJobBase(ref, at);
+  delete _formBlocked[ref];
+}
+function _formForget(ref) { delete _formBases[ref]; delete _formBlocked[ref]; }
+
+// Resolves {ok, at} or {conflict, ...}; rejects on a network/server error.
+function _saveFormRow(ref, formData) {
+  if (_formBlocked[ref]) return Promise.resolve({conflict: true, blocked: true});
+  var payload = {quote_ref: ref, form_data: formData, updated_at: new Date().toISOString()};
+  return _jobFormsSaveChecked(payload, _formBaseOf(ref)).then(function(res) {
+    if (res.ok) _formSetBase(ref, res.at);
+    else { _formBlocked[ref] = true; _keepConflictCopy(ref, formData); }
+    return res;
+  });
+}
+
+// what: e.g. 'toolbox talk'. reopen(ref) opens the latest saved version.
+function _formConflictAsk(what, ref, res, reopen) {
+  if (res.blocked) return; // already asked about this one
+  if (res.deleted) {
+    alert('This ' + what + ' (' + ref + ') has been deleted, so your changes were NOT saved.\n\nA copy has been kept — ask the office if it needs bringing back.');
+    return;
+  }
+  var msg;
+  if (res.isNew) {
+    msg = 'A ' + what + ' called "' + ref + '" already exists, so this was NOT saved and the existing one has not been touched.\n\n' +
+          'Press OK to open the existing one, or Cancel to stay here (it will not save).';
+  } else {
+    var when = res.serverAt ? new Date(res.serverAt).toLocaleString('en-GB', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'recently';
+    msg = 'This ' + what + ' (' + ref + ') was saved on another device (' + when + ') after you opened it.\n\n' +
+          'Your changes were NOT saved, so the other changes are safe. A copy of your screen has been kept.\n\n' +
+          'Press OK to open the latest version, then add your changes again.\n' +
+          'Press Cancel to stay on this screen (it will not save).';
+  }
+  if (confirm(msg)) reopen(ref);
 }
 
 function _enableSaveButtons() {
@@ -6666,12 +6718,14 @@ function clearTBTFormFields() {
 function loadTBT(ref) {
   currentTBTRef = ref;
   document.getElementById('tbtRef').textContent = ref;
-  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1')
+  _formForget(ref);
+  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data,updated_at&limit=1')
     .then(function(r) { return r.json(); })
     .then(function(rows) {
       clearTBTFormFields();
       showTBTForm();
       if (!rows || !rows[0] || !rows[0].form_data) return;
+      _formSetBase(ref, rows[0].updated_at);
       var data = rows[0].form_data;
       var panel = document.getElementById('tbtFormPanel');
       var inputs = panel.querySelectorAll('input[type="text"][id], input[type="date"][id], textarea[id]');
@@ -6755,16 +6809,22 @@ function _tbtSend(payload) {
     btn.textContent = ok ? '✓ Saved' : 'Save failed';
     setTimeout(function(){ if (!_tbtSaving && !_tbtAutoSaveTimer) btn.textContent = 'Save'; }, ok ? 2000 : 2500);
   }
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
-    .then(function(r) {
-      var ok = r.ok || r.status === 201 || r.status === 204;
-      if (ok) {
+  // Only saves over the version that was opened — if someone signed on
+  // another device meanwhile, this is refused rather than wiping them out.
+  _saveFormRow(payload.quote_ref, payload.form_data)
+    .then(function(res) {
+      if (res.ok) {
         refreshTBTBadge();
         // Saved on the way out to the list: reload it so its count is current
         var list = document.getElementById('tbtListPanel');
         if (list && list.style.display !== 'none') fetchTBTList();
+        done(true);
+        return;
       }
-      done(ok);
+      _tbtPendingPayload = null; // would be refused too
+      done(false);
+      if (btn) btn.textContent = 'Not saved';
+      _formConflictAsk('toolbox talk', payload.quote_ref, res, loadTBT);
     })
     .catch(function() { done(false); });
 }
@@ -6928,12 +6988,14 @@ function clearAuditForm(skipConfirm) {
 function loadAudit(ref) {
   currentAuditRef = ref;
   document.getElementById('auditRef').textContent = ref;
-  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1')
+  _formForget(ref);
+  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data,updated_at&limit=1')
     .then(function(r) { return r.json(); })
     .then(function(rows) {
       clearAuditForm(true);
       showAuditForm();
       if (!rows || !rows[0] || !rows[0].form_data) return;
+      _formSetBase(ref, rows[0].updated_at);
       restoreAuditData(rows[0].form_data);
     })
     .catch(function() { showAuditForm(); });
@@ -7000,14 +7062,17 @@ function saveAudit() {
   var btn = document.getElementById('auditSaveBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
   var data = collectAuditData();
-  var payload = { quote_ref: currentAuditRef, updated_at: new Date().toISOString(), form_data: data };
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
-    .then(function(r) {
+  var ref = currentAuditRef;
+  // Only saves over the version that was opened (see _saveFormRow).
+  _saveFormRow(ref, data)
+    .then(function(res) {
       if (btn) btn.disabled = false;
-      if (r.ok || r.status === 201 || r.status === 204) {
+      if (res.ok) {
         if (btn) { btn.textContent = '✓ Saved'; setTimeout(function(){ btn.textContent = 'Save'; }, 2000); }
       } else {
-        if (btn) { btn.textContent = 'Save failed'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
+        if (btn) { btn.textContent = 'Not saved'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
+        // Saved by hand only, so ask again every time Save is pressed
+        _formConflictAsk('audit', ref, res.blocked ? {conflict: true} : res, loadAudit);
       }
     })
     .catch(function() {
@@ -7534,12 +7599,14 @@ function loadMSB(ref) {
   document.getElementById('msbRef').textContent = ref;
   document.getElementById('msbStepNav').innerHTML = '';
   document.getElementById('msbStepContent').innerHTML = '<div class="msb-main"><div class="msb-note">Loading…</div></div>';
+  _formForget(ref);
   Promise.all([
     ensureMSBRefLibrary(),
-    supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1').then(function(r) { return r.json(); })
+    supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data,updated_at&limit=1').then(function(r) { return r.json(); })
   ]).then(function(results) {
     var rows = results[1];
     var d = (rows && rows[0] && rows[0].form_data) ? rows[0].form_data : null;
+    if (d) _formSetBase(ref, rows[0].updated_at);
     if (!d) {
       // loadMSB is only ever called for a ref that was just shown in the
       // list, i.e. it's known to exist — a fetch that comes back with no
@@ -7576,25 +7643,35 @@ function loadMSB(ref) {
 // Soft delete — moves the record to "Recently Deleted" rather than removing
 // it, so a mis-tap here can never actually lose a method statement. Only
 // permanentlyDeleteMSB() below does a real, irreversible DELETE.
+// Only the deletedAt marker changes. It's set on the saved copy as it is right
+// now (not the list's copy, which may be out of date — writing that back used
+// to undo anyone's edits since the list was loaded), and only if nobody saves
+// in between.
+function _msbSetDeletedAt(ref, deletedAt) {
+  return supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data,updated_at&limit=1')
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(rows) {
+      if (!rows || !rows[0]) throw new Error('not found');
+      var updated = {};
+      var fd = rows[0].form_data || {};
+      for (var k in fd) updated[k] = fd[k];
+      if (deletedAt) updated.deletedAt = deletedAt; else delete updated.deletedAt;
+      return _jobFormsSaveChecked({quote_ref: ref, form_data: updated, updated_at: new Date().toISOString()}, rows[0].updated_at);
+    })
+    .then(function(res) { if (!res.ok) throw new Error('changed while saving — try again'); });
+}
+
 function deleteMSB(ref) {
   if (!confirm('Delete this method statement? It moves to Recently Deleted, where it can be restored any time.')) return;
-  var fd = _msbListRowsCache[ref] || {};
-  var updated = {};
-  for (var k in fd) updated[k] = fd[k];
-  updated.deletedAt = new Date().toISOString();
-  supaFetch('PATCH', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref), { form_data: updated })
-    .then(function(r) { if (r.ok || r.status === 204) fetchMSBList(); else alert('Delete failed.'); })
-    .catch(function() { alert('Delete failed — check connection.'); });
+  _msbSetDeletedAt(ref, new Date().toISOString())
+    .then(fetchMSBList)
+    .catch(function(e) { alert('Delete failed — ' + (e && e.message || 'check connection') + '.'); });
 }
 
 function restoreMSB(ref) {
-  var fd = _msbListRowsCache[ref] || {};
-  var updated = {};
-  for (var k in fd) updated[k] = fd[k];
-  delete updated.deletedAt;
-  supaFetch('PATCH', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref), { form_data: updated })
-    .then(function(r) { if (r.ok || r.status === 204) fetchMSBDeletedList(); else alert('Restore failed.'); })
-    .catch(function() { alert('Restore failed — check connection.'); });
+  _msbSetDeletedAt(ref, null)
+    .then(fetchMSBDeletedList)
+    .catch(function(e) { alert('Restore failed — ' + (e && e.message || 'check connection') + '.'); });
 }
 
 function permanentlyDeleteMSB(ref) {
@@ -7698,11 +7775,17 @@ function _msbCleanFormData(state) {
     emergency: cleanEmergency, status: state.status, sentAt: state.sentAt
   };
 }
+// Only saves over the version that was opened (see _saveFormRow). A refused
+// save asks the person once, and is thrown as _msbConflict so callers don't
+// treat it as "offline" and queue it to be pushed later.
 function _msbDoSaveRecord() {
-  var payload = { quote_ref: currentMSBRef, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(msbState) };
-  return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
-    if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('Save failed (' + r.status + ')');
-    _clearMSBOfflinePending(payload.quote_ref);
+  var ref = currentMSBRef;
+  return _saveFormRow(ref, _msbCleanFormData(msbState)).then(function(res) {
+    if (res.ok) { _clearMSBOfflinePending(ref); return; }
+    _formConflictAsk('method statement', ref, res, loadMSB);
+    var err = new Error('Not saved — this method statement was changed on another device.');
+    err._msbConflict = true;
+    throw err;
   });
 }
 
@@ -7724,10 +7807,16 @@ function _msbResyncOne(ref) {
   if (!cached) { _clearMSBOfflinePending(ref); return; }
   var job = cached.job || {};
   var cachedLooksBlank = !job.titleOfDocument && !job.client && !job.siteAddress && !(cached.team || []).length;
+  var base = _storedJobBase(ref);
   var push = function() {
+    // Sent only if nobody has saved it since this device's copy was made (a
+    // copy with no recorded version may only create a new one). Otherwise it
+    // goes into the job history as NOT SAVED instead of over newer work.
     var payload = { quote_ref: ref, updated_at: new Date().toISOString(), form_data: _msbCleanFormData(cached) };
-    return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload).then(function(r) {
-      if (r.ok || r.status === 201 || r.status === 204) _clearMSBOfflinePending(ref);
+    return _jobFormsSaveChecked(payload, base).then(function(res) {
+      if (res.ok) _formSetBase(ref, res.at); // an open copy carries on from this version
+      else _keepConflictCopy(ref, payload.form_data);
+      _clearMSBOfflinePending(ref);
     });
   };
   if (!cachedLooksBlank) { push().catch(function() {}); return; }
@@ -7752,12 +7841,12 @@ function saveMSBDraft() {
   saveMSBRecord().then(function() {
     if (btn) { btn.textContent = '✓ Saved'; setTimeout(function() { btn.textContent = 'Save Draft'; btn.disabled = false; }, 1800); }
   }).catch(function(e) {
-    if (e && e._msbBlankGuard) {
+    if (e && (e._msbBlankGuard || e._msbConflict)) {
       // Refused on purpose — this is not a connectivity problem, so it must
       // NOT be queued for offline auto-sync (that would just overwrite the
       // real content the moment the connection came back).
       if (btn) { btn.disabled = false; btn.textContent = 'Save Draft'; }
-      alert(e.message);
+      if (e._msbBlankGuard) alert(e.message); // a refused clash has already asked
       return;
     }
     // Couldn't reach the server for any reason — keep the work safe locally
@@ -8978,11 +9067,11 @@ function generateMSBPDF() {
   var ref = currentMSBRef;
   saveMSBRecord().catch(function(e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Generate PDF'; }
-    if (e && e._msbBlankGuard) {
+    if (e && (e._msbBlankGuard || e._msbConflict)) {
       // Refused on purpose — not a connectivity problem, must NOT be queued
       // for offline auto-sync (that would overwrite the real content once
       // back online).
-      alert(e.message);
+      if (e._msbBlankGuard) alert(e.message); // a refused clash has already asked
       throw { _msbHandled: true };
     }
     // Couldn't reach the server — the PDF can't be built from a saved copy

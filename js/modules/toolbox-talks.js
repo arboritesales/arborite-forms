@@ -207,12 +207,14 @@ function clearTBTFormFields() {
 function loadTBT(ref) {
   currentTBTRef = ref;
   document.getElementById('tbtRef').textContent = ref;
-  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1')
+  _formForget(ref);
+  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data,updated_at&limit=1')
     .then(function(r) { return r.json(); })
     .then(function(rows) {
       clearTBTFormFields();
       showTBTForm();
       if (!rows || !rows[0] || !rows[0].form_data) return;
+      _formSetBase(ref, rows[0].updated_at);
       var data = rows[0].form_data;
       var panel = document.getElementById('tbtFormPanel');
       var inputs = panel.querySelectorAll('input[type="text"][id], input[type="date"][id], textarea[id]');
@@ -296,16 +298,22 @@ function _tbtSend(payload) {
     btn.textContent = ok ? '✓ Saved' : 'Save failed';
     setTimeout(function(){ if (!_tbtSaving && !_tbtAutoSaveTimer) btn.textContent = 'Save'; }, ok ? 2000 : 2500);
   }
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
-    .then(function(r) {
-      var ok = r.ok || r.status === 201 || r.status === 204;
-      if (ok) {
+  // Only saves over the version that was opened — if someone signed on
+  // another device meanwhile, this is refused rather than wiping them out.
+  _saveFormRow(payload.quote_ref, payload.form_data)
+    .then(function(res) {
+      if (res.ok) {
         refreshTBTBadge();
         // Saved on the way out to the list: reload it so its count is current
         var list = document.getElementById('tbtListPanel');
         if (list && list.style.display !== 'none') fetchTBTList();
+        done(true);
+        return;
       }
-      done(ok);
+      _tbtPendingPayload = null; // would be refused too
+      done(false);
+      if (btn) btn.textContent = 'Not saved';
+      _formConflictAsk('toolbox talk', payload.quote_ref, res, loadTBT);
     })
     .catch(function() { done(false); });
 }

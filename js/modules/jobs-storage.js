@@ -424,8 +424,11 @@ function uploadDocsToStorage(formData, done) {
   uploadNext();
 }
 
+// Each new signature gets its own file. With one fixed file per box, signing a
+// box again replaced the old picture for every saved copy that pointed at it
+// (QU2960 lost its 12 Nov daily-register signatures that way).
 function _storagePath(quoteRef, sigId) {
-  return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + sigId + '.jpg';
+  return quoteRef.replace(/[^a-zA-Z0-9_-]/g, '_') + '/' + sigId + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + '.jpg';
 }
 function _storageAuthUrl(path) {
   return SUPA_URL + '/storage/v1/object/authenticated/' + SIG_BUCKET + '/' + path;

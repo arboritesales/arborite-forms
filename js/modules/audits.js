@@ -103,12 +103,14 @@ function clearAuditForm(skipConfirm) {
 function loadAudit(ref) {
   currentAuditRef = ref;
   document.getElementById('auditRef').textContent = ref;
-  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data&limit=1')
+  _formForget(ref);
+  supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=form_data,updated_at&limit=1')
     .then(function(r) { return r.json(); })
     .then(function(rows) {
       clearAuditForm(true);
       showAuditForm();
       if (!rows || !rows[0] || !rows[0].form_data) return;
+      _formSetBase(ref, rows[0].updated_at);
       restoreAuditData(rows[0].form_data);
     })
     .catch(function() { showAuditForm(); });
@@ -175,14 +177,17 @@ function saveAudit() {
   var btn = document.getElementById('auditSaveBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
   var data = collectAuditData();
-  var payload = { quote_ref: currentAuditRef, updated_at: new Date().toISOString(), form_data: data };
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
-    .then(function(r) {
+  var ref = currentAuditRef;
+  // Only saves over the version that was opened (see _saveFormRow).
+  _saveFormRow(ref, data)
+    .then(function(res) {
       if (btn) btn.disabled = false;
-      if (r.ok || r.status === 201 || r.status === 204) {
+      if (res.ok) {
         if (btn) { btn.textContent = '✓ Saved'; setTimeout(function(){ btn.textContent = 'Save'; }, 2000); }
       } else {
-        if (btn) { btn.textContent = 'Save failed'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
+        if (btn) { btn.textContent = 'Not saved'; setTimeout(function(){ btn.textContent = 'Save'; }, 2500); }
+        // Saved by hand only, so ask again every time Save is pressed
+        _formConflictAsk('audit', ref, res.blocked ? {conflict: true} : res, loadAudit);
       }
     })
     .catch(function() {
