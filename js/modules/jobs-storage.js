@@ -1,5 +1,8 @@
 // ── JOB BAR / MODALS ──
 function setJobRef(ref) {
+  // A different job: forget which saved version the screen was based on, so
+  // it can't be used to save over another job (see _jobFormsSaveChecked).
+  if (ref !== currentJobRef) { _jobBase = {ref: '', at: undefined}; _saveBlockedRef = ''; }
   currentJobRef = ref;
   var fields = ['p_quote','so_quote','ms_jobno','dr_quote'];
   for (var i = 0; i < fields.length; i++) {
@@ -70,9 +73,23 @@ function showNewJobModal() {
 function confirmNewJob() {
   var ref = document.getElementById('newJobRef').value.trim().toUpperCase();
   if (!ref) { alert('Please enter a quote reference.'); return; }
+  // Starting a "new" job with an existing reference would save a blank form
+  // over the real one, so offer to open it instead.
+  var existing = (allJobs || []).filter(function(j){ return j.quote_ref && j.quote_ref.toUpperCase() === ref; })[0];
+  if (existing) {
+    if (confirm('A job called "' + existing.quote_ref + '" already exists.\n\nPress OK to open it, or Cancel to pick a different reference.')) {
+      hideModals();
+      loadJobByRef(existing.quote_ref); // opens the dashboard if we came from the job select screen
+    }
+    return;
+  }
   hideModals();
   clearAllForms();
   setJobRef(ref);
+  // Even if this is the reference already open, it's a blank form now: it
+  // may only create a job, never replace one.
+  _jobBase = {ref: '', at: undefined};
+  _saveBlockedRef = '';
   syncShared();
   setStatus('New job: ' + ref, 'ok');
   if (_fromJobSelect) {
@@ -292,11 +309,13 @@ function _docDbLoadData(id, cb) {
 }
 
 // ── SUPABASE ──
-function supaFetch(method, path, body) {
+// prefer: optional Prefer header, replacing the POST default (upsert).
+function supaFetch(method, path, body, prefer) {
   var bodyStr = body ? JSON.stringify(body) : null;
   function mkOpts() {
     var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
-    if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+    if (prefer) h['Prefer'] = prefer;
+    else if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
     // credentials:'omit' required for iOS Safari cross-origin fetch to work correctly
     var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
     if (bodyStr) {
@@ -600,29 +619,26 @@ function _pushPendingJob(item) {
   var ref = item.ref;
   var cached = _loadJobLocalCache(ref);
   if (!cached) { _clearOfflinePending(ref); return Promise.resolve(); }
-  return supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=updated_at&limit=1')
-    .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+  var base = _storedJobBase(ref);
+  var changedElsewhere = function() {
+    // Never overwrite without a person looking. It stays waiting; opening the
+    // job shows the saved version and keeps this device's copy as a backup.
+    setStatus('Job "' + ref + '" was also changed elsewhere — open it to check, then save', 'warn');
+  };
+  // Saved before this version of the app: no record of which saved copy it
+  // was based on, so it can't be sent safely.
+  if (base === undefined) { changedElsewhere(); return Promise.resolve(); }
+  return _uploadCachedSigs(ref, cached)
+    .then(function() {
+      return _jobFormsSaveChecked({quote_ref: ref, form_data: cached, updated_at: new Date().toISOString()}, base);
     })
-    .then(function(rows) {
-      // Saved elsewhere since this copy was made: never overwrite that without
-      // a person looking. It stays waiting and opens with this device's copy.
-      if (rows[0] && (!item.savedAt || new Date(rows[0].updated_at) > new Date(item.savedAt))) {
-        setStatus('Job "' + ref + '" was also changed elsewhere — open it to check, then save', 'warn');
-        return;
-      }
-      return _uploadCachedSigs(ref, cached)
-        .then(function() {
-          return supaFetch('POST', TABLE + '?on_conflict=quote_ref', {quote_ref: ref, form_data: cached, updated_at: new Date().toISOString()});
-        })
-        .then(function(r) {
-          if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('HTTP ' + r.status);
-          _clearOfflinePending(ref);
-          _saveJobLocalCache(ref, cached);
-          setStatus('Offline changes to job "' + ref + '" synced', 'ok');
-          fetchJobList();
-        });
+    .then(function(res) {
+      if (!res.ok) { changedElsewhere(); return; }
+      _rememberJobBase(ref, res.at);
+      _clearOfflinePending(ref);
+      _saveJobLocalCache(ref, cached);
+      setStatus('Offline changes to job "' + ref + '" synced', 'ok');
+      fetchJobList();
     });
 }
 // Same as a normal save: signatures go to Storage, not into the saved record.

@@ -634,6 +634,9 @@ function initAllSigs() {
 
 // ── JOB BAR / MODALS ──
 function setJobRef(ref) {
+  // A different job: forget which saved version the screen was based on, so
+  // it can't be used to save over another job (see _jobFormsSaveChecked).
+  if (ref !== currentJobRef) { _jobBase = {ref: '', at: undefined}; _saveBlockedRef = ''; }
   currentJobRef = ref;
   var fields = ['p_quote','so_quote','ms_jobno','dr_quote'];
   for (var i = 0; i < fields.length; i++) {
@@ -704,9 +707,23 @@ function showNewJobModal() {
 function confirmNewJob() {
   var ref = document.getElementById('newJobRef').value.trim().toUpperCase();
   if (!ref) { alert('Please enter a quote reference.'); return; }
+  // Starting a "new" job with an existing reference would save a blank form
+  // over the real one, so offer to open it instead.
+  var existing = (allJobs || []).filter(function(j){ return j.quote_ref && j.quote_ref.toUpperCase() === ref; })[0];
+  if (existing) {
+    if (confirm('A job called "' + existing.quote_ref + '" already exists.\n\nPress OK to open it, or Cancel to pick a different reference.')) {
+      hideModals();
+      loadJobByRef(existing.quote_ref); // opens the dashboard if we came from the job select screen
+    }
+    return;
+  }
   hideModals();
   clearAllForms();
   setJobRef(ref);
+  // Even if this is the reference already open, it's a blank form now: it
+  // may only create a job, never replace one.
+  _jobBase = {ref: '', at: undefined};
+  _saveBlockedRef = '';
   syncShared();
   setStatus('New job: ' + ref, 'ok');
   if (_fromJobSelect) {
@@ -926,11 +943,13 @@ function _docDbLoadData(id, cb) {
 }
 
 // ── SUPABASE ──
-function supaFetch(method, path, body) {
+// prefer: optional Prefer header, replacing the POST default (upsert).
+function supaFetch(method, path, body, prefer) {
   var bodyStr = body ? JSON.stringify(body) : null;
   function mkOpts() {
     var h = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_authToken()};
-    if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+    if (prefer) h['Prefer'] = prefer;
+    else if (method === 'POST') h['Prefer'] = 'resolution=merge-duplicates,return=minimal';
     // credentials:'omit' required for iOS Safari cross-origin fetch to work correctly
     var opts = {method:method, headers:h, credentials:'omit', mode:'cors'};
     if (bodyStr) {
@@ -1234,29 +1253,26 @@ function _pushPendingJob(item) {
   var ref = item.ref;
   var cached = _loadJobLocalCache(ref);
   if (!cached) { _clearOfflinePending(ref); return Promise.resolve(); }
-  return supaFetch('GET', TABLE + '?quote_ref=eq.' + encodeURIComponent(ref) + '&select=updated_at&limit=1')
-    .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+  var base = _storedJobBase(ref);
+  var changedElsewhere = function() {
+    // Never overwrite without a person looking. It stays waiting; opening the
+    // job shows the saved version and keeps this device's copy as a backup.
+    setStatus('Job "' + ref + '" was also changed elsewhere — open it to check, then save', 'warn');
+  };
+  // Saved before this version of the app: no record of which saved copy it
+  // was based on, so it can't be sent safely.
+  if (base === undefined) { changedElsewhere(); return Promise.resolve(); }
+  return _uploadCachedSigs(ref, cached)
+    .then(function() {
+      return _jobFormsSaveChecked({quote_ref: ref, form_data: cached, updated_at: new Date().toISOString()}, base);
     })
-    .then(function(rows) {
-      // Saved elsewhere since this copy was made: never overwrite that without
-      // a person looking. It stays waiting and opens with this device's copy.
-      if (rows[0] && (!item.savedAt || new Date(rows[0].updated_at) > new Date(item.savedAt))) {
-        setStatus('Job "' + ref + '" was also changed elsewhere — open it to check, then save', 'warn');
-        return;
-      }
-      return _uploadCachedSigs(ref, cached)
-        .then(function() {
-          return supaFetch('POST', TABLE + '?on_conflict=quote_ref', {quote_ref: ref, form_data: cached, updated_at: new Date().toISOString()});
-        })
-        .then(function(r) {
-          if (!(r.ok || r.status === 201 || r.status === 204)) throw new Error('HTTP ' + r.status);
-          _clearOfflinePending(ref);
-          _saveJobLocalCache(ref, cached);
-          setStatus('Offline changes to job "' + ref + '" synced', 'ok');
-          fetchJobList();
-        });
+    .then(function(res) {
+      if (!res.ok) { changedElsewhere(); return; }
+      _rememberJobBase(ref, res.at);
+      _clearOfflinePending(ref);
+      _saveJobLocalCache(ref, cached);
+      setStatus('Offline changes to job "' + ref + '" synced', 'ok');
+      fetchJobList();
     });
 }
 // Same as a normal save: signatures go to Storage, not into the saved record.
@@ -1486,20 +1502,37 @@ function _applyLoadedJobData(loadedRef, fd_raw) {
 function loadJobByRef(ref) {
   if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Configure Supabase first', 'err'); return; }
   setStatus('Loading...', '');
-  supaFetch('GET', TABLE + '?select=quote_ref,form_data&quote_ref=eq.' + encodeURIComponent(ref) + '&limit=1')
+  supaFetch('GET', TABLE + '?select=quote_ref,form_data,updated_at&quote_ref=eq.' + encodeURIComponent(ref) + '&limit=1')
     .then(function(r){ return r.json(); })
     .then(function(rows){
       if (!rows || rows.length === 0) { setStatus('Not found: ' + ref, 'err'); return; }
-      // Changes still waiting to sync are newer than the server's copy: show
-      // those, or the next save would replace them with the old version.
-      var unsynced = _isOfflinePending(ref) ? _loadJobLocalCache(ref) : null;
+      var serverAt = rows[0].updated_at;
+      // Changes still waiting to sync: show them only if they were made on top
+      // of the version that is saved now. If the job has been saved elsewhere
+      // since, this device's copy is out of date — show the saved job and keep
+      // the device's copy as a backup, rather than let it wipe newer work.
+      var unsynced = null, stale = false;
+      if (_isOfflinePending(ref)) {
+        var local = _loadJobLocalCache(ref);
+        var localBase = _storedJobBase(ref);
+        if (local && localBase !== undefined && _sameTime(localBase, serverAt)) unsynced = local;
+        else if (local) { _keepConflictCopy(rows[0].quote_ref, local); stale = true; }
+        _clearOfflinePending(ref);
+        if (unsynced) _markOfflinePending(ref);
+      }
       _applyLoadedJobData(rows[0].quote_ref, unsynced || rows[0].form_data);
+      _useJobBase(rows[0].quote_ref, serverAt);
       if (_fromJobSelect) {
         _fromJobSelect = false;
         hideModals();
         showDashboard();
       }
       if (unsynced) setStatus('Showing your unsynced changes — save to send them', 'warn');
+      if (stale) {
+        setStatus('Loaded the latest saved version', 'warn');
+        alert('This device had changes to "' + rows[0].quote_ref + '" that were never sent, but the job has been saved on another device since.\n\n' +
+              'To keep the other changes safe, the latest saved version is shown. This device\'s copy has been kept as a backup — add anything missing again.');
+      }
     })
     .catch(function(e){
       var cached = _loadJobLocalCache(ref);
@@ -1509,6 +1542,9 @@ function loadJobByRef(ref) {
         ensureDailyRowsFor(cached);
         restoreFormData(cached);
         setJobRef(ref);
+        // Offline: base saves on the version this device last had from the
+        // server, so they're refused if someone has saved since.
+        _jobBase = {ref: ref, at: _storedJobBase(ref)};
         syncShared();
         _docDbLoad(ref, function(err, docs) {
           docStore = {};
@@ -1555,6 +1591,12 @@ function compressSignatures(data) {
 function saveJob() {
   if (!currentJobRef) { setStatus('Create or load a job first', 'err'); return; }
   if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Supabase not configured', 'err'); return; }
+  if (_saveBlockedRef && _saveBlockedRef === currentJobRef) {
+    setStatus('NOT SAVED — this job was changed on another device. Open it again to carry on.', 'err');
+    return;
+  }
+  if (_saveInFlight) { _saveQueued = true; return; } // runs again once this save is done
+  _saveInFlight = true;
   setStatus('Saving…', '');
   // Disable all save buttons during save
   var saveBtns = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
@@ -1658,7 +1700,135 @@ function _jobFormsUpsert(payload) {
   return supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload);
 }
 
-function _saveSucceeded(payload) {
+// ── SAVE ONLY OVER THE VERSION THIS SCREEN STARTED FROM ──
+// A save sends the whole job, not just what changed. So a phone left open on
+// an old copy used to wipe newer work the moment anyone touched it (QU2960,
+// 12 Nov 2026). Now each save names the saved version it was based on
+// (updated_at), and the server only accepts it if that is still the latest.
+//
+// _jobBase.at: undefined = not based on any saved version (a new job) — the
+// save may only create the job, never replace one; null = based on a saved
+// job with no updated_at; otherwise the updated_at the screen was loaded from.
+var _jobBase = {ref: '', at: undefined};
+var _saveBlockedRef = '';   // a save of this job was refused; stop autosaving it
+var _saveInFlight = false;  // one save at a time, or the second looks like a clash
+var _saveQueued = false;
+var _afterSave = null;
+
+function _getJobBase(ref) { return _jobBase.ref === ref ? _jobBase.at : undefined; }
+// Kept on the device too, so offline changes can later be sent safely.
+function _rememberJobBase(ref, at) {
+  if (at === undefined) return;
+  try { localStorage.setItem('arb_jobver_' + ref, JSON.stringify(at)); } catch(e) {}
+}
+function _storedJobBase(ref) {
+  try { var s = localStorage.getItem('arb_jobver_' + ref); return s === null ? undefined : JSON.parse(s); } catch(e) { return undefined; }
+}
+function _useJobBase(ref, at) {
+  _rememberJobBase(ref, at);
+  if (ref !== currentJobRef) return;
+  _jobBase = {ref: ref, at: at};
+  _saveBlockedRef = '';
+}
+function _sameTime(a, b) {
+  if (a == null || b == null) return a == null && b == null;
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
+// Resolves {ok:true, at} when saved, {conflict:true, ...} when the job was
+// changed elsewhere (nothing is written), and rejects on a network or server
+// error so the caller can fall back to saving offline.
+function _jobFormsSaveChecked(payload, base) {
+  if (JOB_LINK_TOKEN) {
+    return _jobFormsUpsert(payload).then(function(r) {
+      if (!r.ok) return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
+      return {ok: true, at: payload.updated_at};
+    });
+  }
+  var ref = payload.quote_ref;
+  var req;
+  if (base === undefined) {
+    // New job: plain insert, which the server refuses if the reference exists.
+    req = supaFetch('POST', TABLE + '?select=updated_at', payload, 'return=representation');
+  } else {
+    req = supaFetch('PATCH', TABLE + '?select=updated_at&quote_ref=eq.' + encodeURIComponent(ref) +
+                    '&updated_at=' + (base === null ? 'is.null' : 'eq.' + encodeURIComponent(base)),
+                    {form_data: payload.form_data, updated_at: payload.updated_at}, 'return=representation');
+  }
+  return req.then(function(r) {
+    if (r.status === 409) return _checkOwnSave(payload, base);
+    if (!r.ok) return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
+    return r.json().then(function(rows) {
+      if (rows && rows.length) return {ok: true, at: rows[0].updated_at};
+      return _checkOwnSave(payload, base);
+    });
+  });
+}
+// Nothing matched. If the saved job carries this save's own time, it is this
+// save that landed (e.g. a retry after a slow first attempt) — not a clash.
+function _checkOwnSave(payload, base) {
+  return supaFetch('GET', TABLE + '?select=updated_at&quote_ref=eq.' + encodeURIComponent(payload.quote_ref) + '&limit=1')
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(rows) {
+      var row = rows && rows[0];
+      if (row && _sameTime(row.updated_at, payload.updated_at)) return {ok: true, at: row.updated_at};
+      return {conflict: true, isNew: base === undefined, deleted: !row, serverAt: row ? row.updated_at : null};
+    });
+}
+
+// A copy that could not be saved is never just dropped: it goes into the
+// database's job history (job_forms_audit_log, as 'NOT SAVED') so it can be
+// recovered, and onto this device.
+function _keepConflictCopy(ref, formData) {
+  try { localStorage.setItem('arb_conflict_' + ref, JSON.stringify({keptAt: new Date().toISOString(), form_data: formData})); } catch(e) {}
+  if (JOB_LINK_TOKEN) return;
+  supaFetch('POST', 'job_forms_audit_log', {operation: 'NOT SAVED', quote_ref: ref, form_data: formData}, 'return=minimal')
+    .catch(function() {});
+}
+
+function _handleSaveConflict(payload, res) {
+  var ref = payload.quote_ref;
+  _keepConflictCopy(ref, payload.form_data);
+  _saveBlockedRef = ref;
+  if (res.deleted) {
+    setStatus('NOT SAVED — this job has been deleted', 'err');
+    alert('Job "' + ref + '" has been deleted, so this was NOT saved.\n\nA copy of your screen has been kept — ask the office if it needs bringing back.');
+    return;
+  }
+  var msg;
+  if (res.isNew) {
+    setStatus('NOT SAVED — a job called ' + ref + ' already exists', 'err');
+    msg = 'A job called "' + ref + '" already exists.\n\n' +
+          'This was NOT saved, so the existing job has not been touched.\n\n' +
+          'Press OK to open the existing job, or Cancel to stay on this screen (it will not save).';
+  } else {
+    var when = res.serverAt ? new Date(res.serverAt).toLocaleString('en-GB', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) : 'recently';
+    setStatus('NOT SAVED — this job was changed on another device. Open it again to carry on.', 'err');
+    msg = 'Job "' + ref + '" was saved on another device (' + when + ') after you opened it.\n\n' +
+          'Your changes were NOT saved, so the other changes are safe. A copy of your screen has been kept.\n\n' +
+          'Press OK to open the latest version, then add your changes again.\n' +
+          'Press Cancel to stay on this screen (it will not save).';
+  }
+  if (confirm(msg)) loadJobByRef(ref);
+}
+
+function _enableSaveButtons() {
+  var en = !!currentJobRef;
+  var btns = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
+  for (var i = 0; i < btns.length; i++) btns[i].disabled = !en;
+}
+function _saveFinished() {
+  _saveInFlight = false;
+  _enableSaveButtons();
+  if (_afterSave) { var f = _afterSave; _afterSave = null; _saveQueued = false; f(); }
+  else if (_saveQueued) { _saveQueued = false; saveJob(); }
+}
+
+function _saveSucceeded(payload, at) {
+  _useJobBase(payload.quote_ref, at);
   _saveJobLocalCache(payload.quote_ref, payload.form_data);
   _clearOfflinePending(payload.quote_ref);
   setStatus('Saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), 'ok');
@@ -1677,50 +1847,32 @@ function _saveOfflineFallback(payload) {
 }
 
 function sendSave(formData) {
-  var payload ={quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
+  var payload = {quote_ref:currentJobRef, form_data:formData, updated_at:new Date().toISOString()};
+  var base = _getJobBase(currentJobRef);
+  var done = false, retried = false;
 
-  // Use a timeout to detect iOS silent failures
+  function finish(res) {
+    if (done) return;
+    done = true;
+    clearTimeout(saveTimeout);
+    if (res && res.ok) _saveSucceeded(payload, res.at);
+    else if (res && res.conflict) _handleSaveConflict(payload, res);
+    else _saveOfflineFallback(payload);
+    _saveFinished();
+  }
+
+  // iOS can fail silently: if there's no answer in 15s, send the same save
+  // again. Whichever answers first wins; the version check stops the two from
+  // clashing, since a retry that finds its own save already landed is fine.
   var saveTimeout = setTimeout(function() {
+    retried = true;
     setStatus('Save timeout — retrying…', '');
-    sendSaveRaw(payload);
+    _jobFormsSaveChecked(payload, base).then(finish, function(){ finish(null); });
   }, 15000);
 
-  _jobFormsUpsert(payload)
-    .then(function(r){
-      clearTimeout(saveTimeout);
-      if (r.ok || r.status === 201 || r.status === 204) {
-        _saveSucceeded(payload);
-      } else {
-        return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
-      }
-    })
-    .catch(function(e){
-      clearTimeout(saveTimeout);
-      _saveOfflineFallback(payload);
-    })
-    .finally(function(){
-      var en = !!currentJobRef;
-      var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
-      for (var i=0;i<btns2.length;i++) btns2[i].disabled = !en;
-    });
-}
-
-function sendSaveRaw(payload) {
-  // Retry without signatures if original save timed out
-  _jobFormsUpsert(payload)
-    .then(function(r){
-      if (r.ok || r.status === 201 || r.status === 204) {
-        _saveSucceeded(payload);
-      } else {
-        _saveOfflineFallback(payload);
-      }
-    })
-    .catch(function(){ _saveOfflineFallback(payload); })
-    .finally(function(){
-      var en = !!currentJobRef;
-      var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
-      for (var i=0;i<btns2.length;i++) btns2[i].disabled = !en;
-    });
+  _jobFormsSaveChecked(payload, base).then(finish, function() {
+    if (!retried) finish(null); // with a retry under way, wait for its answer
+  });
 }
 function saveForm() { saveJob(); }  // saveJob handles compression + iOS safety
 
@@ -1728,6 +1880,12 @@ function saveAndClose() {
   if (!currentJobRef) return;
   if (SUPA_URL === 'YOUR_SUPABASE_URL') { setStatus('Supabase not configured', 'err'); return; }
   if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  if (_saveBlockedRef && _saveBlockedRef === currentJobRef) {
+    setStatus('NOT SAVED — this job was changed on another device. Open it again to carry on.', 'err');
+    return;
+  }
+  if (_saveInFlight) { _afterSave = saveAndClose; setStatus('Saving…', ''); return; }
+  _saveInFlight = true;
   setStatus('Saving…', '');
   var saveBtns = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
   for (var i=0;i<saveBtns.length;i++) saveBtns[i].disabled = true;
@@ -1796,27 +1954,29 @@ function _finishSaveAndClose(formData, savedRef) {
     });
   }
   var payload = {quote_ref:savedRef, form_data:formData, updated_at:new Date().toISOString()};
-  supaFetch('POST', TABLE + '?on_conflict=quote_ref', payload)
-    .then(function(r){
-      if (r.ok || r.status === 201 || r.status === 204) {
+  _jobFormsSaveChecked(payload, _getJobBase(savedRef))
+    .then(function(res){
+      _saveInFlight = false;
+      if (res.ok) {
+        _rememberJobBase(savedRef, res.at);
         _clearOfflinePending(savedRef);
         setStatus('Saved & closed', 'ok');
         fetchJobList();
         setTimeout(function(){
           clearAllForms();
-          currentJobRef = '';
           setJobRef('');
           setStatus('No job loaded', '');
           showJobSelectScreen();
         }, 200);
       } else {
-        return r.text().then(function(t){ throw new Error(r.status + ': ' + t); });
+        _enableSaveButtons();
+        _handleSaveConflict(payload, res);
       }
     })
     .catch(function(e){
+      _saveInFlight = false;
       setStatus('Save failed: ' + e.message, 'err');
-      var btns2 = document.querySelectorAll('#btnSave, #dashSaveBtn, #appSaveBtn');
-      for (var j=0;j<btns2.length;j++) btns2[j].disabled = false;
+      _enableSaveButtons();
     });
 }
 
