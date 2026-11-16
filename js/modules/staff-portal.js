@@ -719,7 +719,10 @@ function spRenderClockReport() {
             return '<tr><td>' + spEsc(w.name) + '</td><td>' + wDateStr + '</td><td>' + Math.round(w.hours * 100) / 100 + '</td></tr>';
           }).join('')
         + '</table>'
-        + '<button class="sp-btn sp-btn-primary" style="margin-top:10px;" onclick="spExportClockReportPerson()">Export ' + spEsc(spReportSelectedStaff) + ' to Excel</button>';
+        + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">'
+        + '<button class="sp-btn sp-btn-primary" onclick="spExportTimesheetPdf(this)">Download ' + spEsc(spReportSelectedStaff) + '\'s timesheet (PDF)</button>'
+        + '<button class="sp-btn sp-btn-primary" onclick="spExportClockReportPerson()">Export ' + spEsc(spReportSelectedStaff) + ' to Excel</button>'
+        + '</div>';
     }
   });
 }
@@ -1076,6 +1079,135 @@ function spExportPayroll(personName) {
 
 function spExportClockReport() { spExportPayroll(null); }
 function spExportClockReportPerson() { if (spReportSelectedStaff) spExportPayroll(spReportSelectedStaff); }
+
+// ── MONTHLY TIMESHEET PDF — one person, the calendar month shown ──
+// Every day of the month with first clock-in, last clock-out and the hours
+// between (same figures as the on-screen report, no break taken off), leave
+// and bank holidays written in, a total after each Monday-to-Sunday week and
+// a summary at the top. Read-only.
+function spExportTimesheetPdf(btn) {
+  var personName = spReportSelectedStaff;
+  if (!personName) return;
+  var y = spReportMonth.getFullYear(), m = spReportMonth.getMonth();
+  var from = spLocalDateStr(new Date(y, m, 1)), to = spLocalDateStr(new Date(y, m + 1, 0));
+  var done = _busy(btn, 'Preparing PDF…');
+  Promise.all([
+    spRpc('sp_clock_report', { p_year: y, p_month: m + 1 }),
+    spRpc('sp_payroll_leave', { p_from: from, p_to: to })
+  ]).then(function(results) {
+    results.forEach(function(res) {
+      if (!res.ok || !Array.isArray(res.data)) throw new Error((res.data && res.data.message) || 'Could not load the timesheet.');
+    });
+    var rows = results[0].data.filter(function(r) { return r.name === personName; });
+    var leave = results[1].data.filter(function(l) { return l.name === personName; });
+    _withPdfMake(function() {
+      var monthLabel = spReportMonth.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+      pdfMake.createPdf(spTimesheetDoc(personName, monthLabel, rows, leave, from, to))
+        .download('Timesheet - ' + personName + ' - ' + monthLabel + '.pdf');
+      done();
+    }, done);
+  }).catch(function(e) { done(e.message || 'Could not make the timesheet.'); });
+}
+
+function spTimesheetDoc(personName, monthLabel, rows, leave, from, to) {
+  var today = spLocalDateStr(new Date());
+  var byDate = {};
+  rows.forEach(function(r) { byDate[r.work_date] = r; });
+
+  var totals = { hours: 0, worked: 0, noOut: 0, holiday: 0, sick: 0, other: 0, bank: 0 };
+  leave.forEach(function(l) {
+    var n = spLeaveDaysInPeriod(l, from, to);
+    if (l.type === 'holiday') totals.holiday += n;
+    else if (l.type === 'sick') totals.sick += n;
+    else if (l.type === 'bank_holiday') totals.bank += n;
+    else totals.other += n;
+  });
+
+  var grey = '#f2f2f2', weekFill = '#e6eedf';
+  var body = [[
+    { text: 'Date', style: 'th' }, { text: 'Clock in', style: 'th' }, { text: 'Clock out', style: 'th' },
+    { text: 'Hours', style: 'th', alignment: 'right' }, { text: 'Notes', style: 'th' }
+  ]];
+  var weekHours = 0, weekDays = 0;
+  for (var d = new Date(from + 'T00:00:00'); spLocalDateStr(d) <= to; d.setDate(d.getDate() + 1)) {
+    var iso = spLocalDateStr(d), weekend = d.getDay() === 0 || d.getDay() === 6, r = byDate[iso];
+    var notes = [];
+    leave.forEach(function(l) {
+      if (iso < l.start_date || iso > l.end_date) return;
+      if (weekend && l.type !== 'bank_holiday' && l.type !== 'shutdown') return;
+      notes.push((SP_LEAVE_LABELS[l.type] || l.type) + (Number(l.days) === 0.5 ? ' (half day)' : ''));
+    });
+    var hoursText = '';
+    if (r) {
+      totals.worked++; weekDays++;
+      if (r.hours != null) {
+        var h = Number(r.hours);
+        totals.hours += h; weekHours += h;
+        hoursText = spFmtHoursMins(h);
+      } else if (iso === today) {
+        notes.push('Still clocked in');
+      } else {
+        totals.noOut++;
+        notes.push('No clock-out');
+      }
+    }
+    var fill = weekend ? grey : null;
+    body.push([
+      { text: spFmtPayDate(iso), style: 'cell', fillColor: fill, bold: !!r },
+      { text: r && r.clock_in ? r.clock_in.slice(0, 5) : '', style: 'cell', fillColor: fill },
+      { text: r && r.clock_out ? r.clock_out.slice(0, 5) : '', style: 'cell', fillColor: fill },
+      { text: hoursText, style: 'cell', fillColor: fill, alignment: 'right' },
+      { text: notes.join(', '), style: 'cell', fillColor: fill, color: /No clock-out/.test(notes.join()) ? '#c62828' : '#222222' }
+    ]);
+    if (d.getDay() === 0 || iso === to) {
+      body.push([
+        { text: 'Week total', style: 'cell', bold: true, fillColor: weekFill, colSpan: 3 }, {}, {},
+        { text: weekHours ? spFmtHoursMins(weekHours) : '0h', style: 'cell', bold: true, fillColor: weekFill, alignment: 'right' },
+        { text: weekDays + ' day' + (weekDays === 1 ? '' : 's') + ' worked', style: 'cell', fillColor: weekFill }
+      ]);
+      weekHours = 0; weekDays = 0;
+    }
+  }
+
+  var sumRow = function(label, value) {
+    return [{ text: label, style: 'metaLbl' }, { text: String(value), style: 'cell', bold: true }];
+  };
+  var days = function(n) { n = spNum(n); return n + (n === 1 ? ' day' : ' days'); };
+  var summary = [
+    sumRow('Total hours', (totals.hours ? spFmtHoursMins(totals.hours) : '0h') + '  (' + spNum(totals.hours) + ' hrs)'),
+    sumRow('Days worked', totals.worked)
+  ];
+  if (totals.noOut) summary.push(sumRow('Days missing a clock-out', totals.noOut + ' (not counted in the hours)'));
+  summary.push(sumRow('Holiday', days(totals.holiday)), sumRow('Sick', days(totals.sick)));
+  if (totals.other) summary.push(sumRow('Other leave', days(totals.other)));
+  if (totals.bank) summary.push(sumRow('Bank holidays', days(totals.bank)));
+
+  var generated = new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return {
+    pageSize: 'A4', pageMargins: [40, 36, 40, 44],
+    content: [
+      { text: 'ARBORITE TREE SERVICES', style: 'brand' },
+      { text: 'Monthly Timesheet — ' + personName, style: 'title' },
+      { text: monthLabel, style: 'sub' },
+      { table: { widths: [150, '*'], body: summary }, layout: 'lightHorizontalLines', margin: [0, 0, 0, 14] },
+      { table: { headerRows: 1, widths: [80, 55, 55, 60, '*'], body: body }, layout: 'lightHorizontalLines' },
+      { text: 'Hours run from first clock-in to last clock-out each day; breaks are not taken off.', style: 'small', margin: [0, 10, 0, 0] }
+    ],
+    footer: function(page, pages) {
+      return { text: personName + ' · ' + monthLabel + ' · made ' + generated + ' · page ' + page + ' of ' + pages, style: 'small', alignment: 'center', margin: [0, 14, 0, 0] };
+    },
+    styles: {
+      brand: { fontSize: 9, bold: true, color: '#2d5218', characterSpacing: 1.5, margin: [0, 0, 0, 2] },
+      title: { fontSize: 17, bold: true, margin: [0, 0, 0, 2] },
+      sub: { fontSize: 11, color: '#555555', margin: [0, 0, 0, 12] },
+      th: { fontSize: 9, bold: true, color: '#555555' },
+      metaLbl: { fontSize: 9.5, bold: true, color: '#555555' },
+      cell: { fontSize: 9 },
+      small: { fontSize: 8, color: '#777777' }
+    },
+    defaultStyle: { fontSize: 9 }
+  };
+}
 
 function spMapLink(lat, lng) {
   if (lat == null || lng == null) return '';
