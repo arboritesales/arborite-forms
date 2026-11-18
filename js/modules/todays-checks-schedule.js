@@ -78,7 +78,7 @@ function _completeScheduledFor(category, machine) {
   _completeMatchingScheduled(category, machine);
 }
 
-// ── DAILY CHECKS — the five plant machines need a pre-use check every
+// ── DAILY CHECKS — the plant machines and the HGV need a pre-use check every
 // weekday (Mon–Fri) without anyone booking it. They aren't stored as
 // todays_checks rows: a day's daily check counts as done when a finished
 // check (one with an overall rating) was saved for that machine that day, or
@@ -90,9 +90,12 @@ var DAILY_CHECKS = [
   { category: 'digger',  machine: 'Volvo ECR145E' },
   { category: 'climber', machine: 'MDB LV 800 Green Climber' },
   { category: 'stump',   machine: 'FSI D74' },
-  { category: 'mewp',    machine: 'Hinowa MEWP' }
+  { category: 'mewp',    machine: 'Hinowa MEWP' },
+  { category: 'hgv',     machine: 'HGV', from: '2026-11-18' }
 ];
-var DAILY_CHECKS_FROM = '2026-10-23'; // first day they were due — nothing missed before it
+// First day they were due — nothing missed before it (an entry's own `from`
+// wins, for machines added later)
+var DAILY_CHECKS_FROM = '2026-10-23';
 
 // ── WEEKLY SCHEDULE — from the Vehicle & Equipment Check Schedule
 // spreadsheet. Each item is due once in its week (Mon–Fri) and counts as done
@@ -249,7 +252,7 @@ function _fetchCheckHistory(startIso, endIso) {
 // _fetchCheckHistory.
 function _dailyFor(iso, bookedMap, hist) {
   if (iso < DAILY_CHECKS_FROM || _isWeekendIso(iso)) return [];
-  return DAILY_CHECKS.filter(function(d) { return !bookedMap[d.category + '|' + d.machine]; })
+  return DAILY_CHECKS.filter(function(d) { return !(d.from && iso < d.from) && !bookedMap[d.category + '|' + d.machine]; })
     .map(function(d) {
       var k = iso + '|' + d.category + '|' + d.machine;
       return { id: '', daily: true, category: d.category, machine: d.machine, scheduled_date: iso,
