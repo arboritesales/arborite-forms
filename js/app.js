@@ -4230,11 +4230,10 @@ var CHECK_CATEGORIES = {
     ]
   },
   // HGV — the driver's daily / shift vehicle defect check (goods vehicles).
-  // Vehicle is typed in until the HGV regs are added to machines.
   hgv: {
     label: 'HGV', icon: '🚚', table: 'hgv_checks',
     machineLabel: 'Vehicle no',
-    machines: [],
+    machines: ['HGV'],
     hasMileage: true, mileageLabel: 'Odometer reading',
     detailFields: [
       {key:'trailer_no', label:'Trailer no', type:'text'}
