@@ -10781,11 +10781,36 @@ function spRenderPendingRequests() {
   spRpc('sp_pending_requests', {}).then(function(res) {
     var rows = res.ok && Array.isArray(res.data) ? res.data : [];
     if (!rows.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No pending requests.</div>'; return; }
+    // Two-step approval: a request only becomes 'approved' (and shows on the
+    // person's calendar and the Team Calendar) once BOTH Manager approval and
+    // Office approval have been given — see
+    // sql/supabase_staff_leave_two_step_approval_2026-11-18.sql.
+    function approvalBtn(r, role, label, doneAt) {
+      if (doneAt) return '<button class="sp-btn-approved" disabled>✔ ' + label + ' given</button>';
+      return '<button class="sp-btn-approve" onclick="spApproveRequest(\'' + r.id + '\',\'' + role + '\',this)">✔ ' + label + '</button>';
+    }
     el.innerHTML = rows.map(function(r) {
-      return '<div class="sp-req-item"><div class="sp-req-top"><span class="sp-req-dates">' + spEsc(r.name) + ' — ' + spFmtDateRange(r.start_date, r.end_date) + ' (' + r.days + (r.days == 1 ? ' day' : ' days') + ')</span><span class="sp-pill pending">pending</span></div>'
+      var waiting = r.manager_approved_at && !r.office_approved_at ? 'awaiting office'
+        : (!r.manager_approved_at && r.office_approved_at ? 'awaiting manager' : 'pending');
+      return '<div class="sp-req-item"><div class="sp-req-top"><span class="sp-req-dates">' + spEsc(r.name) + ' — ' + spFmtDateRange(r.start_date, r.end_date) + ' (' + r.days + (r.days == 1 ? ' day' : ' days') + ')</span><span class="sp-pill pending">' + waiting + '</span></div>'
         + (r.note ? '<div class="sp-req-note">' + spEsc(r.note) + '</div>' : '')
-        + '<div class="sp-req-actions"><button class="sp-btn-approve" onclick="spDecideRequest(\'' + r.id + '\',\'approved\')">✔ Approve</button><button class="sp-btn-decline" onclick="spDecideRequest(\'' + r.id + '\',\'declined\')">✕ Decline</button></div></div>';
+        + '<div class="sp-req-actions">' + approvalBtn(r, 'manager', 'Manager approval', r.manager_approved_at) + approvalBtn(r, 'office', 'Office approval', r.office_approved_at) + '</div>'
+        + '<div class="sp-req-actions"><button class="sp-btn-decline" onclick="spDecideRequest(\'' + r.id + '\',\'declined\')">✕ Decline</button></div></div>';
     }).join('');
+  });
+}
+
+function spApproveRequest(id, role, btn) {
+  if (btn) btn.disabled = true;
+  spRpc('sp_approve_leave_request', { p_request_id: id, p_role: role }).then(function(res) {
+    if (!res.ok) {
+      if (btn) btn.disabled = false;
+      spToast((res.data && res.data.message) || 'Could not update request.');
+      return;
+    }
+    spToast(res.data === 'approved' ? 'Fully approved — now on the calendars.' : (role === 'manager' ? 'Manager approval given — waiting for office.' : 'Office approval given — waiting for manager.'));
+    spRenderPendingRequests();
+    spRenderTeamSummary();
   });
 }
 
