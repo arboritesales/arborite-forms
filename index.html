@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.0.0">
+  <link rel="stylesheet" href="css/app.css?v=1.0.1">
 </head>
 <body>
 
@@ -61,7 +61,7 @@
       <div class="lock-err" id="lockMgrErr"></div>
     </div>
   </div>
-  <div class="lock-ver">v1.0.0</div>
+  <div class="lock-ver">v1.0.1</div>
   </div>
 </div>
 
@@ -381,7 +381,7 @@
   <div style="position:relative;z-index:1;">
   <div class="ws-header">
     <div class="ws-brand">
-      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.0.0<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
+      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.0.1<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
     </div>
     <button id="logoutBtn" class="ws-icon-btn" onclick="logoutToTeamLogin()" style="display:none;" aria-label="Log out" title="Log out"><svg class="ic"><use href="#i-logout"/></svg><span>Log out</span></button>
   </div>
@@ -454,7 +454,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.0.0</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.0.1</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -2693,6 +2693,10 @@
         <div class="dash-tile-icon">&#127959;&#65039;</div>
         <div class="dash-tile-name">MEWP</div>
       </div>
+      <div class="dash-tile" data-checkstab="hgv" style="text-align:center;padding:22px 16px;" onclick="switchChecksTab('hgv')">
+        <div class="dash-tile-icon">&#128666;</div>
+        <div class="dash-tile-name">HGV</div>
+      </div>
       <div class="dash-tile" data-checkstab="trailer" style="text-align:center;padding:22px 16px;" onclick="switchChecksTab('trailer')">
         <div class="dash-tile-icon">&#128667;</div>
         <div class="dash-tile-name">Trailers</div>
@@ -2889,6 +2893,7 @@
   <div id="checksTab_climber" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;">
     <div class="checks-coming-soon">&#127795; Green Climber checks — coming soon</div>
   </div>
+  <div id="checksTab_hgv" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;"></div>
   <div id="checksTab_mewp" class="checks-tab-content" style="display:none;max-width:600px;margin:0 auto;padding:20px;">
     <div class="checks-coming-soon">&#127959;&#65039; MEWP checks — coming soon</div>
   </div>
@@ -3027,7 +3032,7 @@
   </div>
 </div>
 
-  <script src="js/app.js?v=1.0.0"></script>
+  <script src="js/app.js?v=1.0.1"></script>
 </body>
 </html>
 

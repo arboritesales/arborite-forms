@@ -30,8 +30,8 @@ function _reportSource(kind, cat) {
 }
 
 function _pdfAnswerColour(val) {
-  if (/good|yes|correct|excellent/i.test(val)) return '#2d5a1b';
-  if (/poor|no\b|unsatisfactory|damaged|requires|not working|too low/i.test(val)) return '#c62828';
+  if (/good|yes|\bok\b|correct|excellent/i.test(val)) return '#2d5a1b';
+  if (/poor|no\b|defect|unsatisfactory|damaged|requires|not working|too low/i.test(val)) return '#c62828';
   if (/fair|low|satisfactory/i.test(val)) return '#7a4d00';
   return '#222222';
 }

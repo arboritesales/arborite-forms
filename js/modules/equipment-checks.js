@@ -243,6 +243,49 @@ var CHECK_CATEGORIES = {
       {key:'ground_controls', label:'Function check of ground controls completed?', options:['Yes','No']}
     ]
   },
+  // HGV — the driver's daily / shift vehicle defect check (goods vehicles).
+  // Vehicle is typed in until the HGV regs are added to machines.
+  hgv: {
+    label: 'HGV', icon: '🚚', table: 'hgv_checks',
+    machineLabel: 'Vehicle no',
+    machines: [],
+    hasMileage: true, mileageLabel: 'Odometer reading',
+    detailFields: [
+      {key:'trailer_no', label:'Trailer no', type:'text'}
+    ],
+    checksHeading: 'Daily or Shift Check',
+    fields: [
+      {key:'fuel_oil_leaks', label:'Fuel system / oil leaks', options:['OK','Defect']},
+      {key:'battery_security', label:'Battery security (condition)', options:['OK','Defect']},
+      {key:'tyres_wheels', label:'Tyres / wheel and wheel fixing', options:['OK','Defect']},
+      {key:'spray_suppression', label:'Spray suppression / Wings', options:['OK','Defect','N/A']},
+      {key:'steering', label:'Steering (inc. ESC)', options:['OK','Defect']},
+      {key:'load_height', label:'Security of load / Vehicle height', options:['OK','Defect','N/A']},
+      {key:'mirrors_glass', label:'Mirrors / Cameras / Glass / Visibility', options:['OK','Defect']},
+      {key:'air_leaks', label:'Air build-up / Leaks', options:['OK','Defect','N/A']},
+      {key:'ancillary_equipment', label:'Ancillary equipment', options:['OK','Defect','N/A']},
+      {key:'lights', label:'Lights / Reflectors / Markers', options:['OK','Defect']},
+      {key:'wipers_horn', label:'Wipers / Washers / Horn', options:['OK','Defect']},
+      {key:'indicators', label:'Indicators / Side repeaters', options:['OK','Defect']},
+      {key:'warning_lamps', label:'Warning Lamps / MIL', options:['OK','Defect']},
+      {key:'adas', label:'ADAS', options:['OK','Defect','N/A']},
+      {key:'height_marker', label:'Height marker', options:['OK','Defect','N/A']},
+      {key:'running_height', label:'Running height (state height)', type:'text'},
+      {key:'exhaust_smoke', label:'Excessive engine exhaust smoke', options:['OK','Defect']},
+      {key:'adblue', label:'AdBlue® if required', options:['OK','Defect','N/A']},
+      {key:'hv_cut_off', label:'High voltage emergency cut off switch', options:['OK','Defect','N/A']},
+      {key:'brake_lines', label:'Brake lines (vehicle and trailer combinations)', options:['OK','Defect','N/A']},
+      {key:'coupling_security', label:'Coupling security (vehicle and trailer combinations)', options:['OK','Defect','N/A']},
+      {key:'electrical_connections', label:'Electrical connections inc. ISO cable (vehicle and trailer combinations)', options:['OK','Defect','N/A']},
+      {key:'brakes', label:'Brakes (inc. ABS/EBS)', options:['OK','Defect']},
+      {key:'body_condition', label:'Security / Condition of body', options:['OK','Defect']},
+      {key:'registration_plates', label:'Registration plates', options:['OK','Defect']},
+      {key:'cab_interior', label:'Cab interior / Seat belts', options:['OK','Defect']},
+      {key:'cab_steps_doors', label:'Cab steps / Doors', options:['OK','Defect']},
+      {key:'alt_fuels_isolation', label:'Alternative fuels isolation', options:['OK','Defect','N/A']},
+      {key:'defects_reported_to', label:'Defects reported to', type:'text'}
+    ]
+  },
   // Rigging Kit — sub-tabs reached from the Rigging Kit tile (group: 'riggingkit').
   // Each kit's items are checked individually below — no machine picker.
   rigging: {
@@ -462,13 +505,23 @@ function catOptionClass(opt) {
   if (/^n\/a$|not using on site/.test(o)) return 'active-na';
   if (/too low/.test(o)) return 'active-toolow';
   if (/topped up/.test(o)) return 'active-toppedup';
-  if (/^yes$|^good$|^correct$|excellent|intact and (present|functioning)|functions correctly|fully functioning and clean|correct numberplate/.test(o)) return 'active-good';
-  if (/^no\b|^poor$|damaged|requires maintenance|requires attention|not working|unsatisfactory/.test(o)) return 'active-poor';
+  if (/^yes$|^ok$|^good$|^correct$|excellent|intact and (present|functioning)|functions correctly|fully functioning and clean|correct numberplate/.test(o)) return 'active-good';
+  if (/^no\b|^poor$|^defect$|damaged|requires maintenance|requires attention|not working|unsatisfactory/.test(o)) return 'active-poor';
   if (/^fair$|satisfactory|working but require maintenance|could not test/.test(o)) return 'active-fair';
   return 'active-' + o.replace(/\//g,'').replace(/[^a-z0-9]/g,'');
 }
 
+// Every question on a form: the details-section extras (detailFields) then the checks
+function catAllFields(cfg) {
+  return (cfg.detailFields || []).concat(cfg.fields);
+}
+
 function catFieldRow(cat, f) {
+  if (f.type === 'text') {
+    return '<div class="field-row lw"><div class="fc lbl">' + f.label + '</div><div class="fc">'
+      + '<input id="catField_' + cat + '_' + f.key + '" class="cat-text" placeholder="Enter" style="width:100%;border:none;border-bottom:1.5px solid var(--border);padding:6px 0;font-size:13px;font-family:\'Barlow\',sans-serif;outline:none;background:transparent;" oninput="catAutoSave(\'' + cat + '\')">'
+      + '</div></div>';
+  }
   var btns = f.options.map(function(opt) {
     return '<button class="veh-btn" onclick="catFieldSel(\'' + cat + '\',\'' + f.key + '\',this,\'' + opt.replace(/'/g,"\\'") + '\')">' + opt + '</button>';
   }).join('');
@@ -487,6 +540,7 @@ function catFieldSel(cat, key, btn, val) {
 function catGetFieldVal(cat, key) {
   var group = document.getElementById('catField_' + cat + '_' + key);
   if (!group) return '';
+  if (group.tagName === 'INPUT') return group.value;
   var btn = group.querySelector('.veh-btn[class*="active-"]');
   return btn ? btn.textContent.trim() : '';
 }
@@ -582,6 +636,7 @@ function renderCategoryPanel(cat) {
       + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">' + cfg.icon + ' ' + cfg.label + ' Details</div>'
       + '<div class="field-row lw"><div class="fc lbl">' + cfg.machineLabel + '</div><div class="fc">' + catMachineSelectHtml(cat, cfg) + '</div></div>'
       + mileageHtml
+      + (cfg.detailFields || []).map(function(f){ return catFieldRow(cat, f); }).join('')
       + '</div>')
     + '<div style="background:white;border-radius:8px;margin-bottom:14px;overflow:hidden;">'
     + '<div style="background:#2d5218;padding:10px 16px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:var(--lime);text-transform:uppercase;letter-spacing:1px;">&#9989; ' + (cfg.checksHeading || 'Checks') + '</div>'
@@ -687,6 +742,7 @@ function catClearForm(cat) {
   var root = document.getElementById('catFormPanel_' + cat);
   root.querySelectorAll('.veh-btn').forEach(function(b){ b.className = 'veh-btn'; });
   root.querySelectorAll('.veh-rating-btn').forEach(function(b){ b.className = 'veh-rating-btn'; });
+  root.querySelectorAll('.cat-text').forEach(function(i){ i.value = ''; });
   document.getElementById('catSaveStatus_' + cat).textContent = '';
   resetDefectState('cat_' + cat);
 }
@@ -724,7 +780,7 @@ function saveCatCheck(cat, isAuto) {
     var mEl = document.getElementById('catMileage_' + cat);
     payload.mileage = (mEl && mEl.value) ? parseFloat(mEl.value) : null;
   }
-  cfg.fields.forEach(function(f) { payload[f.key] = catGetFieldVal(cat, f.key); });
+  catAllFields(cfg).forEach(function(f) { payload[f.key] = catGetFieldVal(cat, f.key); });
   payload.comments = document.getElementById('catComments_' + cat).value;
   var _defPayload = getDefectPayload('cat_' + cat);
   payload.has_defect = _defPayload.has_defect;
@@ -832,7 +888,7 @@ function catFieldRows(cat, d) {
   var cfg = CHECK_CATEGORIES[cat];
   var fieldRows = [];
   if (cfg.hasMileage) fieldRows.push([cfg.mileageLabel, (d.mileage != null && d.mileage !== '') ? d.mileage : '']);
-  cfg.fields.forEach(function(f) { fieldRows.push([f.label, d[f.key]]); });
+  catAllFields(cfg).forEach(function(f) { fieldRows.push([f.label, d[f.key], f.type === 'text']); });
   // Third element marks free text, so it isn't coloured as a Good/Poor answer
   fieldRows.push(['Comments', d.comments, true]);
   return fieldRows;
@@ -873,8 +929,8 @@ function loadCatRecord(cat, id) {
       var val = f[1];
       var colour = '';
       if (!f[2]) {
-        if (/good|yes|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
-        else if (/poor|no\b|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
+        if (/good|yes|\bok\b|correct|excellent/i.test(val)) colour = 'color:#2d5a1b;font-weight:700;';
+        else if (/poor|no\b|defect|unsatisfactory/i.test(val)) colour = 'color:#c62828;font-weight:700;';
         else if (/fair|low|satisfactory/i.test(val)) colour = 'color:#7a4d00;font-weight:700;';
       }
       val = _esc(val).replace(/\n/g,'<br>');
