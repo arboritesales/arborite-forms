@@ -288,12 +288,46 @@ function printPanel(id) {
   }
   var target = document.getElementById(id);
   if (target) target.classList.add('printing-active');
+  var mirrors = _addPrintTextMirrors(target);
   _printWithClass(function() {
     var allP = document.querySelectorAll('.panel');
     for (var j = 0; j < allP.length; j++) {
       allP[j].classList.remove('printing-active');
     }
+    _removePrintTextMirrors(mirrors);
   });
+}
+
+// Browser print cuts a <textarea> off at its on-screen size, so long text
+// (e.g. Project Scope on the sign-off) was hidden in the PDF. For printing,
+// each filled textarea is swapped for a plain block holding all its text,
+// which grows to fit and flows across pages.
+function _addPrintTextMirrors(root) {
+  var made = [];
+  if (!root) return made;
+  var tas = root.querySelectorAll('textarea');
+  for (var i = 0; i < tas.length; i++) {
+    var ta = tas[i];
+    if (!ta.value || !ta.value.trim()) continue;
+    var m = document.createElement('div');
+    m.className = 'print-ta-mirror';
+    m.textContent = ta.value;
+    var cs = window.getComputedStyle(ta);
+    m.style.fontSize = cs.fontSize;
+    m.style.fontFamily = cs.fontFamily;
+    m.style.padding = cs.padding;
+    ta.parentNode.insertBefore(m, ta.nextSibling);
+    ta.classList.add('print-ta-hidden');
+    made.push({ ta: ta, m: m });
+  }
+  return made;
+}
+
+function _removePrintTextMirrors(made) {
+  for (var i = 0; i < (made || []).length; i++) {
+    made[i].ta.classList.remove('print-ta-hidden');
+    if (made[i].m.parentNode) made[i].m.parentNode.removeChild(made[i].m);
+  }
 }
 
 function clearForm(id) {
