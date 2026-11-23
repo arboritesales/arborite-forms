@@ -7342,7 +7342,7 @@ function _rfFieldHtml(f) {
       + '<div id="rfPinName" class="rf-pin-name" style="display:none;"></div>'
       + '<span id="rfPinOk" style="display:none;"></span>'
       + '</div>'
-      + '<label class="rf-radio" style="margin-top:10px;"><input type="checkbox" id="rf_subby" onchange="toggleReportSubcontractor(this.checked)"> I&#39;m a subcontractor (no employee PIN)</label>'
+      + '<label class="rf-radio" style="margin-top:10px;"><input type="checkbox" id="rf_subby" onchange="toggleReportSubcontractor(this.checked)"> I&#39;m a subcontractor</label>'
       + '<div id="rfSubbyWrap" style="display:none;margin-top:12px;">'
       + '<label class="rf-label" for="rf_subby_company">Subcontractor company name <span class="rf-req">*</span></label>'
       + '<input id="rf_subby_company" class="rf-inp" type="text" autocomplete="off">'
@@ -7541,7 +7541,7 @@ function _rfFieldPairs(d) {
   if (!form) return Object.keys(a).map(function(k) { return [k, a[k]]; });
   form.fields.forEach(function(f) {
     if (f.type === 'pin') {
-      if (a.subcontractor === 'Yes') pairs.push(['Subcontractor (no employee PIN)', 'Company: ' + (a.subcontractor_company || '—')]);
+      if (a.subcontractor === 'Yes') pairs.push(['Subcontractor','Company: ' + (a.subcontractor_company || '—')]);
       else pairs.push(['Employee PIN checked', d.pin_staff_name ? '✓ ' + d.pin_staff_name : '']);
       return;
     }
