@@ -15,6 +15,7 @@ defects-dashboard.js
 todays-checks-schedule.js
 check-report-downloads.js
 toolbox-talks.js
+report-forms.js
 audits.js
 method-statement-builder.js
 staff-portal.js
