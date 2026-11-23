@@ -383,7 +383,7 @@ function buildAll() {
   buildEquipTable();
   buildAiderChecks();
   buildAudOpsChecks();
-  buildOpSigs('opSigsPowa', 5, 'po');
+  buildOpSigs('opSigsPowa', 10, 'po');
   // opSigsMethod replaced by 15 individual sig boxes
   buildDailyRows(12);
   initAllStaffSelects();
