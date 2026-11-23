@@ -114,7 +114,7 @@ function _rfFormHasInput() {
   var els = form.querySelectorAll('input, textarea, select');
   for (var i = 0; i < els.length; i++) {
     var el = els[i];
-    if (el.type === 'radio') { if (el.checked) return true; }
+    if (el.type === 'radio' || el.type === 'checkbox') { if (el.checked) return true; }
     else if (el.value) return true;
   }
   return false;
@@ -198,10 +198,18 @@ function _rfFieldHtml(f) {
       return '<label class="rf-radio"><input type="radio" name="' + id + '" value="' + _esc(o) + '"> ' + _esc(o) + '</label>';
     }).join('') + '</div>';
   } else if (f.type === 'pin') {
-    h += '<input id="rf_pin" class="lock-inp rf-pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••" autocomplete="off" oninput="checkReportPin(this.value)">'
+    // Subcontractors have no PIN: ticking the box swaps the PIN for their company name
+    h += '<div id="rfPinWrap">'
+      + '<input id="rf_pin" class="lock-inp rf-pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••" autocomplete="off" oninput="checkReportPin(this.value)">'
       + '<div id="rfPinErr" class="rf-pin-err"></div>'
       + '<div id="rfPinName" class="rf-pin-name" style="display:none;"></div>'
-      + '<span id="rfPinOk" style="display:none;"></span>';
+      + '<span id="rfPinOk" style="display:none;"></span>'
+      + '</div>'
+      + '<label class="rf-radio" style="margin-top:10px;"><input type="checkbox" id="rf_subby" onchange="toggleReportSubcontractor(this.checked)"> I&#39;m a subcontractor (no employee PIN)</label>'
+      + '<div id="rfSubbyWrap" style="display:none;margin-top:12px;">'
+      + '<label class="rf-label" for="rf_subby_company">Subcontractor company name <span class="rf-req">*</span></label>'
+      + '<input id="rf_subby_company" class="rf-inp" type="text" autocomplete="off">'
+      + '</div>';
   }
   return h + '<div class="rf-err" id="rfe_' + f.k + '"></div></div>';
 }
@@ -231,9 +239,23 @@ function openReportForm(type) {
   _rfScrollTop();
 }
 
+function toggleReportSubcontractor(on) {
+  document.getElementById('rfPinWrap').style.display = on ? 'none' : '';
+  document.getElementById('rfSubbyWrap').style.display = on ? 'block' : 'none';
+  var card = document.getElementById('rfq_pin');
+  card.parentNode.classList.remove('rf-card-err');
+  document.getElementById('rfe_pin').textContent = '';
+  if (on) {
+    document.getElementById('rf_pin').value = '';
+    checkReportPin('');
+    document.getElementById('rf_subby_company').focus();
+  }
+}
+
 function _rfClearErr(e) {
   var q = e.target.closest('.rf-q');
-  if (!q || q.id === 'rfq_pin') return;
+  if (!q) return;
+  if (q.id === 'rfq_pin' && e.target.id !== 'rf_subby_company') return;
   q.parentNode.classList.remove('rf-card-err');
   var err = q.querySelector('.rf-err');
   if (err) err.textContent = '';
@@ -276,10 +298,17 @@ function submitReportForm() {
     var errEl = document.getElementById('rfe_' + f.k);
     var msg = '';
     if (f.type === 'pin') {
-      var pinEl = document.getElementById('rf_pin');
-      staffName = _verifiedInspectorName(pinEl);
-      if (!pinEl.value) msg = 'This is a required question';
-      else if (!staffName) msg = 'Enter a recognised employee PIN — wait for your name to show';
+      if (document.getElementById('rf_subby').checked) {
+        var company = String(document.getElementById('rf_subby_company').value || '').trim();
+        answers.subcontractor = 'Yes';
+        answers.subcontractor_company = company;
+        if (!company) msg = 'Enter your company name';
+      } else {
+        var pinEl = document.getElementById('rf_pin');
+        staffName = _verifiedInspectorName(pinEl);
+        if (!pinEl.value) msg = 'Enter your employee PIN, or tick the subcontractor box';
+        else if (!staffName) msg = 'Enter a recognised employee PIN — wait for your name to show';
+      }
     } else {
       var v = _rfValue(f);
       if (f.req && !v) msg = 'This is a required question';
@@ -374,7 +403,11 @@ function _rfFieldPairs(d) {
   var pairs = [];
   if (!form) return Object.keys(a).map(function(k) { return [k, a[k]]; });
   form.fields.forEach(function(f) {
-    if (f.type === 'pin') { pairs.push(['Employee PIN checked', d.pin_staff_name ? '✓ ' + d.pin_staff_name : '']); return; }
+    if (f.type === 'pin') {
+      if (a.subcontractor === 'Yes') pairs.push(['Subcontractor (no employee PIN)', 'Company: ' + (a.subcontractor_company || '—')]);
+      else pairs.push(['Employee PIN checked', d.pin_staff_name ? '✓ ' + d.pin_staff_name : '']);
+      return;
+    }
     var v = a[f.k];
     if (f.type === 'date' && v) v = _rfFmtDate(v);
     pairs.push([f.label, v || '']);
