@@ -135,7 +135,9 @@ function _csvCell(v) {
   var s = String(v === undefined || v === null ? '' : v);
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
-function _blobToDataUrl(blob) {
+// Promise version — named apart from documents.js's callback-style
+// _blobToDataUrl(blob, cb), which this would otherwise replace in app.js.
+function _blobToDataUrlAsync(blob) {
   return new Promise(function(resolve) {
     var fr = new FileReader();
     fr.onload = function() { resolve(fr.result); };
@@ -196,7 +198,7 @@ function _buildDefectsZip(all, btn, single, done) {
       .then(function(r) { if (!r.ok) throw new Error(r.status); return r.blob(); })
       .then(function(blob) {
         photosDir.file(j.file, blob);
-        return _blobToDataUrl(blob).then(function(url) { j.it.photos.push({ file: j.file, url: url }); });
+        return _blobToDataUrlAsync(blob).then(function(url) { j.it.photos.push({ file: j.file, url: url }); });
       })
       .catch(function() { missing++; j.it.photos.push({ file: j.file + ' (could not be downloaded)', url: null }); })
       .then(nextPhoto);
