@@ -10874,13 +10874,23 @@ var SP_LEAVE_LABELS = { sick: 'Sick', unpaid: 'Unpaid', holiday: 'Holiday', othe
 function spBuildPayPeople(rows, leave, from, to) {
   var byName = {};
   function person(name) {
-    if (!byName[name]) byName[name] = { name: name, salaried: false, days: [], leave: [], worked: 0, noOut: 0, basic: 0, half: 0, dbl: 0, earlyMins: 0, awaiting: 0, sick: 0, unpaid: 0 };
+    if (!byName[name]) byName[name] = { name: name, salaried: false, days: [], leave: [], worked: 0, weekdaysWorked: 0, noOut: 0, basic: 0, half: 0, dbl: 0, earlyMins: 0, awaiting: 0,
+      sick: 0, unpaid: 0, holiday: 0, other: 0, bankHol: 0, shutdown: 0 };
     return byName[name];
+  }
+  // Days off are counted up to today when the period hasn't finished yet, so
+  // they line up with Working Days (which can't include days still to come).
+  var today = spLocalDateStr(new Date()), countTo = to < today ? to : today;
+  var workingDays = 0;
+  for (var d = new Date(from + 'T00:00:00'); spLocalDateStr(d) <= countTo; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() !== 0 && d.getDay() !== 6) workingDays++;
   }
   rows.forEach(function(r) {
     var p = person(r.name), pay = spDayPay(r);
     if (r.salaried) p.salaried = true;
     p.worked++;
+    var dow = new Date(r.work_date + 'T00:00:00').getDay();
+    if (dow !== 0 && dow !== 6 && r.work_date <= countTo) p.weekdaysWorked++;
     if (!r.clock_out) p.noOut++;
     p.basic += pay.paid.basic;
     p.half += pay.paid.half;
@@ -10896,13 +10906,24 @@ function spBuildPayPeople(rows, leave, from, to) {
     var p = byName[l.name];
     if (!p) return;
     p.leave.push(l);
-    if (l.type === 'sick') p.sick += spLeaveDaysInPeriod(l, from, to);
-    if (l.type === 'unpaid') p.unpaid += spLeaveDaysInPeriod(l, from, to);
+    if (countTo < from) return;
+    var n = spLeaveDaysInPeriod(l, from, countTo);
+    if (l.type === 'sick') p.sick += n;
+    else if (l.type === 'unpaid') p.unpaid += n;
+    else if (l.type === 'holiday') p.holiday += n;
+    else if (l.type === 'bank_holiday') p.bankHol += n;
+    else if (l.type === 'shutdown') p.shutdown += n;
+    else p.other += n;
   });
   return Object.keys(byName).sort().map(function(n) {
     var p = byName[n];
     p.early = spRoundHalf(p.earlyMins);
     p.basicNet = p.basic - p.early;
+    p.workingDays = workingDays;
+    p.bhShut = p.bankHol + p.shutdown;
+    p.daysOff = p.holiday + p.sick + p.unpaid + p.other + p.bhShut;
+    // Weekdays with no clock-in and no leave booked on the app.
+    p.unaccounted = Math.max(0, workingDays - p.weekdaysWorked - p.daysOff);
     return p;
   });
 }
@@ -10950,7 +10971,9 @@ function spPayGridSheet(people, from, to) {
     aoa.push(line);
   }
   [['Basic Overtime', 'basicNet'], ['Left Early (taken off basic)', 'early'], ['Overtime @ 1.5', 'half'], ['Overtime @ 2', 'dbl'],
-   ['Sickness (days)', 'sick'], ['Unpaid Leave (days)', 'unpaid'], ['Awaiting Approval', 'awaiting']].forEach(function(t) {
+   ['Working Days', 'workingDays'], ['Days Worked (Mon-Fri)', 'weekdaysWorked'], ['Holiday (days)', 'holiday'], ['Sickness (days)', 'sick'], ['Unpaid Leave (days)', 'unpaid'],
+   ['Other Leave (days)', 'other'], ['Bank Holiday / Shutdown (days)', 'bhShut'], ['No Clock-In or Leave (days)', 'unaccounted'],
+   ['Awaiting Approval', 'awaiting']].forEach(function(t) {
     var line = [t[0]];
     people.forEach(function(p, i) {
       var c = 1 + i * 2;
@@ -10980,16 +11003,39 @@ function spClockReportWorkbook(rows, leave, from, to) {
   var summaryAoa = [
     ['Staff overtime: ' + spFmtPeriod(from, to)],
     ['Only approved overtime is counted. Anything not yet approved is under Awaiting Approval.'],
+    ['Working Days = Monday to Friday in the period' + (spLocalDateStr(new Date()) < to ? ', up to today' : '')
+      + '. Days Worked + days off + No Clock-In or Leave = Working Days. Days off come from leave booked on the app; dates are on the Days Off tab.'],
     [],
-    ['Name', 'Pay Type', 'Basic Overtime', 'Overtime @ 1.5', 'Overtime @ 2', 'Sickness (days)', 'Unpaid Leave (days)',
-     'Basic Before Deductions', 'Left Early', 'Awaiting Approval', 'Days Worked', 'Days Missing Clock-Out']
+    ['Name', 'Pay Type', 'Basic Overtime', 'Overtime @ 1.5', 'Overtime @ 2',
+     'Working Days', 'Days Worked (Mon-Fri)', 'Holiday (days)', 'Sickness (days)', 'Unpaid Leave (days)', 'Other Leave (days)', 'Bank Holiday / Shutdown (days)', 'No Clock-In or Leave (days)',
+     'Basic Before Deductions', 'Left Early', 'Awaiting Approval', 'Weekend Days Worked', 'Days Missing Clock-Out']
   ];
   people.forEach(function(p) {
-    summaryAoa.push([p.name, p.salaried ? 'Salaried' : 'Overtime', spNum(p.basicNet), spNum(p.half), spNum(p.dbl), spNum(p.sick), spNum(p.unpaid),
-      spNum(p.basic), spNum(p.early), spNum(p.awaiting), p.worked, p.noOut]);
+    summaryAoa.push([p.name, p.salaried ? 'Salaried' : 'Overtime', spNum(p.basicNet), spNum(p.half), spNum(p.dbl),
+      p.workingDays, p.weekdaysWorked, spNum(p.holiday), spNum(p.sick), spNum(p.unpaid), spNum(p.other), spNum(p.bhShut), spNum(p.unaccounted),
+      spNum(p.basic), spNum(p.early), spNum(p.awaiting), p.worked - p.weekdaysWorked, p.noOut]);
   });
   var summarySheet = XLSX.utils.aoa_to_sheet(summaryAoa);
-  summarySheet['!cols'] = [{ wch: 24 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 10 }, { wch: 17 }, { wch: 11 }, { wch: 22 }];
+  summarySheet['!cols'] = [{ wch: 24 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
+    { wch: 12 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 17 }, { wch: 27 }, { wch: 25 },
+    { wch: 22 }, { wch: 10 }, { wch: 17 }, { wch: 19 }, { wch: 22 }];
+
+  // Every leave entry in the period, so it's clear which days someone was off.
+  var daysOff = [];
+  people.forEach(function(p) {
+    p.leave.forEach(function(l) {
+      if (l.type === 'bank_holiday' || l.type === 'shutdown') return;
+      daysOff.push({ Name: p.name, Type: SP_LEAVE_LABELS[l.type] || l.type, From: spFmtPayDate(l.start_date), To: spFmtPayDate(l.end_date), 'Days (whole entry)': spNum(l.days) });
+    });
+  });
+  var bhSeen = {};
+  people.forEach(function(p) {
+    p.leave.forEach(function(l) {
+      if ((l.type !== 'bank_holiday' && l.type !== 'shutdown') || bhSeen[l.type + l.start_date]) return;
+      bhSeen[l.type + l.start_date] = true;
+      daysOff.push({ Name: 'Everyone', Type: SP_LEAVE_LABELS[l.type] || l.type, From: spFmtPayDate(l.start_date), To: spFmtPayDate(l.end_date), 'Days (whole entry)': spNum(l.days) });
+    });
+  });
 
   var daily = [];
   people.filter(function(p) { return p.days.length; }).forEach(function(p, i) {
@@ -11028,6 +11074,9 @@ function spClockReportWorkbook(rows, leave, from, to) {
   var dailySheet = XLSX.utils.json_to_sheet(daily);
   dailySheet['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 9 }, { wch: 9 }, { wch: 8 }, { wch: 11 }, { wch: 11 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 20 }, { wch: 17 }];
   XLSX.utils.book_append_sheet(wb, dailySheet, 'Daily');
+  var daysOffSheet = daysOff.length ? XLSX.utils.json_to_sheet(daysOff) : XLSX.utils.aoa_to_sheet([['No leave booked on the app in this period.']]);
+  daysOffSheet['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, daysOffSheet, 'Days Off');
   var weeklySheet = XLSX.utils.json_to_sheet(weekly);
   weeklySheet['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 10 }];
   XLSX.utils.book_append_sheet(wb, weeklySheet, 'Weekly Hours');
