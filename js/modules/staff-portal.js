@@ -804,11 +804,11 @@ function spApproveAll(name) {
 }
 
 // A day needs a manager to look at it if overtime is suggested, they left
-// early, the clock-out was automatic or is missing. Plain 07:00-16:00 days and
-// salaried staff's days don't.
+// early, or the clock-out is missing. Plain 07:00-16:00 days, weekday auto
+// clock-outs (a standard day) and salaried staff's days don't.
 function spDayNeedsApproval(r, pay) {
   if (r.is_approved || r.salaried) return false;
-  return !r.clock_out || pay.awaiting > 0 || pay.earlyMins > 0 || !!r.auto_clock_out;
+  return !r.clock_out || pay.awaiting > 0 || pay.earlyMins > 0;
 }
 
 // "1.5h basic, 2h @ 1.5" or "no overtime".
@@ -839,7 +839,7 @@ function spOtDayHtml(r, i, showName) {
   else status = '<b>' + (hasOt ? '+' : '') + spOtSummary(shown) + '</b>';
   var flags = [];
   if (r.is_bank_holiday) flags.push('Bank holiday');
-  if (r.auto_clock_out) flags.push('Auto clock-out at 16:00 — they forgot to clock out');
+  if (r.auto_clock_out) flags.push('Forgot to clock out — 16:00 added, paid as a standard day');
   if (!r.clock_out) flags.push('No clock-out — fix the time before approving');
   var early = pay.earlyMins > 0
     ? '<div style="margin-top:4px;font-size:12px;">Left ' + spFmtHoursMins(pay.earlyMins / 60) + ' early: '
@@ -878,7 +878,7 @@ function spOtToApproveHtml(rows) {
   });
   var html = '<h3 style="margin:18px 0 6px;">Overtime to approve</h3>';
   if (!order.length) return html + '<div style="color:var(--mid);font-size:12px;">Nothing waiting to approve this month.</div>';
-  html += '<div style="color:var(--mid);font-size:12px;margin-bottom:8px;">Normal 07:00–16:00 days and salaried staff aren\'t listed — there\'s nothing to approve.</div>';
+  html += '<div style="color:var(--mid);font-size:12px;margin-bottom:8px;">Normal 07:00–16:00 days, forgotten clock-outs (paid as a standard day) and salaried staff aren\'t listed — there\'s nothing to approve.</div>';
   if (total) html += '<button class="sp-btn-approve" style="padding:6px 12px;font-size:12px;margin-bottom:8px;" onclick="spApproveAll(null)">Approve everything as shown (' + total + ' day' + (total === 1 ? '' : 's') + ')</button>';
   order.forEach(function(n) {
     var ready = byName[n].filter(function(i) { return rows[i].clock_out; }).length;
@@ -944,7 +944,9 @@ function spDayPay(r) {
   // Salaried: nothing suggested and nothing taken off; a manager adds
   // overtime by hand on the odd day they earn it.
   if (r.salaried) kind = 'salaried';
-  if (kind === 'week') {
+  // Forgot to clock out (16:00 added automatically): a standard day, no
+  // overtime suggested, so it doesn't need approving.
+  if (kind === 'week' && !r.auto_clock_out) {
     if (inM != null) morning = spRoundHalf(Math.max(0, 7 * 60 - inM));
     if (outM != null) {
       evening = spRoundHalf(Math.max(0, outM - 16 * 60));
