@@ -10,7 +10,7 @@
 <link rel="icon" href="arborite-logo-192.png" type="image/png">
 <link rel="apple-touch-icon" href="arborite-logo-192.png">
 <title>Arborite Tree Services &mdash; Field Forms</title>
-  <link rel="stylesheet" href="css/app.css?v=1.0.9">
+  <link rel="stylesheet" href="css/app.css?v=1.0.10">
 </head>
 <body>
 
@@ -61,7 +61,7 @@
       <div class="lock-err" id="lockMgrErr"></div>
     </div>
   </div>
-  <div class="lock-ver">v1.0.9</div>
+  <div class="lock-ver">v1.0.10</div>
   </div>
 </div>
 
@@ -333,6 +333,9 @@
         </div>
         <div id="spEditStaffHistory" style="display:none;">
           <button class="sp-btn sp-btn-decline" style="margin-bottom:14px;" onclick="spResetOneStaffPassword()">Get setup code / reset password</button>
+          <div class="sp-field"><label>Pay type</label>
+            <select id="spEditPayType" onchange="spSavePayType()" disabled><option value="overtime">Gets overtime</option><option value="salaried">Salaried (overtime only when a manager adds it)</option></select>
+          </div>
           <div id="spEditHistoryList" style="margin-bottom:14px;"></div>
           <div style="border-top:1px solid var(--row-alt);padding-top:12px;">
             <h3 style="margin-bottom:10px;">Add entry</h3>
@@ -382,7 +385,7 @@
   <div style="position:relative;z-index:1;">
   <div class="ws-header">
     <div class="ws-brand">
-      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.0.9<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
+      <div><div class="ws-title">Arborite Field Forms</div><div class="ws-ver">v1.0.10<span id="welcomeRole" style="display:none;"> &middot; Manager</span></div></div>
     </div>
     <button id="logoutBtn" class="ws-icon-btn" onclick="logoutToTeamLogin()" style="display:none;" aria-label="Log out" title="Log out"><svg class="ic"><use href="#i-logout"/></svg><span>Log out</span></button>
   </div>
@@ -460,7 +463,7 @@
 <div id="dashboard" class="dashboard">
   <div class="dash-header">
     <div class="dash-header-logo"><img src="arborite-logo-192.png" alt="Arborite"></div>
-    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.0.9</span></div>
+    <div class="dash-header-title">Arborite Field Forms <span style="font-size:11px;opacity:0.5;font-weight:400;letter-spacing:0.3px;">v1.0.10</span></div>
     <div class="dash-header-actions"></div>
   </div>
 
@@ -3047,7 +3050,7 @@
   </div>
 </div>
 
-  <script src="js/app.js?v=1.0.9"></script>
+  <script src="js/app.js?v=1.0.10"></script>
 </body>
 </html>
 

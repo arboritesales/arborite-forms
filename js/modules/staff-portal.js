@@ -665,12 +665,17 @@ function spRenderClockReport() {
 
     if (!spReportSelectedStaff) {
       spEnsureStaffNamesLoaded(function(names) {
-        if (!names.length) { el.innerHTML = '<div style="color:var(--mid);font-size:12px;">No staff found.</div>'; if (weeklyEl) weeklyEl.innerHTML = ''; return; }
-        el.innerHTML = names.map(function(n) {
+        var salariedNames = {};
+        rows.forEach(function(r) { if (r.salaried) salariedNames[r.name] = true; });
+        var list = names.length ? names.map(function(n) {
           var count = rows.filter(function(r) { return r.name === n; }).length;
           return '<div class="sp-onsite-row" style="cursor:pointer;" onclick="spSelectReportStaff(\'' + spJsStr(n) + '\')"><span>' + spEsc(n)
+            + (salariedNames[n] ? ' <span class="sp-onsite-time">· Salaried</span>' : '')
             + '<br><span class="sp-onsite-time">' + (count ? count + ' day' + (count === 1 ? '' : 's') + ' worked' : 'No activity this month') + '</span></span><span>&rsaquo;</span></div>';
-        }).join('');
+        }).join('') : '<div style="color:var(--mid);font-size:12px;">No staff found.</div>';
+        el.innerHTML = spOtTotalsHtml(rows) + spOtToApproveHtml(rows)
+          + '<h3 style="margin:18px 0 6px;">Everyone</h3><div style="color:var(--mid);font-size:12px;margin-bottom:6px;">Open someone to see every day, add overtime for salaried staff, or download their timesheet.</div>'
+          + list;
       });
       if (weeklyEl) weeklyEl.innerHTML = '';
       return;
@@ -684,33 +689,15 @@ function spRenderClockReport() {
       if (weeklyEl) weeklyEl.innerHTML = '';
       return;
     }
-    // Maps over the FULL rows array (not personRows) so index i still lines
-    // up with spLastClockReportRows — spSaveOvertime looks entries up by
-    // that index, and rows not belonging to the selected person just render
-    // as an empty string.
-    var body = rows.map(function(r, i) {
-      if (r.name !== spReportSelectedStaff) return '';
-      var dateStr = spFmtPayDate(r.work_date);
-      if (r.is_bank_holiday) dateStr += '<br><span style="font-size:11px;">Bank holiday</span>';
-      var pay = spDayPay(r);
-      // Boxes show what's been approved, or what the clock suggests until then.
-      var shown = r.is_approved ? pay.paid : pay.suggest;
-      var status = r.is_approved
-        ? '<b style="color:var(--green);">Approved</b>'
-        : (pay.awaiting > 0 ? '<b>Not approved yet</b> (' + spNum(pay.awaiting) + 'h from clock)' : '');
-      var early = pay.earlyMins > 0
-        ? '<div style="margin:4px 0;">Left early: ' + spFmtHoursMins(pay.earlyMins / 60)
-          + ' <label style="white-space:nowrap;"><input type="checkbox" id="spOtFull' + i + '"' + (r.early_full_pay ? ' checked' : '') + '> Full pay, no deduction</label></div>'
-        : '';
-      var box = function(label, id, val) {
-        return '<label style="white-space:nowrap;margin-right:8px;">' + label + ' <input type="number" step="0.25" min="0" style="width:56px;" id="' + id + i + '" value="' + spNum(val) + '"></label>';
-      };
-      var otCell = (status ? '<div style="margin-bottom:4px;">' + status + '</div>' : '') + early
-        + box('Basic', 'spOtBasic', shown.basic) + box('@ 1.5', 'spOtHalf', shown.half) + box('@ 2', 'spOtDouble', shown.dbl)
-        + '<button class="sp-btn-approve" style="padding:2px 8px;font-size:11px;" onclick="spSaveOvertime(' + i + ')">Approve</button>';
-      return '<tr><td>' + spEsc(r.name) + '</td><td>' + dateStr + '</td><td>' + (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '</td><td>' + (r.clock_out ? r.clock_out.slice(0, 5) : '—') + '</td><td>' + (r.hours != null ? r.hours : '—') + '</td><td>' + otCell + '</td></tr>';
-    }).join('');
-    el.innerHTML = header + '<table class="sp-dash-table"><tr><th>Name</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Overtime hours to approve</th></tr>' + body + '</table>';
+    var isSalaried = personRows.some(function(r) { return r.salaried; });
+    var waiting = rows.filter(function(r) { return r.name === spReportSelectedStaff && r.clock_out && spDayNeedsApproval(r, spDayPay(r)); }).length;
+    // Index i must line up with spLastClockReportRows — spSaveOvertime looks
+    // rows up by it — so this maps over the full rows array.
+    var body = rows.map(function(r, i) { return r.name === spReportSelectedStaff ? spOtDayHtml(r, i, false) : ''; }).join('');
+    el.innerHTML = header
+      + (isSalaried ? '<div style="color:var(--mid);font-size:12px;margin-bottom:10px;">Salaried — no overtime is worked out automatically. Use <b>Add overtime</b> on a day when they\'ve earned it.</div>' : '')
+      + (waiting ? '<button class="sp-btn-approve" style="padding:6px 12px;font-size:12px;margin-bottom:10px;" onclick="spApproveAll(\'' + spJsStr(spReportSelectedStaff) + '\')">Approve all suggested (' + waiting + ' day' + (waiting === 1 ? '' : 's') + ')</button>' : '')
+      + body;
     if (weeklyEl) {
       var weekly = spComputeWeeklyHours(personRows);
       weeklyEl.innerHTML = '<h3 style="margin:14px 0 8px;">Hours per week</h3><table class="sp-dash-table"><tr><th>Name</th><th>Week starting</th><th>Hours</th></tr>'
@@ -765,24 +752,164 @@ function spComputeWeeklyHours(rows) {
 // Approving a day saves the three figures typed in. Saving at all is what marks
 // a day as approved: the export only pays overtime on approved days, and lists
 // the rest under "Awaiting Approval".
-function spSaveOvertime(i) {
+// Saves day i using the boxes on screen if it's shown (they start filled with
+// the suggestion), otherwise the suggestion itself. Resolves to an error
+// message, or null when saved.
+function spSaveDay(i) {
   var r = spLastClockReportRows[i];
-  if (!r) return;
-  var read = function(id) {
-    var v = document.getElementById(id + i).value.trim();
+  if (!r) return Promise.resolve('Day not found.');
+  var pay = spDayPay(r), start = r.is_approved ? pay.paid : pay.suggest;
+  var read = function(id, fallback) {
+    var el = document.getElementById(id + i);
+    if (!el) return fallback;
+    var v = el.value.trim();
     return v === '' ? 0 : Number(v);
   };
-  var basic = read('spOtBasic'), half = read('spOtHalf'), dbl = read('spOtDouble');
-  if (![basic, half, dbl].every(function(n) { return isFinite(n) && n >= 0; })) { spToast('Enter hours as numbers, e.g. 1.5.'); return; }
+  var basic = read('spOtBasic', start.basic), half = read('spOtHalf', start.half), dbl = read('spOtDouble', start.dbl);
+  if (![basic, half, dbl].every(function(n) { return isFinite(n) && n >= 0; })) return Promise.resolve('Enter hours as numbers, e.g. 1.5.');
   var fullEl = document.getElementById('spOtFull' + i);
-  spRpc('sp_manager_set_day_pay', {
+  return spRpc('sp_manager_set_day_pay', {
     p_staff_name: r.name, p_work_date: r.work_date, p_hours_basic: basic, p_hours_time_half: half, p_hours_double: dbl,
     p_early_full_pay: fullEl ? fullEl.checked : !!r.early_full_pay
   }).then(function(res) {
-    if (!res.ok) { spToast((res.data && res.data.message) || 'Could not save overtime.'); return; }
-    spToast('Overtime approved.');
+    return res.ok ? null : ((res.data && res.data.message) || 'Could not save overtime.');
+  }, function() { return 'Connection error — try again.'; });
+}
+
+function spSaveOvertime(i) {
+  spSaveDay(i).then(function(err) {
+    if (err) { spToast(err); return; }
+    spToast('Saved.');
     spRenderClockReport();
   });
+}
+
+// Approves every waiting day (one person's, or everyone's when name is null)
+// as suggested. Days with no clock-out are skipped until the time is fixed.
+function spApproveAll(name) {
+  var list = [];
+  spLastClockReportRows.forEach(function(r, i) {
+    if ((!name || r.name === name) && r.clock_out && spDayNeedsApproval(r, spDayPay(r))) list.push(i);
+  });
+  if (!list.length) { spToast('Nothing to approve.'); return; }
+  if (!confirm('Approve ' + list.length + ' day' + (list.length === 1 ? '' : 's') + (name ? ' for ' + name : ' for everyone')
+    + ' as shown?\n\nWhere someone left early, it\'s taken off their overtime unless you\'ve picked Pay in full.')) return;
+  var failed = 0;
+  list.reduce(function(p, i) {
+    return p.then(function() { return spSaveDay(i).then(function(err) { if (err) failed++; }); });
+  }, Promise.resolve()).then(function() {
+    spToast(failed ? failed + ' day' + (failed === 1 ? '' : 's') + ' could not be saved — try again.' : 'Approved ' + list.length + ' day' + (list.length === 1 ? '' : 's') + '.');
+    spRenderClockReport();
+  });
+}
+
+// A day needs a manager to look at it if overtime is suggested, they left
+// early, the clock-out was automatic or is missing. Plain 07:00-16:00 days and
+// salaried staff's days don't.
+function spDayNeedsApproval(r, pay) {
+  if (r.is_approved || r.salaried) return false;
+  return !r.clock_out || pay.awaiting > 0 || pay.earlyMins > 0 || !!r.auto_clock_out;
+}
+
+// "1.5h basic, 2h @ 1.5" or "no overtime".
+function spOtSummary(s) {
+  var parts = [];
+  if (s.basic) parts.push(spNum(s.basic) + 'h basic');
+  if (s.half) parts.push(spNum(s.half) + 'h @ 1.5');
+  if (s.dbl) parts.push(spNum(s.dbl) + 'h @ 2');
+  return parts.length ? parts.join(', ') : 'no overtime';
+}
+
+function spToggleOtEdit(i) {
+  var el = document.getElementById('spOtEdit' + i);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// One day as a single line: date, times, what's suggested or approved, and
+// buttons. The hour boxes stay hidden until Change / Add overtime is pressed.
+function spOtDayHtml(r, i, showName) {
+  var pay = spDayPay(r);
+  var shown = r.is_approved ? pay.paid : pay.suggest;
+  var hasOt = shown.basic || shown.half || shown.dbl;
+  var times = (r.clock_in ? r.clock_in.slice(0, 5) : '—') + '–' + (r.clock_out ? r.clock_out.slice(0, 5) : '?')
+    + (r.hours != null ? ' · ' + spNum(r.hours) + 'h' : '');
+  var status;
+  if (r.salaried) status = r.is_approved && hasOt ? '<b style="color:var(--green);">Overtime added: ' + spOtSummary(shown) + '</b>' : '<span style="color:var(--mid);">Salaried</span>';
+  else if (r.is_approved) status = '<b style="color:var(--green);">Approved: ' + spOtSummary(shown) + '</b>';
+  else status = '<b>' + (hasOt ? '+' : '') + spOtSummary(shown) + '</b>';
+  var flags = [];
+  if (r.is_bank_holiday) flags.push('Bank holiday');
+  if (r.auto_clock_out) flags.push('Auto clock-out at 16:00 — they forgot to clock out');
+  if (!r.clock_out) flags.push('No clock-out — fix the time before approving');
+  var early = pay.earlyMins > 0
+    ? '<div style="margin-top:4px;font-size:12px;">Left ' + spFmtHoursMins(pay.earlyMins / 60) + ' early: '
+      + '<label style="white-space:nowrap;margin-right:8px;"><input type="radio" name="spOtEarly' + i + '"' + (r.early_full_pay ? '' : ' checked') + '> Take off overtime</label>'
+      + '<label style="white-space:nowrap;"><input type="radio" name="spOtEarly' + i + '" id="spOtFull' + i + '"' + (r.early_full_pay ? ' checked' : '') + '> Pay in full</label></div>'
+    : '';
+  var box = function(label, id, val) {
+    return '<label style="white-space:nowrap;margin-right:8px;">' + label + ' <input type="number" step="0.25" min="0" style="width:56px;" id="' + id + i + '" value="' + spNum(val) + '"></label>';
+  };
+  var btn = function(text, onclick, cls) {
+    return '<button class="' + (cls || 'sp-btn-approve') + '" style="padding:3px 10px;font-size:11px;margin-right:6px;" onclick="' + onclick + '">' + text + '</button>';
+  };
+  var buttons = '';
+  if (r.salaried) buttons = btn(r.is_approved && hasOt ? 'Change' : 'Add overtime', 'spToggleOtEdit(' + i + ')', 'sp-btn-decline');
+  else if (!r.is_approved) buttons = (r.clock_out ? btn('Approve', 'spSaveOvertime(' + i + ')') : '') + btn('Change', 'spToggleOtEdit(' + i + ')', 'sp-btn-decline');
+  else buttons = btn('Change', 'spToggleOtEdit(' + i + ')', 'sp-btn-decline');
+  var edit = '<div id="spOtEdit' + i + '" style="display:none;margin-top:6px;">'
+    + box('Basic', 'spOtBasic', shown.basic) + box('@ 1.5', 'spOtHalf', shown.half) + box('@ 2', 'spOtDouble', shown.dbl)
+    + btn('Save', 'spSaveOvertime(' + i + ')') + '</div>';
+  return '<div style="padding:9px 0;border-bottom:1px solid var(--row-alt);">'
+    + '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;align-items:center;">'
+    + '<span>' + (showName ? '<b>' + spEsc(r.name) + '</b> · ' : '') + spFmtPayDate(r.work_date) + ' · ' + times + ' · ' + status + '</span>'
+    + '<span>' + buttons + '</span></div>'
+    + (flags.length ? '<div style="font-size:12px;color:#ffcf7a;margin-top:3px;">' + flags.map(spEsc).join(' · ') + '</div>' : '')
+    + early + edit + '</div>';
+}
+
+// Everyone's days that need approving, grouped by person.
+function spOtToApproveHtml(rows) {
+  var byName = {}, order = [], total = 0;
+  rows.forEach(function(r, i) {
+    if (!spDayNeedsApproval(r, spDayPay(r))) return;
+    if (!byName[r.name]) { byName[r.name] = []; order.push(r.name); }
+    byName[r.name].push(i);
+    if (r.clock_out) total++;
+  });
+  var html = '<h3 style="margin:18px 0 6px;">Overtime to approve</h3>';
+  if (!order.length) return html + '<div style="color:var(--mid);font-size:12px;">Nothing waiting to approve this month.</div>';
+  html += '<div style="color:var(--mid);font-size:12px;margin-bottom:8px;">Normal 07:00–16:00 days and salaried staff aren\'t listed — there\'s nothing to approve.</div>';
+  if (total) html += '<button class="sp-btn-approve" style="padding:6px 12px;font-size:12px;margin-bottom:8px;" onclick="spApproveAll(null)">Approve everything as shown (' + total + ' day' + (total === 1 ? '' : 's') + ')</button>';
+  order.forEach(function(n) {
+    var ready = byName[n].filter(function(i) { return rows[i].clock_out; }).length;
+    html += '<div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><h4 style="margin:0;">' + spEsc(n) + '</h4>'
+      + (ready ? '<button class="sp-btn-approve" style="padding:3px 10px;font-size:11px;" onclick="spApproveAll(\'' + spJsStr(n) + '\')">Approve all for ' + spEsc(n) + '</button>' : '') + '</div>'
+      + byName[n].map(function(i) { return spOtDayHtml(rows[i], i, false); }).join('');
+  });
+  return html;
+}
+
+// One row per person for the month: approved overtime, left early, still
+// waiting. Salaried staff only appear once they have overtime added.
+function spOtTotalsHtml(rows) {
+  var byName = {}, order = [];
+  rows.forEach(function(r) {
+    var pay = spDayPay(r);
+    if (!byName[r.name]) { byName[r.name] = { salaried: !!r.salaried, basic: 0, half: 0, dbl: 0, early: 0, waiting: 0 }; order.push(r.name); }
+    var p = byName[r.name];
+    p.basic += pay.paid.basic; p.half += pay.paid.half; p.dbl += pay.paid.dbl;
+    p.early += pay.deductMins;
+    if (spDayNeedsApproval(r, pay)) p.waiting++;
+  });
+  var shown = order.filter(function(n) { var p = byName[n]; return !p.salaried || p.basic || p.half || p.dbl; });
+  if (!shown.length) return '';
+  return '<h3 style="margin:6px 0 6px;">This month so far</h3><table class="sp-dash-table"><tr><th>Name</th><th>Basic</th><th>@ 1.5</th><th>@ 2</th><th>Left early</th><th>Waiting</th></tr>'
+    + shown.map(function(n) {
+        var p = byName[n];
+        return '<tr><td>' + spEsc(n) + (p.salaried ? ' <span style="font-size:11px;color:var(--mid);">Salaried</span>' : '') + '</td><td>' + spNum(p.basic) + 'h</td><td>' + spNum(p.half) + 'h</td><td>' + spNum(p.dbl) + 'h</td><td>'
+          + (p.early ? spFmtHoursMins(p.early / 60) : '—') + '</td><td>' + (p.waiting ? '<b>' + p.waiting + ' day' + (p.waiting === 1 ? '' : 's') + '</b>' : '—') + '</td></tr>';
+      }).join('')
+    + '</table><div style="color:var(--mid);font-size:11px;margin-top:4px;">Basic, @ 1.5 and @ 2 are approved hours only. Left early is taken off basic in the export.</div>';
 }
 
 // "HH:MM[:SS...]" -> minutes past midnight, or null.
@@ -814,6 +941,9 @@ function spDayPay(r) {
   if (inM != null) inM = Math.floor(inM);
   if (outM != null) outM = Math.floor(outM);
   var morning = 0, evening = 0, earlyMins = 0;
+  // Salaried: nothing suggested and nothing taken off; a manager adds
+  // overtime by hand on the odd day they earn it.
+  if (r.salaried) kind = 'salaried';
   if (kind === 'week') {
     if (inM != null) morning = spRoundHalf(Math.max(0, 7 * 60 - inM));
     if (outM != null) {
@@ -821,7 +951,7 @@ function spDayPay(r) {
       if (!r.has_leave) earlyMins = Math.max(0, 16 * 60 - outM);
     }
   }
-  var worked = r.hours != null ? spRoundHalf(Number(r.hours) * 60) : 0;
+  var worked = r.hours != null && kind !== 'salaried' ? spRoundHalf(Number(r.hours) * 60) : 0;
   var suggest = {
     basic: morning + evening,
     half: (kind === 'sat' || kind === 'bh') ? worked : 0,
@@ -881,11 +1011,12 @@ var SP_LEAVE_LABELS = { sick: 'Sick', unpaid: 'Unpaid', holiday: 'Holiday', othe
 function spBuildPayPeople(rows, leave, from, to) {
   var byName = {};
   function person(name) {
-    if (!byName[name]) byName[name] = { name: name, days: [], leave: [], worked: 0, noOut: 0, basic: 0, half: 0, dbl: 0, earlyMins: 0, awaiting: 0, sick: 0, unpaid: 0 };
+    if (!byName[name]) byName[name] = { name: name, salaried: false, days: [], leave: [], worked: 0, noOut: 0, basic: 0, half: 0, dbl: 0, earlyMins: 0, awaiting: 0, sick: 0, unpaid: 0 };
     return byName[name];
   }
   rows.forEach(function(r) {
     var p = person(r.name), pay = spDayPay(r);
+    if (r.salaried) p.salaried = true;
     p.worked++;
     if (!r.clock_out) p.noOut++;
     p.basic += pay.paid.basic;
@@ -987,15 +1118,15 @@ function spClockReportWorkbook(rows, leave, from, to) {
     ['Staff overtime: ' + spFmtPeriod(from, to)],
     ['Only approved overtime is counted. Anything not yet approved is under Awaiting Approval.'],
     [],
-    ['Name', 'Basic Overtime', 'Overtime @ 1.5', 'Overtime @ 2', 'Sickness (days)', 'Unpaid Leave (days)',
+    ['Name', 'Pay Type', 'Basic Overtime', 'Overtime @ 1.5', 'Overtime @ 2', 'Sickness (days)', 'Unpaid Leave (days)',
      'Basic Before Deductions', 'Left Early', 'Awaiting Approval', 'Days Worked', 'Days Missing Clock-Out']
   ];
   people.forEach(function(p) {
-    summaryAoa.push([p.name, spNum(p.basicNet), spNum(p.half), spNum(p.dbl), spNum(p.sick), spNum(p.unpaid),
+    summaryAoa.push([p.name, p.salaried ? 'Salaried' : 'Overtime', spNum(p.basicNet), spNum(p.half), spNum(p.dbl), spNum(p.sick), spNum(p.unpaid),
       spNum(p.basic), spNum(p.early), spNum(p.awaiting), p.worked, p.noOut]);
   });
   var summarySheet = XLSX.utils.aoa_to_sheet(summaryAoa);
-  summarySheet['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 10 }, { wch: 17 }, { wch: 11 }, { wch: 22 }];
+  summarySheet['!cols'] = [{ wch: 24 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 10 }, { wch: 17 }, { wch: 11 }, { wch: 22 }];
 
   var daily = [];
   people.filter(function(p) { return p.days.length; }).forEach(function(p, i) {
@@ -1006,7 +1137,7 @@ function spClockReportWorkbook(rows, leave, from, to) {
         Name: r.name,
         Date: spFmtPayDate(r.work_date),
         'Clock In': r.clock_in ? r.clock_in.slice(0, 5) : '',
-        'Clock Out': r.clock_out ? r.clock_out.slice(0, 5) : '',
+        'Clock Out': r.clock_out ? r.clock_out.slice(0, 5) + (r.auto_clock_out ? ' (auto)' : '') : '',
         Hours: r.hours != null ? spNum(r.hours) : '',
         'Morning OT': pay.morning,
         'Evening OT': pay.evening,
@@ -1354,7 +1485,32 @@ function spLoadEditStaffList() {
 function spOnEditStaffChange() {
   spCurrentEditStaff = document.getElementById('spEditStaffSelect').value;
   document.getElementById('spEditStaffHistory').style.display = spCurrentEditStaff ? 'block' : 'none';
-  if (spCurrentEditStaff) spRenderStaffHistory();
+  if (spCurrentEditStaff) { spRenderStaffHistory(); spLoadPayType(spCurrentEditStaff); }
+}
+
+function spLoadPayType(name) {
+  var sel = document.getElementById('spEditPayType');
+  if (!sel) return;
+  sel.disabled = true;
+  spRpc('sp_manager_get_salaried', { p_staff_name: name }).then(function(res) {
+    if (spCurrentEditStaff !== name) return;
+    if (!res.ok || typeof res.data !== 'boolean') return; // stays disabled
+    sel.value = res.data ? 'salaried' : 'overtime';
+    sel.disabled = false;
+  });
+}
+
+function spSavePayType() {
+  var sel = document.getElementById('spEditPayType'), name = spCurrentEditStaff;
+  if (!sel || !name) return;
+  var salaried = sel.value === 'salaried';
+  sel.disabled = true;
+  spRpc('sp_manager_set_salaried', { p_staff_name: name, p_salaried: salaried }).then(function(res) {
+    sel.disabled = false;
+    if (!res.ok) { spToast((res.data && res.data.message) || 'Could not change pay type.'); sel.value = salaried ? 'overtime' : 'salaried'; return; }
+    spToast(name + ' is now ' + (salaried ? 'salaried.' : 'on overtime.'));
+    spRenderClockReport();
+  }, function() { sel.disabled = false; spToast('Connection error — try again.'); });
 }
 
 // Clears one person's password and gets a one-time setup code to pass on — it's
